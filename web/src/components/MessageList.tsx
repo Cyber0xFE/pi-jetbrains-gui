@@ -85,6 +85,7 @@ function MessageView({ message, previousAssistantModel, tools, thinkingLabel }: 
     .map((block) => block.text)
     .join("\n\n")
     .trim();
+  const canCopy = copyableText.length > 0 && !message.streaming;
 
   return (
     <article className={`message message-${message.role}`}>
@@ -101,14 +102,12 @@ function MessageView({ message, previousAssistantModel, tools, thinkingLabel }: 
       {message.stopReason === "error" && (
         <div className="message-error">{message.errorMessage ?? "the request failed"}</div>
       )}
-      {(showModel || copyableText.length > 0) && (
+      {showModel && (
         <footer className="message-footer">
-          {showModel && <span>{message.model}{message.streaming ? " · streaming" : ""}</span>}
-          {copyableText.length > 0 && !message.streaming && (
-            <CopyMessageButton text={copyableText} />
-          )}
+          <span>{message.model}{message.streaming ? " · streaming" : ""}</span>
         </footer>
       )}
+      {canCopy && <CopyMessageButton text={copyableText} />}
     </article>
   );
 }

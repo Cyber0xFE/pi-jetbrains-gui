@@ -247,6 +247,7 @@ body {
 }
 
 .message {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -279,13 +280,17 @@ body {
 }
 
 .message-copy {
-  margin-left: auto;
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
   border: 1px solid transparent;
   border-radius: 4px;
-  padding: 1px 6px;
-  background: transparent;
+  padding: 1px 5px;
+  background: var(--bg);
   color: var(--fg-dim);
   font: inherit;
+  font-size: 0.8em;
+  line-height: 1.2;
   cursor: pointer;
   opacity: 0;
   transition: opacity 120ms ease, background 120ms ease;
@@ -300,6 +305,12 @@ body {
   border-color: var(--border);
   background: var(--bg-raised);
   color: var(--fg);
+}
+
+.message-user .message-copy {
+  right: 5px;
+  bottom: 4px;
+  background: var(--bg-raised);
 }
 
 .latest-button {
