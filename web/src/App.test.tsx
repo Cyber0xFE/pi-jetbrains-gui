@@ -107,7 +107,7 @@ describe("App", () => {
     expect(screen.getByText("boom")).toBeDefined();
     expect(screen.getAllByText(/fake-model/).length).toBeGreaterThan(0);
     expect(screen.getByText(/1\.2%\/100k/)).toBeDefined();
-    expect(screen.getByRole("button", { name: "(auto)" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "(auto-compact)" })).toBeDefined();
     // The TUI-style footer sits below the composer, not above the transcript.
     const app = document.querySelector(".app");
     expect(app?.lastElementChild?.className).toContain("statusbar");

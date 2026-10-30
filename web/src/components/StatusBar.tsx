@@ -107,7 +107,7 @@ export function StatusBar({
             title="Automatic compaction when the context window fills up"
             aria-pressed={autoCompaction}
           >
-            {autoCompaction ? "(auto)" : "(manual)"}
+            {autoCompaction ? "(auto-compact)" : "(compact off)"}
           </button>
           {status.isCompacting && <span className="status-streaming">compacting…</span>}
           {(busy || status.isStreaming) && <span className="status-streaming">running…</span>}

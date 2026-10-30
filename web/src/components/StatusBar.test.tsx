@@ -51,7 +51,7 @@ describe("StatusBar", () => {
     expect(screen.getByText("CH99.4%")).toBeDefined();
     expect(screen.getByText("$0.043")).toBeDefined();
     expect(screen.getByText("35.9%/524k")).toBeDefined();
-    expect(screen.getByRole("button", { name: "(auto)" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "(auto-compact)" })).toBeDefined();
     expect(screen.getByText(/agent-plan\/deepseek-v4\.1-flash ▾/)).toBeDefined();
     expect(screen.getByRole("button", { name: "high ▾" })).toBeDefined();
   });
@@ -95,7 +95,7 @@ describe("StatusBar", () => {
     render(footer({ phase: "running", message: "ready", model: "m", contextWindow: 524_000, context: null }));
 
     expect(screen.getByText("?/524k")).toBeDefined();
-    expect(screen.getByRole("button", { name: "(auto)" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "(auto-compact)" })).toBeDefined();
   });
 
   it("warns and errors based on context usage, and shows (manual) when disabled", () => {
@@ -123,7 +123,7 @@ describe("StatusBar", () => {
       ),
     );
 
-    const autoButton = screen.getByRole("button", { name: "(auto)" });
+    const autoButton = screen.getByRole("button", { name: "(auto-compact)" });
     fireEvent.click(autoButton);
     expect(onToggleAutoCompaction).toHaveBeenCalledTimes(1);
   });
