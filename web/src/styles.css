@@ -1124,11 +1124,11 @@ body {
 }
 
 .composer-send-stop {
-  color: var(--fg);
+  color: var(--error);
 }
 
 .composer-send-stop:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--fg) 10%, transparent);
+  background: color-mix(in srgb, var(--error) 12%, transparent);
 }
 
 .button {

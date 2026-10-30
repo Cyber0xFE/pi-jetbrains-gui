@@ -212,8 +212,8 @@ export function Composer({
         />
         {busy ? (
           <button type="button" className="composer-send composer-send-stop" onClick={onAbort} title="Stop" aria-label="Stop">
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true">
-              <rect x="5" y="5" width="14" height="14" rx="2" />
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+              <rect x="4" y="4" width="16" height="16" rx="2" />
             </svg>
           </button>
         ) : (
