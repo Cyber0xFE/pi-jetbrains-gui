@@ -68,11 +68,7 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
       {connecting && (
         <div className="connecting-status" role="status" aria-label="正在连接服务">
           <span>正在连接服务</span>
-          <span className="connecting-dots" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </span>
+          <span className="connecting-ellipsis" aria-hidden="true" />
         </div>
       )}
       {showLatestButton && (
@@ -275,7 +271,10 @@ function BlockView({ block, tools, streaming, thinkingLabel }: BlockProps): JSX.
     case "thinking":
       return (
         <details className="thinking">
-          <summary>{thinkingLabel ?? (block.redacted ? "thinking (redacted)" : "thinking")}</summary>
+          <summary>
+            <span>{thinkingLabel ?? (block.redacted ? "thinking (redacted)" : "thinking")}</span>
+            {streaming && <span className="thinking-ellipsis" aria-hidden="true" />}
+          </summary>
           <pre>{block.text}</pre>
         </details>
       );
