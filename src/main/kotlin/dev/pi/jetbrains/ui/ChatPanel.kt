@@ -14,6 +14,7 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
 import dev.pi.jetbrains.PiChatService
+import dev.pi.jetbrains.PiSettings
 import dev.pi.jetbrains.editor.EditorNavigator
 import dev.pi.jetbrains.rpc.PiEvent
 import dev.pi.jetbrains.rpc.PiJson
@@ -46,6 +47,7 @@ import kotlinx.serialization.json.contentOrNull
 import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Component
+import java.awt.Toolkit
 import java.util.concurrent.LinkedBlockingQueue
 import javax.swing.JLabel
 import javax.swing.JPanel
@@ -134,6 +136,7 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
         scope.launch {
             service.events.collect { event ->
                 if (event is PiEvent.ExtensionUiRequest) handleExtensionUiRequest(event)
+                if (event is PiEvent.Session && event.type == "agent_settled") maybePlayTaskCompletionSound(event)
                 val record = toRecord(event) ?: return@collect
                 synchronized(hydrationLock) {
                     if (!hydrated) {
@@ -483,6 +486,14 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
             size += length
         }
         activeBridge.send(HostMessages.history(batch, final = true))
+    }
+
+    private fun maybePlayTaskCompletionSound(event: PiEvent.Session) {
+        val aborted = (event.payload["aborted"] as? JsonPrimitive)?.contentOrNull?.toBoolean() == true
+        if (aborted || !PiSettings.get().getState().taskCompletionSoundEnabled) return
+        ApplicationManager.getApplication().invokeLater {
+            runCatching { Toolkit.getDefaultToolkit().beep() }
+        }
     }
 
     private fun handleExtensionUiRequest(event: PiEvent.ExtensionUiRequest) {

@@ -16,6 +16,7 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         var approvalsEnabled: Boolean = false,
         var approveBash: Boolean = false,
         var approveWrite: Boolean = false,
+        var taskCompletionSoundEnabled: Boolean = true,
         var logDirectory: String = "",
     )
 

@@ -16,6 +16,7 @@ import javax.swing.JTextField
 class PiSettingsConfigurable : Configurable {
     private val nodePath = JTextField()
     private val logDirectory = JTextField()
+    private val taskCompletionSound = JCheckBox("Play a sound when a task is completed")
     private var panel: JPanel? = null
 
     override fun getDisplayName(): String = "pi"
@@ -36,6 +37,7 @@ class PiSettingsConfigurable : Configurable {
         result.add(nodePath, fieldConstraints)
         result.add(JLabel("Log directory (reserved for diagnostics):"), labelConstraints)
         result.add(logDirectory, fieldConstraints)
+        result.add(taskCompletionSound, fieldConstraints)
         panel = result
         reset()
         return result
@@ -43,19 +45,23 @@ class PiSettingsConfigurable : Configurable {
 
     override fun isModified(): Boolean {
         val state = PiSettings.get().getState()
-        return nodePath.text != state.nodePath || logDirectory.text != state.logDirectory
+        return nodePath.text != state.nodePath ||
+            logDirectory.text != state.logDirectory ||
+            taskCompletionSound.isSelected != state.taskCompletionSoundEnabled
     }
 
     override fun apply() {
         val state = PiSettings.get().getState()
         state.nodePath = nodePath.text.trim()
         state.logDirectory = logDirectory.text.trim()
+        state.taskCompletionSoundEnabled = taskCompletionSound.isSelected
     }
 
     override fun reset() {
         val state = PiSettings.get().getState()
         nodePath.text = state.nodePath
         logDirectory.text = state.logDirectory
+        taskCompletionSound.isSelected = state.taskCompletionSoundEnabled
     }
 
     override fun disposeUIResources() {
