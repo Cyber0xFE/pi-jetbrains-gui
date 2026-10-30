@@ -10,6 +10,7 @@ interface Props {
   loading: boolean;
   onClose: () => void;
   onNewSession: () => void;
+  onRename: (name: string) => void;
   onRefresh: () => void;
   onSwitch: (path: string) => void;
   onFork: (entryId: string) => void;
@@ -28,11 +29,14 @@ export function SessionDialog({
   loading,
   onClose,
   onNewSession,
+  onRename,
   onRefresh,
   onSwitch,
   onFork,
 }: Props): JSX.Element {
   const [tab, setTab] = useState<Tab>("sessions");
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
 
   const sessionItems = useMemo<PickerItem[]>(
     () =>
@@ -61,8 +65,22 @@ export function SessionDialog({
   );
 
   const items = tab === "sessions" ? sessionItems : treeItems;
+  const currentSession = sessions.find((session) => session.current);
+
+  const openRename = (): void => {
+    setRenameValue(currentSession?.name?.trim() ?? "");
+    setRenameOpen(true);
+  };
+
+  const submitRename = (): void => {
+    const name = renameValue.trim();
+    if (!name) return;
+    onRename(name);
+    setRenameOpen(false);
+  };
 
   return (
+    <>
     <Picker
       title={tab === "sessions" ? "Sessions" : "Session tree"}
       items={items}
@@ -93,6 +111,9 @@ export function SessionDialog({
           <button type="button" className="button button-secondary" onClick={onRefresh}>
             Refresh
           </button>
+          <button type="button" className="button button-secondary" onClick={openRename} disabled={!currentSession}>
+            Rename
+          </button>
           <button type="button" className="button" onClick={onNewSession}>
             New session
           </button>
@@ -104,5 +125,38 @@ export function SessionDialog({
       }}
       onClose={onClose}
     />
+    {renameOpen && (
+      <div className="overlay overlay-front" role="presentation">
+        <form
+          className="rename-dialog"
+          role="dialog"
+          aria-label="Rename session"
+          onSubmit={(event) => {
+            event.preventDefault();
+            submitRename();
+          }}
+        >
+          <h2 className="picker-title">Rename session</h2>
+          <input
+            autoFocus
+            className="picker-search rename-input"
+            value={renameValue}
+            maxLength={120}
+            placeholder="Session title"
+            onChange={(event) => setRenameValue(event.target.value)}
+          />
+          <div className="rename-hint">A title makes this session easier to find later.</div>
+          <footer className="picker-footer">
+            <button type="button" className="button button-secondary" onClick={() => setRenameOpen(false)}>
+              Cancel
+            </button>
+            <button type="submit" className="button" disabled={!renameValue.trim()}>
+              Save
+            </button>
+          </footer>
+        </form>
+      </div>
+    )}
+    </>
   );
 }

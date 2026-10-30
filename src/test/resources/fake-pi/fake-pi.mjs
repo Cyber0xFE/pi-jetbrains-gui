@@ -103,6 +103,9 @@ function handle(line) {
 		case "compact":
 			send({ id, type: "response", command: "compact", success: true, data: { tokensBefore: 1000, estimatedTokensAfter: 100 } });
 			return;
+		case "set_session_name":
+			send({ id, type: "response", command: "set_session_name", success: true });
+			return;
 		case "set_model":
 			send({
 				id,

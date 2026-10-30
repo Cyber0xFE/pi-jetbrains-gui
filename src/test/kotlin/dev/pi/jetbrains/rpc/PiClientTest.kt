@@ -167,6 +167,10 @@ class PiClientTest {
             .await().decodeDataAs<RpcForkResult>()
         assertEquals("original prompt", fork?.text)
         assertEquals(false, fork?.cancelled)
+
+        val renamed = client.send(RpcCommand(type = "set_session_name", name = "my session"))
+            .await()
+        assertTrue(renamed.success)
     }
 
     private fun startClient(

@@ -174,6 +174,16 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
                 val entryId = message.entryId ?: return
                 scope.launch { changeSession("fork") { service.fork(entryId) } }
             }
+            "rename_session" -> {
+                val name = message.name?.trim() ?: return
+                scope.launch {
+                    val response = request { service.setSessionName(name) }
+                    if (response?.success == true) {
+                        request { service.requestState() }
+                        sendSessions()
+                    }
+                }
+            }
 
             // ---- M3: model / thinking ----------------------------------------------------------
             "get_models" -> scope.launch { sendModels() }

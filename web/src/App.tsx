@@ -109,6 +109,7 @@ export function App(): JSX.Element {
         status={state.status}
         disabled={!ready}
         modelCount={state.models.length}
+        sessionFallback={state.sessions.find((session) => session.current)?.firstMessage}
         onOpenSessions={openSessions}
         onOpenModels={() => {
           post({ type: "get_models" });
@@ -187,6 +188,9 @@ export function App(): JSX.Element {
           onNewSession={() => {
             post({ type: "new_session" });
             closeDialog();
+          }}
+          onRename={(name) => {
+            post({ type: "rename_session", name });
           }}
           onRefresh={() => {
             post({ type: "list_sessions" });

@@ -1069,3 +1069,35 @@ body {
   color: var(--fg-dim);
   font-size: 0.82em;
 }
+
+.overlay-front {
+  z-index: 110;
+}
+
+.rename-dialog {
+  width: min(460px, 92vw);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+  padding-top: 12px;
+}
+
+.rename-dialog .picker-title,
+.rename-dialog .rename-hint {
+  margin-left: 14px;
+  margin-right: 14px;
+}
+
+.rename-dialog .picker-title {
+  margin-bottom: 4px;
+}
+
+.rename-input {
+  width: calc(100% - 20px);
+}
+
+.rename-hint {
+  color: var(--fg-dim);
+  font-size: 0.82em;
+}

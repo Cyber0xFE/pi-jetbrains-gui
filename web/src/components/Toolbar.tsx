@@ -4,6 +4,8 @@ interface Props {
   status: WireStatus;
   disabled: boolean;
   modelCount: number;
+  /** Current session's first user message, used before falling back to the id. */
+  sessionFallback?: string | null;
   onOpenSessions: () => void;
   onOpenModels: () => void;
   onOpenThinking: () => void;
@@ -25,6 +27,7 @@ export function Toolbar({
   status,
   disabled,
   modelCount,
+  sessionFallback,
   onOpenSessions,
   onOpenModels,
   onOpenThinking,
@@ -32,9 +35,7 @@ export function Toolbar({
   onCompact,
   onToggleAutoCompaction,
 }: Props): JSX.Element {
-  const sessionLabel = status.sessionName?.trim()
-    ? status.sessionName.trim()
-    : shortSessionId(status.sessionId);
+  const sessionLabel = status.sessionName?.trim() || sessionFallback?.trim() || shortSessionId(status.sessionId);
   const modelLabel = status.model ? `${status.provider ? `${status.provider}/` : ""}${status.model}` : "model";
   const thinkingVisible = status.reasoning !== false && status.thinkingLevel !== null && status.thinkingLevel !== undefined;
   const auto = status.autoCompaction !== false;

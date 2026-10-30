@@ -255,6 +255,8 @@ data class ClientMessage(
     val level: String? = null,
     val enabled: Boolean? = null,
     val entryId: String? = null,
+    /** Session title for `set_session_name`. */
+    val name: String? = null,
 )
 
 /** Encodes host messages with the shared RPC JSON settings. */

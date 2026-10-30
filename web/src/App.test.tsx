@@ -163,6 +163,34 @@ describe("App", () => {
     );
   });
 
+  it("renames the current session from the session picker", async () => {
+    render(<App />);
+    await waitFor(() => expect(window.__piDeliver).toBeDefined());
+
+    deliver(
+      {
+        type: "status",
+        status: { phase: "running", message: "ready", sessionId: "s1", sessionFile: "/p/s1.jsonl" },
+      },
+      {
+        type: "sessions",
+        sessions: [{ path: "/p/s1.jsonl", id: "s1", messageCount: 2, modified: 1, current: true }],
+      },
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "s1" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Rename" }));
+    const input = await screen.findByPlaceholderText("Session title");
+    fireEvent.change(input, { target: { value: "架构设计讨论" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(window.__piSent?.filter((message) => message.type === "rename_session")).toEqual([
+        { type: "rename_session", name: "架构设计讨论" },
+      ]),
+    );
+  });
+
   it("filters models and sets the selected one", async () => {
     render(<App />);
     await waitFor(() => expect(window.__piDeliver).toBeDefined());

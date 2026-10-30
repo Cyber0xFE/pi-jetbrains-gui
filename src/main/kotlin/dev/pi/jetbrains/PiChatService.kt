@@ -288,6 +288,9 @@ class PiChatService(private val project: Project) : Disposable {
     suspend fun fork(entryId: String): RpcResponse =
         requireClient().send(RpcCommand(type = "fork", entryId = entryId)).await()
 
+    suspend fun setSessionName(name: String): RpcResponse =
+        requireClient().send(RpcCommand(type = "set_session_name", name = name)).await()
+
     suspend fun sessionTree(): RpcResponse =
         requireClient().send(RpcCommand(type = "get_tree")).await()
 

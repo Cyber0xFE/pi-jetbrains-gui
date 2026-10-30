@@ -221,6 +221,7 @@ export type Outbound =
   | { type: "new_session" }
   | { type: "switch_session"; path: string }
   | { type: "fork"; entryId: string }
+  | { type: "rename_session"; name: string }
   // M3: model / thinking
   | { type: "get_models" }
   | { type: "set_model"; provider: string; modelId: string }
