@@ -22,7 +22,12 @@ class WebViewBridge(
     private val log: (String) -> Unit = {},
 ) : Disposable {
     private val query: JBCefJSQuery = JBCefJSQuery.create(browser as JBCefBrowserBase)
+
+    // send() is called from coroutine threads while markReady() runs on the EDT; the deque is
+    // not thread-safe, so all ready/pending access is guarded by this lock.
+    private val lock = Any()
     private val pending = ArrayDeque<JsonElement>()
+    @Volatile
     private var ready = false
 
     init {
@@ -48,22 +53,31 @@ class WebViewBridge(
 
     /** Called once the page reports it installed its message handler. */
     fun markReady() {
-        ready = true
-        while (pending.isNotEmpty()) {
-            execute(pending.removeFirst())
+        val queued: List<JsonElement>
+        synchronized(lock) {
+            ready = true
+            queued = pending.toList()
+            pending.clear()
         }
+        queued.forEach(::execute)
     }
 
     fun send(message: JsonElement) {
-        if (!ready) {
-            if (pending.size >= MAX_PENDING) {
-                log("dropping webview message: ${pending.size} already queued before the page was ready")
-                return
+        val executeNow = synchronized(lock) {
+            if (!ready) {
+                if (pending.size >= MAX_PENDING) {
+                    log("dropping webview message: ${pending.size} already queued before the page was ready")
+                    return
+                }
+                pending.addLast(message)
+                false
+            } else {
+                true
             }
-            pending.addLast(message)
-            return
         }
-        execute(message)
+        if (executeNow) {
+            execute(message)
+        }
     }
 
     private fun execute(message: JsonElement) {

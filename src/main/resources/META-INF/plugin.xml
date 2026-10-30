@@ -19,7 +19,7 @@
         <toolWindow
                 id="pi"
                 anchor="right"
-                icon="AllIcons.Toolwindows.ToolWindowMessages"
+                icon="/icons/toolWindowPi.png"
                 factoryClass="dev.pi.jetbrains.ui.ChatToolWindowFactory"/>
     </extensions>
 </idea-plugin>
