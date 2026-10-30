@@ -48,6 +48,8 @@ import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Component
 import java.awt.Toolkit
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import javax.swing.JLabel
 import javax.swing.JPanel
@@ -73,6 +75,9 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
     private val hydrationQueue = ArrayDeque<JsonElement>()
     private val hydrationLock = Any()
     private val hydrateMutex = Mutex()
+    private val soundExecutor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "pi-task-completion-sound").apply { isDaemon = true }
+    }
 
     /** Bumped on every reset so in-flight hydration and record batches from the old session drop. */
     private var generation = 0
@@ -491,7 +496,7 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
     private fun maybePlayTaskCompletionSound(event: PiEvent.Session) {
         val aborted = (event.payload["aborted"] as? JsonPrimitive)?.contentOrNull?.toBoolean() == true
         if (aborted || !PiSettings.get().getState().taskCompletionSoundEnabled) return
-        ApplicationManager.getApplication().invokeLater {
+        soundExecutor.execute {
             runCatching { Toolkit.getDefaultToolkit().beep() }
         }
     }
@@ -658,6 +663,7 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
         }
 
     override fun dispose() {
+        soundExecutor.shutdownNow()
         scope.cancel()
         browser?.let { Disposer.dispose(it) }
         browser = null
