@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { normalizeTaggedBlocks, type Block, type ChatMessage, type ToolState } from "../state/sessionReducer";
 import { Markdown } from "./Markdown";
 import { ToolCard } from "./tools/ToolCard";
@@ -16,6 +16,7 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
   const scroller = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const [showLatestButton, setShowLatestButton] = useState(false);
+  const toolStatesByMessage = useMessageToolStates(messages, tools);
 
   useEffect(() => {
     const element = scroller.current;
@@ -51,7 +52,7 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
         <div className="empty">{loadingHistory ? "loading transcript…" : emptyHint}</div>
       )}
       {messages.map((message, messageIndex) => (
-        <MessageView
+        <MemoMessageView
           key={message.id}
           message={message}
           previousAssistantModel={
@@ -60,6 +61,7 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
               : null
           }
           tools={tools}
+          toolStates={toolStatesByMessage.get(message.id) ?? EMPTY_TOOL_STATES}
           thinkingLabel={thinkingLabel}
         />
       ))}
@@ -86,6 +88,8 @@ interface MessageViewProps {
   message: ChatMessage;
   previousAssistantModel: string | null | undefined;
   tools: Record<string, ToolState>;
+  /** Stable references for the tool calls owned by this message. */
+  toolStates: readonly (ToolState | undefined)[];
   thinkingLabel: string | null;
 }
 
@@ -123,6 +127,92 @@ function MessageView({ message, previousAssistantModel, tools, thinkingLabel }: 
   );
 }
 
+/**
+ * Streaming updates replace only the active message object. Keep finished messages out of the
+ * render path; tool state is compared only for tool calls owned by this message (including nested
+ * calls), so an unrelated tool update does not repaint the whole transcript.
+ */
+const MemoMessageView = memo(MessageView, areMessageViewPropsEqual);
+
+function areMessageViewPropsEqual(previous: MessageViewProps, next: MessageViewProps): boolean {
+  if (
+    previous.message !== next.message ||
+    previous.previousAssistantModel !== next.previousAssistantModel ||
+    previous.thinkingLabel !== next.thinkingLabel ||
+    previous.toolStates !== next.toolStates
+  ) {
+    return false;
+  }
+  return true;
+}
+
+const EMPTY_TOOL_STATES: readonly (ToolState | undefined)[] = [];
+
+type CachedToolStates = {
+  callIds: string[];
+  states: readonly (ToolState | undefined)[];
+  message: ChatMessage;
+};
+
+/**
+ * Builds the tool dependencies once per store update instead of scanning every tool for every
+ * message inside React.memo comparators. The arrays for unaffected messages are reused, so their
+ * memoized views remain mounted while another message streams.
+ */
+function useMessageToolStates(
+  messages: ChatMessage[],
+  tools: Record<string, ToolState>,
+): Map<string, readonly (ToolState | undefined)[]> {
+  const cache = useRef(new Map<string, CachedToolStates>());
+  return useMemo(() => {
+    const children = new Map<string, string[]>();
+    for (const tool of Object.values(tools)) {
+      if (!tool.parentCallId) continue;
+      const siblings = children.get(tool.parentCallId) ?? [];
+      siblings.push(tool.callId);
+      children.set(tool.parentCallId, siblings);
+    }
+
+    const nextCache = new Map<string, CachedToolStates>();
+    const result = new Map<string, readonly (ToolState | undefined)[]>();
+    for (const message of messages) {
+      const callIds: string[] = [];
+      const seen = new Set<string>();
+      const pending = message.blocks
+        .filter((block): block is Extract<Block, { kind: "tool" }> => block.kind === "tool")
+        .map((block) => block.callId);
+      while (pending.length > 0) {
+        const callId = pending.shift();
+        if (typeof callId !== "string" || seen.has(callId)) continue;
+        seen.add(callId);
+        callIds.push(callId);
+        pending.push(...(children.get(callId) ?? []));
+      }
+
+      const previous = cache.current.get(message.id);
+      const states = previous && previous.message === message && sameToolStates(previous, callIds, tools)
+        ? previous.states
+        : callIds.map((callId) => tools[callId]);
+      nextCache.set(message.id, { callIds, states, message });
+      result.set(message.id, states);
+    }
+    cache.current = nextCache;
+    return result;
+  }, [messages, tools]);
+}
+
+function sameToolStates(
+  cached: CachedToolStates,
+  callIds: string[],
+  tools: Record<string, ToolState>,
+): boolean {
+  if (cached.callIds.length !== callIds.length) return false;
+  for (let index = 0; index < callIds.length; index += 1) {
+    const callId = callIds[index];
+    if (callId === undefined || cached.callIds[index] !== callId || cached.states[index] !== tools[callId]) return false;
+  }
+  return true;
+}
 
 function CopyMessageButton({ text }: { text: string }): JSX.Element {
   const [copied, setCopied] = useState(false);
