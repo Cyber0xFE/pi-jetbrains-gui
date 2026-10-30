@@ -104,7 +104,7 @@ describe("App", () => {
     expect(screen.getByText("streamed answer")).toBeDefined();
     expect(screen.getByText("file body")).toBeDefined();
     expect(screen.getByText("boom")).toBeDefined();
-    expect(screen.getByText(/fake-model/)).toBeDefined();
+    expect(screen.getAllByText(/fake-model/).length).toBeGreaterThan(0);
     expect(screen.getByText(/1\.2%\/100k \(auto\)/)).toBeDefined();
     // The TUI-style footer sits below the composer, not above the transcript.
     const app = document.querySelector(".app");
@@ -132,5 +132,123 @@ describe("App", () => {
       ]),
     );
     expect((input as HTMLTextAreaElement).value).toBe("");
+  });
+
+  it("lists sessions and switches to another one", async () => {
+    render(<App />);
+    await waitFor(() => expect(window.__piDeliver).toBeDefined());
+
+    deliver(
+      {
+        type: "status",
+        status: { phase: "running", message: "ready", sessionId: "s1", sessionFile: "/p/s1.jsonl" },
+      },
+      {
+        type: "sessions",
+        sessions: [
+          { path: "/p/s1.jsonl", id: "s1", messageCount: 2, modified: 1, current: true },
+          { path: "/p/s2.jsonl", id: "s2", messageCount: 4, modified: 2, current: false, firstMessage: "older session" },
+        ],
+      },
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "s1" }));
+    expect(await screen.findByRole("dialog", { name: "Sessions" })).toBeDefined();
+
+    fireEvent.click(screen.getByText("older session"));
+    await waitFor(() =>
+      expect(window.__piSent?.filter((message) => message.type === "switch_session")).toEqual([
+        { type: "switch_session", path: "/p/s2.jsonl" },
+      ]),
+    );
+  });
+
+  it("filters models and sets the selected one", async () => {
+    render(<App />);
+    await waitFor(() => expect(window.__piDeliver).toBeDefined());
+
+    deliver(
+      { type: "status", status: { phase: "running", message: "ready", provider: "openai", model: "gpt-5" } },
+      {
+        type: "models",
+        currentProvider: "openai",
+        currentModel: "gpt-5",
+        models: [
+          { id: "gpt-5", name: "GPT-5", provider: "openai", reasoning: true, contextWindow: 200_000 },
+          { id: "claude", name: "Claude", provider: "anthropic", contextWindow: 100_000 },
+        ],
+      },
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /openai\/gpt-5/ }));
+    const search = await screen.findByPlaceholderText("Filter models by name or provider…");
+    fireEvent.change(search, { target: { value: "claude" } });
+
+    expect(screen.queryByText(/GPT-5/)).toBeNull();
+    fireEvent.click(screen.getByText("Claude"));
+
+    await waitFor(() =>
+      expect(window.__piSent?.filter((message) => message.type === "set_model")).toEqual([
+        { type: "set_model", provider: "anthropic", modelId: "claude" },
+      ]),
+    );
+  });
+
+  it("changes the thinking level and shows retry controls", async () => {
+    render(<App />);
+    await waitFor(() => expect(window.__piDeliver).toBeDefined());
+
+    deliver(
+      {
+        type: "status",
+        status: {
+          phase: "running",
+          message: "ready",
+          model: "m",
+          reasoning: true,
+          thinkingLevel: "high",
+          retry: { attempt: 1, maxAttempts: 3, delayMs: 2000, errorMessage: "overloaded" },
+        },
+      },
+      { type: "thinking_levels", levels: ["off", "low", "high"], current: "high" },
+    );
+
+    expect(await screen.findByText(/retrying \(1\/3\)/)).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Abort retry" }));
+    await waitFor(() =>
+      expect(window.__piSent?.filter((message) => message.type === "abort_retry")).toEqual([{ type: "abort_retry" }]),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "high ▾" }));
+    fireEvent.click(await screen.findByText("low"));
+    await waitFor(() =>
+      expect(window.__piSent?.filter((message) => message.type === "set_thinking_level")).toEqual([
+        { type: "set_thinking_level", level: "low" },
+      ]),
+    );
+  });
+
+  it("completes slash commands in the composer", async () => {
+    render(<App />);
+    await waitFor(() => expect(window.__piDeliver).toBeDefined());
+
+    deliver(
+      { type: "status", status: { phase: "running", message: "ready", model: "m" } },
+      {
+        type: "commands",
+        commands: [
+          { name: "compact", description: "Compact the context", source: "extension" },
+          { name: "review", description: "Review the diff", source: "prompt" },
+        ],
+      },
+    );
+
+    const input = (await screen.findByPlaceholderText(/Send a message to pi/)) as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "/co" } });
+    expect(await screen.findByRole("listbox", { name: "Slash commands" })).toBeDefined();
+
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(input.value).toBe("/compact "));
+    expect(window.__piSent?.filter((message) => message.type === "prompt")).toEqual([]);
   });
 });

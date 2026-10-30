@@ -38,6 +38,85 @@ function handle(line) {
 				},
 			});
 			return;
+		case "get_available_models":
+			send({
+				id,
+				type: "response",
+				command: "get_available_models",
+				success: true,
+				data: {
+					models: [
+						{ id: "fake-model", name: "Fake Model", provider: "fake", reasoning: true, contextWindow: 200000 },
+						{ id: "other-model", name: "Other Model", provider: "fake", contextWindow: 64000 },
+					],
+				},
+			});
+			return;
+		case "get_available_thinking_levels":
+			send({ id, type: "response", command: "get_available_thinking_levels", success: true, data: { levels: ["off", "low", "high"] } });
+			return;
+		case "get_commands":
+			send({
+				id,
+				type: "response",
+				command: "get_commands",
+				success: true,
+				data: {
+					commands: [
+						{ name: "review", description: "Review the diff", source: "prompt", sourceInfo: { path: "/p/review.md" } },
+						{ name: "skill:draw", description: "Draw", source: "skill", sourceInfo: { path: "/p/skill.md" } },
+					],
+				},
+			});
+			return;
+		case "get_tree":
+			send({
+				id,
+				type: "response",
+				command: "get_tree",
+				success: true,
+				data: {
+					tree: [
+						{
+							entry: { type: "message", id: "entry-1", parentId: null, timestamp: "2025-10-30T00:00:00.000Z", message: { role: "user", content: "hi" } },
+							children: [
+								{
+									entry: { type: "message", id: "entry-2", parentId: "entry-1", timestamp: "2025-10-30T00:00:01.000Z", message: { role: "assistant", content: [{ type: "text", text: "hello" }] } },
+									children: [],
+								},
+							],
+						},
+					],
+					leafId: "entry-2",
+				},
+			});
+			return;
+		case "switch_session":
+			send({ id, type: "response", command: "switch_session", success: true, data: { cancelled: command.sessionPath === "cancel-me" } });
+			return;
+		case "new_session":
+			send({ id, type: "response", command: "new_session", success: true, data: { cancelled: false } });
+			return;
+		case "fork":
+			send({ id, type: "response", command: "fork", success: true, data: { text: "original prompt", cancelled: false } });
+			return;
+		case "compact":
+			send({ id, type: "response", command: "compact", success: true, data: { tokensBefore: 1000, estimatedTokensAfter: 100 } });
+			return;
+		case "set_model":
+			send({
+				id,
+				type: "response",
+				command: "set_model",
+				success: true,
+				data: { id: command.modelId, name: command.modelId, provider: command.provider },
+			});
+			return;
+		case "set_thinking_level":
+		case "set_auto_compaction":
+		case "abort_retry":
+			send({ id, type: "response", command: command.type, success: true });
+			return;
 		case "echo":
 			// A malformed record must be dropped by the client without breaking the stream.
 			process.stdout.write("this is not json\n");

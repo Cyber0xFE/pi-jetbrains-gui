@@ -117,12 +117,22 @@ export interface WireUsage {
 
 export type WirePhase = "stopped" | "starting" | "running" | "failed";
 
+/** Active automatic retry window (`auto_retry_start` … `auto_retry_end`). */
+export interface WireRetry {
+  attempt: number;
+  maxAttempts: number;
+  delayMs: number;
+  errorMessage?: string | null;
+}
+
 export interface WireStatus {
   phase: WirePhase;
   message: string;
   node?: string | null;
   pi?: string | null;
   sessionId?: string | null;
+  sessionFile?: string | null;
+  sessionName?: string | null;
   model?: string | null;
   provider?: string | null;
   reasoning?: boolean | null;
@@ -133,6 +143,50 @@ export interface WireStatus {
   usage?: UsageTotals | null;
   contextWindow?: number | null;
   context?: ContextUsage | null;
+  retry?: WireRetry | null;
+}
+
+/** One row of the session list (plan M3.2). */
+export interface SessionSummary {
+  path: string;
+  id: string;
+  name?: string | null;
+  cwd?: string | null;
+  created?: number | null;
+  modified: number;
+  messageCount: number;
+  firstMessage?: string | null;
+  parentSessionPath?: string | null;
+  current: boolean;
+}
+
+/** One flattened `get_tree` row (plan M3.3). */
+export interface TreeEntry {
+  id: string;
+  parentId?: string | null;
+  type: string;
+  role?: string | null;
+  label?: string | null;
+  text: string;
+  depth: number;
+  forkable: boolean;
+  active: boolean;
+}
+
+/** One row of the model picker (plan M3.4). */
+export interface ModelInfo {
+  id: string;
+  name?: string | null;
+  provider?: string | null;
+  reasoning?: boolean | null;
+  contextWindow?: number | null;
+}
+
+/** Slash command from `get_commands` (plan M3.8). */
+export interface SlashCommand {
+  name: string;
+  description?: string | null;
+  source: string;
 }
 
 export type NoticeLevel = "info" | "error";
@@ -142,7 +196,14 @@ export type Inbound =
   | { type: "status"; status: WireStatus }
   | { type: "records"; records: WireRecord[] }
   | { type: "history"; messages: WireMessage[]; final: boolean }
-  | { type: "notice"; level: NoticeLevel; message: string };
+  | { type: "notice"; level: NoticeLevel; message: string }
+  | { type: "sessions"; sessions: SessionSummary[] }
+  | { type: "session_tree"; entries: TreeEntry[]; leafId: string | null; sessionId: string | null }
+  | { type: "models"; models: ModelInfo[]; currentProvider: string | null; currentModel: string | null }
+  | { type: "thinking_levels"; levels: string[]; current: string | null }
+  | { type: "commands"; commands: SlashCommand[] }
+  | { type: "reset"; reason: string }
+  | { type: "prefill"; text: string };
 
 /** webview -> Kotlin. */
 export type Outbound =
@@ -153,4 +214,20 @@ export type Outbound =
   | { type: "request_state" }
   | { type: "open_path"; path: string; line?: number }
   | { type: "open_url"; url: string }
-  | { type: "log"; message: string };
+  | { type: "log"; message: string }
+  // M3: sessions
+  | { type: "list_sessions" }
+  | { type: "get_tree" }
+  | { type: "new_session" }
+  | { type: "switch_session"; path: string }
+  | { type: "fork"; entryId: string }
+  // M3: model / thinking
+  | { type: "get_models" }
+  | { type: "set_model"; provider: string; modelId: string }
+  | { type: "get_thinking_levels" }
+  | { type: "set_thinking_level"; level: string }
+  // M3: compaction / retry / slash commands
+  | { type: "compact" }
+  | { type: "set_auto_compaction"; enabled: boolean }
+  | { type: "abort_retry" }
+  | { type: "get_commands" };

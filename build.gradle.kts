@@ -63,7 +63,7 @@ intellijPlatform {
 
         description = """
             <p>Graphical front-end for the <code>pi</code> coding agent inside JetBrains IDEs.</p>
-            <p>M2: rich transcript rendering with per-tool cards, diffs, markdown and editor navigation.</p>
+            <p>M3: sessions, session tree with forks, model and thinking pickers, compaction, retries and slash commands.</p>
         """.trimIndent()
     }
 }

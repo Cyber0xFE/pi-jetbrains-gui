@@ -318,4 +318,86 @@ describe("sessionReducer", () => {
     expect(state.tools["call-h"]?.details).toEqual({ diff: "+1 changed", firstChangedLine: 1 });
     expect(state.tools["call-h"]?.status).toBe("done");
   });
+
+  it("clears the transcript when the session changes", () => {
+    const populated = apply(
+      initialState,
+      records(
+        assistantStart(),
+        { type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "old" }], timestamp: 1 } },
+        { type: "tool_execution_start", toolCallId: "c1", toolName: "read", args: {} },
+        { type: "agent_start" },
+      ),
+    );
+    expect(populated.messages).toHaveLength(1);
+    expect(populated.busy).toBe(true);
+
+    const state = apply(populated, { kind: "inbound", message: { type: "reset", reason: "switch" } });
+
+    expect(state.messages).toEqual([]);
+    expect(state.tools).toEqual({});
+    expect(state.busy).toBe(false);
+    expect(state.streamingMessageId).toBeNull();
+    expect(state.historyLoading).toBe(true);
+  });
+
+  it("stores sessions, tree, models, thinking levels and commands", () => {
+    const state = apply(
+      initialState,
+      {
+        kind: "inbound",
+        message: {
+          type: "sessions",
+          sessions: [{ path: "/p/a.jsonl", id: "a", messageCount: 1, modified: 1, current: true }],
+        },
+      },
+      {
+        kind: "inbound",
+        message: {
+          type: "session_tree",
+          leafId: "e2",
+          sessionId: "a",
+          entries: [
+            { id: "e1", type: "message", role: "user", text: "user: hi", depth: 0, forkable: true, active: true },
+            { id: "e2", type: "message", role: "assistant", text: "assistant: hello", depth: 1, forkable: false, active: true },
+          ],
+        },
+      },
+      {
+        kind: "inbound",
+        message: {
+          type: "models",
+          currentProvider: "p",
+          currentModel: "m1",
+          models: [{ id: "m1", provider: "p", reasoning: true }],
+        },
+      },
+      { kind: "inbound", message: { type: "thinking_levels", levels: ["off", "low"], current: "low" } },
+      {
+        kind: "inbound",
+        message: { type: "commands", commands: [{ name: "review", description: "Review", source: "prompt" }] },
+      },
+    );
+
+    expect(state.sessions).toHaveLength(1);
+    expect(state.sessionsLoading).toBe(false);
+    expect(state.tree.map((entry) => entry.id)).toEqual(["e1", "e2"]);
+    expect(state.treeLeafId).toBe("e2");
+    expect(state.models[0]?.id).toBe("m1");
+    expect(state.thinkingLevels).toEqual(["off", "low"]);
+    expect(state.commands[0]?.name).toBe("review");
+  });
+
+  it("reports compaction results as a notice", () => {
+    const state = apply(initialState, records({
+      type: "compaction_end",
+      reason: "manual",
+      aborted: false,
+      willRetry: false,
+      result: { summary: "s", firstKeptEntryId: "e1", tokensBefore: 150_000, estimatedTokensAfter: 32_000 },
+    }));
+
+    expect(state.notices[0]?.level).toBe("info");
+    expect(state.notices[0]?.message).toContain("150k → 32k");
+  });
 });

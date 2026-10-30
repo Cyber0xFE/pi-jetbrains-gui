@@ -1,6 +1,7 @@
 package dev.pi.jetbrains.rpc
 
 import dev.pi.jetbrains.runtime.CommandRunner
+import dev.pi.jetbrains.session.SessionTree
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -130,6 +131,42 @@ class PiClientTest {
 
         withTimeout(TIMEOUT_MS) { exited.await() }
         assertEquals(false, client.running.value)
+    }
+
+    @Test
+    fun `decodes M3 model, thinking, command and tree payloads`() = runBlocking {
+        val client = startClient()
+
+        val models = client.send(RpcCommand(type = "get_available_models"))
+            .await().decodeDataAs<RpcModelsData>()
+        assertEquals(listOf("fake-model", "other-model"), models?.models?.map { it.id })
+        assertEquals(true, models?.models?.first()?.reasoning)
+
+        val levels = client.send(RpcCommand(type = "get_available_thinking_levels"))
+            .await().decodeDataAs<RpcThinkingLevelsData>()
+        assertEquals(listOf("off", "low", "high"), levels?.levels)
+
+        val commands = client.send(RpcCommand(type = "get_commands"))
+            .await().decodeDataAs<RpcCommandsData>()
+        assertEquals(listOf("review", "skill:draw"), commands?.commands?.map { it.name })
+        assertEquals("skill", commands?.commands?.last()?.source)
+
+        val tree = client.send(RpcCommand(type = "get_tree")).await().decodeDataAs<RpcTreeData>()
+        assertEquals("entry-2", tree?.leafId)
+        val rows = SessionTree.flatten(tree?.tree.orEmpty(), tree?.leafId)
+        assertEquals(listOf("entry-1", "entry-2"), rows.map { it.id })
+        assertEquals("user: hi", rows.first().text)
+        assertTrue(rows.first().forkable)
+        assertTrue(rows.first().active && rows.last().active)
+
+        val cancelled = client.send(RpcCommand(type = "switch_session", sessionPath = "cancel-me"))
+            .await().decodeDataAs<RpcSwitchResult>()
+        assertEquals(true, cancelled?.cancelled)
+
+        val fork = client.send(RpcCommand(type = "fork", entryId = "entry-1"))
+            .await().decodeDataAs<RpcForkResult>()
+        assertEquals("original prompt", fork?.text)
+        assertEquals(false, fork?.cancelled)
     }
 
     private fun startClient(

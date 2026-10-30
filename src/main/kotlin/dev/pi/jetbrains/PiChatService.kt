@@ -20,6 +20,8 @@ import dev.pi.jetbrains.runtime.NodeResolution
 import dev.pi.jetbrains.runtime.NodeRuntimeResolver
 import dev.pi.jetbrains.runtime.PiPackageResolver
 import dev.pi.jetbrains.runtime.PiResolution
+import dev.pi.jetbrains.session.SessionIndex
+import dev.pi.jetbrains.session.SessionSummary
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -64,12 +66,22 @@ class PiChatService(private val project: Project) : Disposable {
         val cost: Double? = null,
     )
 
+    /** Active `auto_retry_start` … `auto_retry_end` window (plan M3.7). */
+    data class RetryInfo(
+        val attempt: Int,
+        val maxAttempts: Int,
+        val delayMs: Long,
+        val errorMessage: String? = null,
+    )
+
     data class Status(
         val phase: Phase = Phase.STOPPED,
         val message: String = "not started",
         val node: String? = null,
         val pi: String? = null,
         val sessionId: String? = null,
+        val sessionFile: String? = null,
+        val sessionName: String? = null,
         val model: String? = null,
         val provider: String? = null,
         val reasoning: Boolean? = null,
@@ -79,6 +91,7 @@ class PiChatService(private val project: Project) : Disposable {
         val autoCompaction: Boolean = true,
         val contextWindow: Long? = null,
         val context: StatusUsage? = null,
+        val retry: RetryInfo? = null,
     )
 
     private val _status = MutableStateFlow(Status())
@@ -125,7 +138,6 @@ class PiChatService(private val project: Project) : Disposable {
                 nodeRuntime.executable.toString(),
                 installation.cliEntry.toString(),
                 "--mode", "rpc",
-                "--no-session",
             )
 
             val process = PiProcess(
@@ -185,7 +197,7 @@ class PiChatService(private val project: Project) : Disposable {
             // Termination blocks until the process is gone, so keep it off the caller's thread.
             thread(name = "pi-stop", isDaemon = true) { active.close() }
         }
-        _status.update { it.copy(phase = Phase.STOPPED, message = "stopped") }
+        _status.update { it.copy(phase = Phase.STOPPED, message = "stopped", retry = null) }
     }
 
     /** Sends `get_state` and refreshes the status line. */
@@ -201,6 +213,8 @@ class PiChatService(private val project: Project) : Disposable {
                     phase = Phase.RUNNING,
                     message = "ready",
                     sessionId = state.sessionId,
+                    sessionFile = state.sessionFile,
+                    sessionName = state.sessionName,
                     model = state.model?.id,
                     provider = state.model?.provider,
                     reasoning = state.model?.reasoning,
@@ -255,6 +269,56 @@ class PiChatService(private val project: Project) : Disposable {
         return (data["messages"] as? JsonArray)?.toList() ?: emptyList()
     }
 
+    // ---------------------------------------------------------------------------------------------
+    // M3: sessions, models, thinking, compaction and retry
+    // ---------------------------------------------------------------------------------------------
+
+    /** Lists sessions of this project folder on disk; call from `Dispatchers.IO`. */
+    fun listSessions(): List<SessionSummary> {
+        val cwd = projectWorkDir() ?: return emptyList()
+        return SessionIndex.list(cwd)
+    }
+
+    suspend fun switchSession(sessionPath: String): RpcResponse =
+        requireClient().send(RpcCommand(type = "switch_session", sessionPath = sessionPath)).await()
+
+    suspend fun newSession(): RpcResponse =
+        requireClient().send(RpcCommand(type = "new_session")).await()
+
+    suspend fun fork(entryId: String): RpcResponse =
+        requireClient().send(RpcCommand(type = "fork", entryId = entryId)).await()
+
+    suspend fun sessionTree(): RpcResponse =
+        requireClient().send(RpcCommand(type = "get_tree")).await()
+
+    suspend fun availableModels(): RpcResponse =
+        requireClient().send(RpcCommand(type = "get_available_models")).await()
+
+    suspend fun setModel(provider: String, modelId: String): RpcResponse =
+        requireClient().send(RpcCommand(type = "set_model", provider = provider, modelId = modelId)).await()
+
+    suspend fun availableThinkingLevels(): RpcResponse =
+        requireClient().send(RpcCommand(type = "get_available_thinking_levels")).await()
+
+    suspend fun setThinkingLevel(level: String): RpcResponse =
+        requireClient().send(RpcCommand(type = "set_thinking_level", level = level)).await()
+
+    /** Compaction can take minutes on a large context (plan 5.3). */
+    suspend fun compact(customInstructions: String? = null): RpcResponse =
+        requireClient().send(
+            RpcCommand(type = "compact", customInstructions = customInstructions),
+            COMPACT_TIMEOUT,
+        ).await()
+
+    suspend fun setAutoCompaction(enabled: Boolean): RpcResponse =
+        requireClient().send(RpcCommand(type = "set_auto_compaction", enabled = enabled)).await()
+
+    suspend fun abortRetry(): RpcResponse =
+        requireClient().send(RpcCommand(type = "abort_retry")).await()
+
+    suspend fun slashCommands(): RpcResponse =
+        requireClient().send(RpcCommand(type = "get_commands")).await()
+
     override fun dispose() {
         stop()
         scope.cancel()
@@ -268,9 +332,9 @@ class PiChatService(private val project: Project) : Disposable {
         client = null
         _status.update {
             if (stoppedDeliberately) {
-                it.copy(phase = Phase.STOPPED, message = "stopped (code=$code)")
+                it.copy(phase = Phase.STOPPED, message = "stopped (code=$code)", retry = null)
             } else {
-                it.copy(phase = Phase.FAILED, message = "pi exited unexpectedly (code=$code)")
+                it.copy(phase = Phase.FAILED, message = "pi exited unexpectedly (code=$code)", retry = null)
             }
         }
     }
@@ -304,6 +368,28 @@ class PiChatService(private val project: Project) : Disposable {
             }
             "compaction_start" -> _status.update { it.copy(isCompacting = true) }
             "compaction_end" -> _status.update { it.copy(isCompacting = false) }
+            "session_info_changed" -> {
+                val name = (event.payload["name"] as? JsonPrimitive)?.contentOrNull
+                _status.update { it.copy(sessionName = name) }
+            }
+            "auto_retry_start" -> _status.update {
+                it.copy(
+                    retry = RetryInfo(
+                        attempt = (event.payload["attempt"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 0,
+                        maxAttempts = (event.payload["maxAttempts"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 0,
+                        delayMs = (event.payload["delayMs"] as? JsonPrimitive)?.contentOrNull?.toLongOrNull() ?: 0,
+                        errorMessage = (event.payload["errorMessage"] as? JsonPrimitive)?.contentOrNull,
+                    ),
+                )
+            }
+            "auto_retry_end" -> _status.update {
+                val success = (event.payload["success"] as? JsonPrimitive)?.contentOrNull?.toBoolean() ?: false
+                val finalError = (event.payload["finalError"] as? JsonPrimitive)?.contentOrNull
+                it.copy(
+                    retry = null,
+                    message = if (success) it.message else (finalError ?: it.message),
+                )
+            }
             "thinking_level_changed" -> {
                 val level = (event.payload["level"] as? JsonPrimitive)?.contentOrNull
                 if (level != null) _status.update { it.copy(thinkingLevel = level) }
@@ -339,5 +425,6 @@ class PiChatService(private val project: Project) : Disposable {
     companion object {
         private val LOG = Logger.getInstance(PiChatService::class.java)
         private val PLUGIN_ID = PluginId.getId("dev.pi.jetbrains")
+        private val COMPACT_TIMEOUT: Duration = Duration.ofSeconds(300)
     }
 }

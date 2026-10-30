@@ -2,7 +2,11 @@ import { toolResultParts } from "../tools/result";
 import type {
   AssistantDelta,
   Inbound,
+  ModelInfo,
   NoticeLevel,
+  SessionSummary,
+  SlashCommand,
+  TreeEntry,
   WireContent,
   WireImageContent,
   WireMessage,
@@ -89,6 +93,14 @@ export interface ChatState {
   cacheHitRate: number | null;
   /** `ctx.ui.setStatus()` texts, keyed by extension key. */
   extensionStatuses: Record<string, string>;
+  /** M3: project sessions, session tree, model + thinking pickers and slash commands. */
+  sessions: SessionSummary[];
+  sessionsLoading: boolean;
+  tree: TreeEntry[];
+  treeLeafId: string | null;
+  models: ModelInfo[];
+  thinkingLevels: string[];
+  commands: SlashCommand[];
 }
 
 export const initialState: ChatState = {
@@ -104,6 +116,13 @@ export const initialState: ChatState = {
   thinkingLabel: null,
   cacheHitRate: null,
   extensionStatuses: {},
+  sessions: [],
+  sessionsLoading: true,
+  tree: [],
+  treeLeafId: null,
+  models: [],
+  thinkingLevels: [],
+  commands: [],
 };
 
 export type Action =
@@ -139,7 +158,36 @@ function applyInbound(state: ChatState, message: Inbound): ChatState {
       return applyHistory(state, message.messages, message.final);
     case "notice":
       return withNotice(state, message.level, message.message);
+    case "sessions":
+      return { ...state, sessions: message.sessions, sessionsLoading: false };
+    case "session_tree":
+      return { ...state, tree: message.entries, treeLeafId: message.leafId };
+    case "models":
+      return { ...state, models: message.models };
+    case "thinking_levels":
+      return { ...state, thinkingLevels: message.levels };
+    case "commands":
+      return { ...state, commands: message.commands };
+    case "reset":
+      return resetTranscript(state);
+    case "prefill":
+      // The composer lives in App state, not the transcript reducer.
+      return state;
   }
+}
+
+/** A session switch started: drop everything that belonged to the previous transcript. */
+function resetTranscript(state: ChatState): ChatState {
+  return {
+    ...state,
+    messages: [],
+    tools: {},
+    streamingMessageId: null,
+    busy: false,
+    sending: false,
+    historyLoading: true,
+    cacheHitRate: null,
+  };
 }
 
 function applyRecord(state: ChatState, record: WireRecord): ChatState {
@@ -164,6 +212,8 @@ function applyRecord(state: ChatState, record: WireRecord): ChatState {
       return { ...state, busy: true, sending: false };
     case "agent_settled":
       return { ...state, busy: false, sending: false, streamingMessageId: null };
+    case "compaction_end":
+      return onCompactionEnd(state, record);
     case "response":
       return onResponse(state, record);
     default:
@@ -489,6 +539,23 @@ function attachToolResult(state: ChatState, message: WireMessage): ChatState {
       },
     },
   };
+}
+
+/** `compaction_end` carries the token delta; surface it as a short notice (plan M3.6). */
+function onCompactionEnd(state: ChatState, record: WireRecord): ChatState {
+  if (record.aborted === true) {
+    return withNotice(state, "error", "compaction was aborted");
+  }
+  const error = typeof record.errorMessage === "string" ? record.errorMessage : undefined;
+  if (error) return withNotice(state, "error", `compaction failed: ${error}`);
+  const result = record.result as Record<string, unknown> | undefined;
+  const before = typeof result?.tokensBefore === "number" ? result.tokensBefore : undefined;
+  const after = typeof result?.estimatedTokensAfter === "number" ? result.estimatedTokensAfter : undefined;
+  const detail =
+    before !== undefined && after !== undefined
+      ? `${Math.round(before / 1000)}k → ${Math.round(after / 1000)}k tokens`
+      : "context compacted";
+  return withNotice(state, "info", detail);
 }
 
 function onResponse(state: ChatState, record: WireRecord): ChatState {

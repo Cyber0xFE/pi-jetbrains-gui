@@ -3,6 +3,7 @@ package dev.pi.jetbrains.rpc
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 
 /**
@@ -118,4 +119,60 @@ data class RpcSessionStats(
     val tokens: RpcTokens? = null,
     val cost: Double? = null,
     val contextUsage: RpcContextUsage? = null,
+)
+
+/** `get_available_models` response data. */
+@Serializable
+data class RpcModelsData(val models: List<RpcModelInfo> = emptyList())
+
+/** `get_available_thinking_levels` response data. */
+@Serializable
+data class RpcThinkingLevelsData(val levels: List<String> = emptyList())
+
+/** One discoverable slash command from `get_commands` (plan M3.8). */
+@Serializable
+data class RpcSlashCommand(
+    val name: String,
+    val description: String? = null,
+    /** `extension`, `prompt` or `skill`. */
+    val source: String = "prompt",
+)
+
+/** `get_commands` response data. */
+@Serializable
+data class RpcCommandsData(val commands: List<RpcSlashCommand> = emptyList())
+
+/** One node of `get_tree`; `entry` stays opaque so session entry types can grow. */
+@Serializable
+data class RpcSessionTreeNode(
+    val entry: JsonObject = JsonObject(emptyMap()),
+    val children: List<RpcSessionTreeNode> = emptyList(),
+    val label: String? = null,
+    val labelTimestamp: String? = null,
+)
+
+/** `get_tree` response data. */
+@Serializable
+data class RpcTreeData(
+    val tree: List<RpcSessionTreeNode> = emptyList(),
+    val leafId: String? = null,
+)
+
+/** `switch_session` / `new_session` response data. */
+@Serializable
+data class RpcSwitchResult(val cancelled: Boolean = false)
+
+/** `fork` response data. */
+@Serializable
+data class RpcForkResult(
+    val text: String? = null,
+    val cancelled: Boolean = false,
+)
+
+/** Subset of the `compact` response data; the event stream carries the progress. */
+@Serializable
+data class RpcCompactionResult(
+    val tokensBefore: Long? = null,
+    val estimatedTokensAfter: Long? = null,
+    val summary: String? = null,
 )

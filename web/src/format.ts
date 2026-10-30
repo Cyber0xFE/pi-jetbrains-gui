@@ -14,3 +14,17 @@ export function formatTokens(count: number): string {
 export function formatCost(cost: number): string {
   return `$${cost.toFixed(3)}`;
 }
+
+/** Compact absolute timestamp for the session picker; empty for missing values. */
+export function formatWhen(epochMs: number | null | undefined): string {
+  if (epochMs === null || epochMs === undefined || epochMs <= 0) return "unknown time";
+  const date = new Date(epochMs);
+  if (Number.isNaN(date.getTime())) return "unknown time";
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
