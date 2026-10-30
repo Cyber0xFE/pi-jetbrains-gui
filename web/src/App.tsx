@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import type { PromptImage } from "./types";
 import { onMessage, post } from "./bridge";
 import { Composer } from "./components/Composer";
 import { MessageList } from "./components/MessageList";
@@ -16,6 +17,7 @@ export function App(): JSX.Element {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const [draft, setDraft] = useState("");
   const [dialog, setDialog] = useState<Dialog>(null);
+  const [images, setImages] = useState<PromptImage[]>([]);
 
   useEffect(() => {
     onMessage((message) => {
@@ -47,11 +49,12 @@ export function App(): JSX.Element {
 
   const send = useCallback(() => {
     const text = draft.trim();
-    if (text.length === 0) return;
-    post({ type: "prompt", message: text });
+    if (text.length === 0 && images.length === 0) return;
+    post({ type: "prompt", message: text, images: images.length > 0 ? images : undefined });
     store.dispatch({ kind: "submit" });
     setDraft("");
-  }, [draft, store]);
+    setImages([]);
+  }, [draft, images, store]);
 
   const abort = useCallback(() => post({ type: "abort" }), []);
 
@@ -125,6 +128,14 @@ export function App(): JSX.Element {
           post({ type: "set_auto_compaction", enabled: state.status.autoCompaction === false })
         }
       />
+      {state.status.pendingContext && (
+        <div className="contextbar" title={state.status.pendingContext}>
+          <span className="contextbar-icon">⌁</span>
+          <span className="contextbar-label">Editor context queued</span>
+          <span className="contextbar-value">{state.status.pendingContext}</span>
+          <span className="contextbar-hint">will be included in the next message</span>
+        </div>
+      )}
       {retry && (
         <div className="retrybar">
           <span className="retrybar-message">
@@ -153,6 +164,9 @@ export function App(): JSX.Element {
           ))}
         </div>
       )}
+      {Object.values(state.widgets).filter((widget) => widget.placement === "aboveEditor").map((widget, index) => (
+        <div className="extension-widget" key={`above:${index}`}>{widget.lines.map((line, lineIndex) => <div key={lineIndex}>{line}</div>)}</div>
+      ))}
       <MessageList
         messages={state.messages}
         tools={state.tools}
@@ -167,7 +181,13 @@ export function App(): JSX.Element {
         disabled={!ready || state.sending}
         busy={busy}
         commands={state.commands}
+        images={images}
+        onAddImage={(image) => setImages((current) => [...current, image].slice(-4))}
+        onRemoveImage={(index) => setImages((current) => current.filter((_, imageIndex) => imageIndex !== index))}
       />
+      {Object.values(state.widgets).filter((widget) => widget.placement === "belowEditor").map((widget, index) => (
+        <div className="extension-widget" key={`below:${index}`}>{widget.lines.map((line, lineIndex) => <div key={lineIndex}>{line}</div>)}</div>
+      ))}
       <StatusBar
         status={state.status}
         busy={state.busy}
@@ -175,7 +195,7 @@ export function App(): JSX.Element {
         extensionStatuses={state.extensionStatuses}
         onSend={send}
         onAbort={abort}
-        canSend={ready && !state.sending && draft.trim().length > 0}
+        canSend={ready && !state.sending && (draft.trim().length > 0 || images.length > 0)}
       />
 
       {dialog === "sessions" && (

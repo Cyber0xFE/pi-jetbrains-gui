@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { KeyboardEvent } from "react";
-import type { SlashCommand } from "../types";
+import type { ClipboardEvent, KeyboardEvent } from "react";
+import type { PromptImage, SlashCommand } from "../types";
 
 interface Props {
   value: string;
@@ -10,12 +10,25 @@ interface Props {
   busy: boolean;
   /** Discoverable commands from `get_commands` (plan M3.8). */
   commands: SlashCommand[];
+  images: PromptImage[];
+  onAddImage: (image: PromptImage) => void;
+  onRemoveImage: (index: number) => void;
 }
 
 const MAX_SUGGESTIONS = 8;
 
 /** The textarea plus the `/` command menu; sending is triggered by Enter or the footer button. */
-export function Composer({ value, onChange, onSend, disabled, busy, commands }: Props): JSX.Element {
+export function Composer({
+  value,
+  onChange,
+  onSend,
+  disabled,
+  busy,
+  commands,
+  images,
+  onAddImage,
+  onRemoveImage,
+}: Props): JSX.Element {
   const [highlight, setHighlight] = useState(0);
   const [dismissed, setDismissed] = useState(false);
   const rows = useRef<Array<HTMLButtonElement | null>>([]);
@@ -43,6 +56,22 @@ export function Composer({ value, onChange, onSend, disabled, busy, commands }: 
     if (!open) return;
     rows.current[highlight]?.scrollIntoView?.({ block: "nearest" });
   }, [highlight, open]);
+
+  const handlePaste = (event: ClipboardEvent<HTMLTextAreaElement>): void => {
+    for (const item of Array.from(event.clipboardData.items)) {
+      if (!item.type.startsWith("image/")) continue;
+      const file = item.getAsFile();
+      if (!file) continue;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = typeof reader.result === "string" ? reader.result : "";
+        const comma = result.indexOf(",");
+        if (comma >= 0) onAddImage({ mimeType: file.type, data: result.slice(comma + 1) });
+      };
+      reader.readAsDataURL(file);
+      event.preventDefault();
+    }
+  };
 
   const handleChange = (next: string): void => {
     setDismissed(false);
@@ -86,6 +115,18 @@ export function Composer({ value, onChange, onSend, disabled, busy, commands }: 
 
   return (
     <div className="composer">
+      {images.length > 0 && (
+        <div className="composer-images" aria-label="Attached images">
+          {images.map((image, index) => (
+            <div className="composer-image" key={`${image.mimeType}:${index}`}>
+              <img src={`data:${image.mimeType};base64,${image.data}`} alt={`Attachment ${index + 1}`} />
+              <button type="button" className="composer-image-remove" onClick={() => onRemoveImage(index)} aria-label="Remove image">
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       {open && (
         <div className="slash-menu" role="listbox" aria-label="Slash commands">
           {matches.map((command, index) => (
@@ -112,6 +153,7 @@ export function Composer({ value, onChange, onSend, disabled, busy, commands }: 
         className="composer-input"
         value={value}
         onChange={(event) => handleChange(event.target.value)}
+        onPaste={handlePaste}
         onKeyDown={handleKeyDown}
         placeholder={
           disabled

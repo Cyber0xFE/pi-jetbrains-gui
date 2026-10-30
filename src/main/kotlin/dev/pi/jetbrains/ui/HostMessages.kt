@@ -55,6 +55,7 @@ data class HostStatus(
     val usage: HostUsage? = null,
     val context: HostContextUsage? = null,
     val retry: HostRetry? = null,
+    val pendingContext: String? = null,
 ) {
     companion object {
         fun from(status: PiChatService.Status): HostStatus = HostStatus(
@@ -88,6 +89,7 @@ data class HostStatus(
             retry = status.retry?.let {
                 HostRetry(it.attempt, it.maxAttempts, it.delayMs, it.errorMessage)
             },
+            pendingContext = status.pendingContext,
         )
     }
 }
@@ -110,6 +112,21 @@ data class HostNoticeMessage(
     val type: String = "notice",
     val level: String = "error",
     val message: String,
+)
+
+@Serializable
+data class HostExtensionStatusMessage(
+    val type: String = "extension_status",
+    val key: String,
+    val text: String? = null,
+)
+
+@Serializable
+data class HostWidgetMessage(
+    val type: String = "widget",
+    val key: String,
+    val lines: List<String> = emptyList(),
+    val placement: String = "aboveEditor",
 )
 
 /** One session row for the session picker (plan M3.2). */
@@ -257,6 +274,14 @@ data class ClientMessage(
     val entryId: String? = null,
     /** Session title for `set_session_name`. */
     val name: String? = null,
+    /** Clipboard/editor images sent with a prompt. */
+    val images: List<ClientImage> = emptyList(),
+)
+
+@Serializable
+data class ClientImage(
+    val data: String,
+    val mimeType: String,
 )
 
 /** Encodes host messages with the shared RPC JSON settings. */
@@ -277,6 +302,18 @@ object HostMessages {
         PiJson.encodeToJsonElement(
             HostNoticeMessage.serializer(),
             HostNoticeMessage(level = level, message = message),
+        )
+
+    fun extensionStatus(key: String, text: String?): JsonElement =
+        PiJson.encodeToJsonElement(
+            HostExtensionStatusMessage.serializer(),
+            HostExtensionStatusMessage(key = key, text = text),
+        )
+
+    fun widget(key: String, lines: List<String>, placement: String): JsonElement =
+        PiJson.encodeToJsonElement(
+            HostWidgetMessage.serializer(),
+            HostWidgetMessage(key = key, lines = lines, placement = placement),
         )
 
     fun sessions(sessions: List<SessionSummary>, currentPath: String?): JsonElement =

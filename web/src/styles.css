@@ -699,12 +699,61 @@ body {
   color: var(--fg-dim);
 }
 
+.extension-widget {
+  flex: 0 0 auto;
+  padding: 5px 10px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-soft);
+  color: var(--fg-dim);
+  font-size: 0.84em;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .composer {
   flex: 0 0 auto;
   border-top: 1px solid var(--border);
   background: var(--bg-soft);
   padding: 8px 8px 0;
   display: flex;
+  flex-direction: column;
+}
+
+.composer-images {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 0 0 6px;
+}
+
+.composer-image {
+  position: relative;
+  width: 52px;
+  height: 52px;
+}
+
+.composer-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.composer-image-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+  line-height: 15px;
 }
 
 .composer-input {
@@ -822,6 +871,43 @@ body {
   color: var(--fg);
   font-weight: 600;
   max-width: 22ch;
+}
+
+.contextbar {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 7px;
+  align-items: baseline;
+  min-width: 0;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--fg-dim);
+  font-size: 0.84em;
+}
+
+.contextbar-icon {
+  color: var(--accent);
+  font-size: 1.1em;
+}
+
+.contextbar-label {
+  flex: 0 0 auto;
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.contextbar-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+}
+
+.contextbar-hint {
+  flex: 0 0 auto;
+  color: var(--fg-dim);
 }
 
 .retrybar {

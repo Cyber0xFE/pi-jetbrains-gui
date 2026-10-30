@@ -1,6 +1,8 @@
 package dev.pi.jetbrains.ui
 
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
@@ -15,6 +17,8 @@ import dev.pi.jetbrains.rpc.RpcCommandsData
 import dev.pi.jetbrains.rpc.RpcForkResult
 import dev.pi.jetbrains.rpc.RpcModelsData
 import dev.pi.jetbrains.rpc.RpcResponse
+import dev.pi.jetbrains.rpc.RpcExtensionUiResponse
+import dev.pi.jetbrains.rpc.RpcImage
 import dev.pi.jetbrains.rpc.RpcSwitchResult
 import dev.pi.jetbrains.rpc.RpcThinkingLevelsData
 import dev.pi.jetbrains.rpc.RpcTreeData
@@ -31,12 +35,18 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import java.awt.BorderLayout
 import java.awt.Component
 import java.util.concurrent.LinkedBlockingQueue
 import javax.swing.JLabel
 import javax.swing.JPanel
 import javax.swing.SwingConstants
+import javax.swing.JTextArea
+import javax.swing.JScrollPane
+import javax.swing.JOptionPane
 
 /**
  * JCEF host for the chat UI (plan M1).
@@ -108,6 +118,7 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
         }
         scope.launch {
             service.events.collect { event ->
+                if (event is PiEvent.ExtensionUiRequest) handleExtensionUiRequest(event)
                 val record = toRecord(event) ?: return@collect
                 synchronized(hydrationLock) {
                     if (!hydrated) {
@@ -144,7 +155,8 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
             }
             "prompt" -> {
                 val text = message.message?.takeIf { it.isNotBlank() } ?: return
-                scope.launch { request { service.prompt(text) } }
+                val images = message.images.map { RpcImage(data = it.data, mimeType = it.mimeType) }
+                scope.launch { request { service.prompt(text, images) } }
             }
             "abort" -> scope.launch { request { service.abort() } }
             "start" -> service.start()
@@ -419,6 +431,81 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
             size += length
         }
         activeBridge.send(HostMessages.history(batch, final = true))
+    }
+
+    private fun handleExtensionUiRequest(event: PiEvent.ExtensionUiRequest) {
+        val payload = event.payload
+        when (event.method) {
+            "select" -> ApplicationManager.getApplication().invokeLater {
+                val options = (payload["options"] as? kotlinx.serialization.json.JsonArray)
+                    ?.mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull }
+                    ?.toTypedArray() ?: emptyArray()
+                val result = Messages.showChooseDialog(
+                    payload.string("title") ?: "Select",
+                    "pi extension",
+                    options,
+                    options.firstOrNull(),
+                    Messages.getQuestionIcon(),
+                )
+                if (result >= 0 && result < options.size) respond(RpcExtensionUiResponse.Value(id = event.id, value = options[result]))
+                else respond(RpcExtensionUiResponse.Cancelled(id = event.id))
+            }
+            "confirm" -> ApplicationManager.getApplication().invokeLater {
+                val result = Messages.showYesNoDialog(
+                    payload.string("message") ?: "Allow this operation?",
+                    payload.string("title") ?: "Confirm",
+                    Messages.getQuestionIcon(),
+                )
+                respond(RpcExtensionUiResponse.Confirmation(id = event.id, confirmed = result == Messages.YES))
+            }
+            "input" -> ApplicationManager.getApplication().invokeLater {
+                val value = Messages.showInputDialog(
+                    payload.string("title") ?: "Input",
+                    "pi extension",
+                    Messages.getQuestionIcon(),
+                )
+                if (value == null) respond(RpcExtensionUiResponse.Cancelled(id = event.id))
+                else respond(RpcExtensionUiResponse.Value(id = event.id, value = value))
+            }
+            "editor" -> ApplicationManager.getApplication().invokeLater {
+                val area = JTextArea(payload.string("prefill") ?: "", 16, 72)
+                val result = JOptionPane.showConfirmDialog(
+                    this,
+                    JScrollPane(area),
+                    payload.string("title") ?: "Edit",
+                    JOptionPane.OK_CANCEL_OPTION,
+                    JOptionPane.PLAIN_MESSAGE,
+                )
+                if (result == JOptionPane.OK_OPTION) respond(RpcExtensionUiResponse.Value(id = event.id, value = area.text))
+                else respond(RpcExtensionUiResponse.Cancelled(id = event.id))
+            }
+            "notify" -> {
+                val notifyType = payload.string("notifyType")
+                bridge?.send(HostMessages.notice(payload.string("message") ?: "", if (notifyType == "error") "error" else "info"))
+            }
+            "setStatus" -> {
+                val key = payload.string("statusKey") ?: return
+                val text = payload.string("statusText")
+                bridge?.send(HostMessages.extensionStatus(key, text))
+            }
+            "setWidget" -> {
+                val key = payload.string("widgetKey") ?: return
+                val lines = (payload["widgetLines"] as? kotlinx.serialization.json.JsonArray)
+                    ?.mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull } ?: emptyList()
+                bridge?.send(HostMessages.widget(key, lines, payload.string("widgetPlacement") ?: "aboveEditor"))
+            }
+            "setTitle" -> payload.string("title")?.let { title ->
+                ApplicationManager.getApplication().invokeLater {
+                    val window = com.intellij.openapi.wm.ToolWindowManager.getInstance(project).getToolWindow("pi")
+                    window?.stripeTitle = title
+                }
+            }
+            "set_editor_text" -> payload.string("text")?.let { bridge?.send(HostMessages.prefill(it)) }
+        }
+    }
+
+    private fun respond(response: RpcExtensionUiResponse) {
+        scope.launch { runCatching { service.respondToExtensionUi(response) } }
     }
 
     private fun toRecord(event: PiEvent): JsonElement? = when (event) {

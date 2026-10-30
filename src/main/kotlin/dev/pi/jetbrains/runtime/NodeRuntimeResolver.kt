@@ -36,12 +36,14 @@ sealed interface NodeResolution {
 class NodeRuntimeResolver(
     private val minVersion: SemanticVersion = SemanticVersion(22, 19, 0),
     private val pathEnv: String? = System.getenv("PATH"),
+    private val configuredNode: Path? = null,
     private val bundledNode: Path? = null,
     private val runner: CommandRunner = CommandRunner.Default,
 ) {
     fun resolve(): NodeResolution {
         val attempts = mutableListOf<String>()
-        val candidates = pathCandidates() + listOfNotNull(bundledNode?.let { Candidate(it, "bundled") })
+        val candidates = listOfNotNull(configuredNode?.let { Candidate(it, "configured") }) +
+            pathCandidates() + listOfNotNull(bundledNode?.let { Candidate(it, "bundled") })
 
         for (candidate in candidates.distinctBy { it.executable.toAbsolutePath().normalize() }) {
             val raw = runner.run(listOf(candidate.executable.toString(), "-v"))

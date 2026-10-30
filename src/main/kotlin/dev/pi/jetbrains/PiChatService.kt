@@ -6,6 +6,8 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.wm.ToolWindowManager
+import com.intellij.openapi.application.ApplicationManager
 import dev.pi.jetbrains.editor.ToolFileRefresher
 import dev.pi.jetbrains.rpc.PiClient
 import dev.pi.jetbrains.rpc.PiEvent
@@ -13,6 +15,8 @@ import dev.pi.jetbrains.rpc.PiJson
 import dev.pi.jetbrains.rpc.PiProcess
 import dev.pi.jetbrains.rpc.RpcCommand
 import dev.pi.jetbrains.rpc.RpcResponse
+import dev.pi.jetbrains.rpc.RpcExtensionUiResponse
+import dev.pi.jetbrains.rpc.RpcImage
 import dev.pi.jetbrains.rpc.RpcSessionStats
 import dev.pi.jetbrains.rpc.decodeDataAs
 import dev.pi.jetbrains.rpc.sessionState
@@ -44,6 +48,8 @@ import kotlinx.serialization.json.contentOrNull
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.nio.file.StandardOpenOption
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.time.Duration
 import kotlin.concurrent.thread
 
@@ -92,6 +98,7 @@ class PiChatService(private val project: Project) : Disposable {
         val contextWindow: Long? = null,
         val context: StatusUsage? = null,
         val retry: RetryInfo? = null,
+        val pendingContext: String? = null,
     )
 
     private val _status = MutableStateFlow(Status())
@@ -105,6 +112,7 @@ class PiChatService(private val project: Project) : Disposable {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val fileRefresher = ToolFileRefresher(project)
+    private val queuedContext = ConcurrentLinkedQueue<String>()
     private var forwardJob: Job? = null
     private var startJob: Job? = null
 
@@ -118,10 +126,22 @@ class PiChatService(private val project: Project) : Disposable {
         if (_status.value.phase == Phase.STARTING || _status.value.phase == Phase.RUNNING) return
         stopRequested = false
         // Drop stats from a previous process so the footer never shows a stale session.
-        _status.update { Status(phase = Phase.STARTING, message = "resolving node and pi") }
+        _status.update {
+            Status(
+                phase = Phase.STARTING,
+                message = "resolving node and pi",
+                pendingContext = queuedContext.peek()?.let(::contextPreview),
+            )
+        }
 
         startJob = scope.launch {
-            val nodeRuntime = when (val node = NodeRuntimeResolver(bundledNode = bundledNodeBinary()).resolve()) {
+            val configuredNode = PiSettings.get().getState().nodePath.trim().takeIf { it.isNotEmpty() }?.let {
+                runCatching { Paths.get(it) }.getOrNull()
+            }
+            val nodeRuntime = when (val node = NodeRuntimeResolver(
+                bundledNode = bundledNodeBinary(),
+                configuredNode = configuredNode,
+            ).resolve()) {
                 is NodeResolution.NotFound -> return@launch fail(node.reason)
                 is NodeResolution.Found -> node
             }
@@ -134,20 +154,21 @@ class PiChatService(private val project: Project) : Disposable {
             }
 
             val workDir = projectWorkDir() ?: return@launch fail("project has no base directory")
+            // Keep GUI behavior consistent with pi TUI: tool calls are not intercepted by an
+            // approval extension. pi itself has no built-in approval gate.
             val command = listOf(
                 nodeRuntime.executable.toString(),
                 installation.cliEntry.toString(),
                 "--mode", "rpc",
             )
-
             val process = PiProcess(
                 command = command,
                 workDir = workDir,
-                log = { LOG.debug("[${project.name}] $it") },
+                log = { diagnosticLog("[${project.name}] $it") },
             )
             val newClient = PiClient(
                 process = process,
-                log = { LOG.debug(it) },
+                log = { diagnosticLog(it) },
                 onExit = ::onProcessExit,
             )
             client = newClient
@@ -229,9 +250,33 @@ class PiChatService(private val project: Project) : Disposable {
         return response
     }
 
-    /** Sends a prompt; the response only reports that it was accepted or queued. */
-    suspend fun prompt(message: String): RpcResponse =
-        requireClient().send(RpcCommand(type = "prompt", message = message)).await()
+    /** Sends a prompt; queued editor context is prepended only once. */
+    suspend fun prompt(message: String, images: List<RpcImage> = emptyList()): RpcResponse {
+        val context = queuedContext.poll()
+        _status.update { it.copy(pendingContext = null) }
+        val fullMessage = if (context.isNullOrBlank()) message else "$context\n\n$message"
+        return requireClient().send(
+            RpcCommand(type = "prompt", message = fullMessage, images = images.takeIf { it.isNotEmpty() }),
+        ).await()
+    }
+
+    fun queueContext(context: String) {
+        if (context.isBlank()) return
+        queuedContext.add(context)
+        _status.update { it.copy(pendingContext = contextPreview(context)) }
+    }
+
+    private fun contextPreview(context: String): String =
+        context.lineSequence().firstOrNull { it.isNotBlank() }?.trim()?.take(240) ?: "editor context"
+
+    fun respondToExtensionUi(response: RpcExtensionUiResponse): Boolean =
+        requireClient().respondToExtensionUi(response)
+
+    fun showToolWindow() {
+        ApplicationManager.getApplication().invokeLater {
+            ToolWindowManager.getInstance(project).getToolWindow("pi")?.show()
+        }
+    }
 
     suspend fun abort(): RpcResponse =
         requireClient().send(RpcCommand(type = "abort")).await()
@@ -342,7 +387,25 @@ class PiChatService(private val project: Project) : Disposable {
         }
     }
 
+    private fun diagnosticLog(message: String) {
+        LOG.debug(message)
+        val directory = PiSettings.get().getState().logDirectory.trim().takeIf { it.isNotEmpty() } ?: return
+        runCatching {
+            val path = Paths.get(directory).resolve("pi.log")
+            Files.createDirectories(path.parent)
+            Files.writeString(
+                path,
+                "${java.time.Instant.now()} $message${System.lineSeparator()}",
+                Charsets.UTF_8,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.APPEND,
+            )
+        }
+    }
+
     private fun fail(message: String) {
+        diagnosticLog(message)
         LOG.warn(message)
         _status.update { it.copy(phase = Phase.FAILED, message = message) }
     }

@@ -176,3 +176,19 @@ data class RpcCompactionResult(
     val estimatedTokensAfter: Long? = null,
     val summary: String? = null,
 )
+
+/** Responses to the RPC extension UI sub-protocol (not normal commands). */
+@Serializable
+sealed interface RpcExtensionUiResponse {
+    @Serializable
+    data class Value(val type: String = "extension_ui_response", val id: String, val value: String) :
+        RpcExtensionUiResponse
+
+    @Serializable
+    data class Confirmation(val type: String = "extension_ui_response", val id: String, val confirmed: Boolean) :
+        RpcExtensionUiResponse
+
+    @Serializable
+    data class Cancelled(val type: String = "extension_ui_response", val id: String, val cancelled: Boolean = true) :
+        RpcExtensionUiResponse
+}

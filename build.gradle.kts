@@ -63,7 +63,7 @@ intellijPlatform {
 
         description = """
             <p>Graphical front-end for the <code>pi</code> coding agent inside JetBrains IDEs.</p>
-            <p>M3: sessions, session tree with forks, model and thinking pickers, compaction, retries and slash commands.</p>
+            <p>M4: extension UI dialogs, editor context injection, clipboard images and diagnostics settings.</p>
         """.trimIndent()
     }
 }
@@ -132,4 +132,23 @@ sourceSets.main {
 
 tasks.named<ProcessResources>("processResources") {
     dependsOn(syncWebview)
+}
+
+// Protocol review utility. Set -PpiSourceDir=D:/workspace/pi when validating against a checkout.
+val dumpRpcSchema by tasks.registering(Exec::class) {
+    group = "verification"
+    description = "Snapshots pi's RPC declarations for protocol drift review."
+    val piSourceDir = providers.gradleProperty("piSourceDir").orElse("../pi")
+    val source = file("${piSourceDir.get()}/packages/coding-agent/src/modes/rpc/rpc-types.ts")
+    inputs.file(source)
+    outputs.file(layout.projectDirectory.file("rpc-schema.json"))
+    workingDir(projectDir)
+    commandLine(
+        "node", "--experimental-strip-types", "scripts/dump-rpc-schema.ts",
+        source.absolutePath, file("rpc-schema.json").absolutePath,
+    )
+}
+
+tasks.named("check") {
+    dependsOn(dumpRpcSchema)
 }

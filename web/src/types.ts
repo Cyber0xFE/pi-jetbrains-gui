@@ -125,6 +125,11 @@ export interface WireRetry {
   errorMessage?: string | null;
 }
 
+export interface PromptImage {
+  data: string;
+  mimeType: string;
+}
+
 export interface WireStatus {
   phase: WirePhase;
   message: string;
@@ -144,6 +149,7 @@ export interface WireStatus {
   contextWindow?: number | null;
   context?: ContextUsage | null;
   retry?: WireRetry | null;
+  pendingContext?: string | null;
 }
 
 /** One row of the session list (plan M3.2). */
@@ -203,13 +209,15 @@ export type Inbound =
   | { type: "thinking_levels"; levels: string[]; current: string | null }
   | { type: "commands"; commands: SlashCommand[] }
   | { type: "reset"; reason: string }
-  | { type: "prefill"; text: string };
+  | { type: "prefill"; text: string }
+  | { type: "widget"; key: string; lines: string[]; placement: "aboveEditor" | "belowEditor" }
+  | { type: "extension_status"; key: string; text: string | null };
 
 /** webview -> Kotlin. */
 export type Outbound =
   | { type: "ready" }
   | { type: "start" }
-  | { type: "prompt"; message: string }
+  | { type: "prompt"; message: string; images?: PromptImage[] }
   | { type: "abort" }
   | { type: "request_state" }
   | { type: "open_path"; path: string; line?: number }

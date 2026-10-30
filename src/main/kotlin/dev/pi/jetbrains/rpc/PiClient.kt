@@ -91,6 +91,16 @@ class PiClient(
         return deferred
     }
 
+    /** Sends a response to an extension_ui_request (it is not a normal RPC command). */
+    fun respondToExtensionUi(response: RpcExtensionUiResponse): Boolean {
+        val payload = when (response) {
+            is RpcExtensionUiResponse.Value -> PiJson.encodeToString(RpcExtensionUiResponse.Value.serializer(), response)
+            is RpcExtensionUiResponse.Confirmation -> PiJson.encodeToString(RpcExtensionUiResponse.Confirmation.serializer(), response)
+            is RpcExtensionUiResponse.Cancelled -> PiJson.encodeToString(RpcExtensionUiResponse.Cancelled.serializer(), response)
+        }
+        return process.writeLine(payload)
+    }
+
     /** Stops the child process; pending requests fail with [PiProcessExitedException]. */
     fun stop() {
         process.stop()

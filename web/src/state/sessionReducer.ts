@@ -93,6 +93,7 @@ export interface ChatState {
   cacheHitRate: number | null;
   /** `ctx.ui.setStatus()` texts, keyed by extension key. */
   extensionStatuses: Record<string, string>;
+  widgets: Record<string, { lines: string[]; placement: "aboveEditor" | "belowEditor" }>;
   /** M3: project sessions, session tree, model + thinking pickers and slash commands. */
   sessions: SessionSummary[];
   sessionsLoading: boolean;
@@ -116,6 +117,7 @@ export const initialState: ChatState = {
   thinkingLabel: null,
   cacheHitRate: null,
   extensionStatuses: {},
+  widgets: {},
   sessions: [],
   sessionsLoading: true,
   tree: [],
@@ -173,6 +175,18 @@ function applyInbound(state: ChatState, message: Inbound): ChatState {
     case "prefill":
       // The composer lives in App state, not the transcript reducer.
       return state;
+    case "extension_status": {
+      const extensionStatuses = { ...state.extensionStatuses };
+      if (message.text == null || message.text.trim().length === 0) delete extensionStatuses[message.key];
+      else extensionStatuses[message.key] = message.text;
+      return { ...state, extensionStatuses };
+    }
+    case "widget": {
+      const widgets = { ...state.widgets };
+      if (message.lines.length === 0) delete widgets[message.key];
+      else widgets[message.key] = { lines: message.lines, placement: message.placement };
+      return { ...state, widgets };
+    }
   }
 }
 
@@ -494,6 +508,19 @@ function onExtensionUiRequest(state: ChatState, record: WireRecord): ChatState {
       if (text === undefined) delete extensionStatuses[key];
       else extensionStatuses[key] = text;
       return { ...state, extensionStatuses };
+    }
+    case "setWidget": {
+      const key = typeof record.widgetKey === "string" ? record.widgetKey : undefined;
+      if (key === undefined) return state;
+      const rawLines = record.widgetLines;
+      const lines = Array.isArray(rawLines) ? rawLines.filter((line): line is string => typeof line === "string") : [];
+      const widgets = { ...state.widgets };
+      if (lines.length === 0) delete widgets[key];
+      else widgets[key] = {
+        lines,
+        placement: record.widgetPlacement === "belowEditor" ? "belowEditor" : "aboveEditor",
+      };
+      return { ...state, widgets };
     }
     default:
       return state;
