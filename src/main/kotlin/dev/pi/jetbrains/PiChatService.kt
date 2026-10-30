@@ -6,6 +6,12 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.editor.event.SelectionEvent
+import com.intellij.openapi.editor.event.SelectionListener
+import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.openapi.application.ApplicationManager
 import dev.pi.jetbrains.editor.ToolFileRefresher
@@ -49,7 +55,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
-import java.util.concurrent.ConcurrentLinkedQueue
 import java.time.Duration
 import kotlin.concurrent.thread
 
@@ -112,7 +117,13 @@ class PiChatService(private val project: Project) : Disposable {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val fileRefresher = ToolFileRefresher(project)
-    private val queuedContext = ConcurrentLinkedQueue<String>()
+    @Volatile
+    private var editorContext: String? = null
+    private val selectionListener = object : SelectionListener {
+        override fun selectionChanged(event: SelectionEvent) {
+            if (event.editor.project == project) updateEditorContext(event.editor)
+        }
+    }
     private var forwardJob: Job? = null
     private var startJob: Job? = null
 
@@ -122,6 +133,11 @@ class PiChatService(private val project: Project) : Disposable {
     @Volatile
     private var stopRequested = false
 
+    init {
+        EditorFactory.getInstance().eventMulticaster.addSelectionListener(selectionListener, this)
+        ApplicationManager.getApplication().invokeLater { refreshEditorContext() }
+    }
+
     fun start() {
         if (_status.value.phase == Phase.STARTING || _status.value.phase == Phase.RUNNING) return
         stopRequested = false
@@ -130,7 +146,7 @@ class PiChatService(private val project: Project) : Disposable {
             Status(
                 phase = Phase.STARTING,
                 message = "resolving node and pi",
-                pendingContext = queuedContext.peek()?.let(::contextPreview),
+                pendingContext = editorContext?.let(::contextPreview),
             )
         }
 
@@ -252,22 +268,65 @@ class PiChatService(private val project: Project) : Disposable {
 
     /** Sends a prompt; queued editor context is prepended only once. */
     suspend fun prompt(message: String, images: List<RpcImage> = emptyList()): RpcResponse {
-        val context = queuedContext.poll()
-        _status.update { it.copy(pendingContext = null) }
+        val context = editorContext
         val fullMessage = if (context.isNullOrBlank()) message else "$context\n\n$message"
         return requireClient().send(
             RpcCommand(type = "prompt", message = fullMessage, images = images.takeIf { it.isNotEmpty() }),
         ).await()
     }
 
-    fun queueContext(context: String) {
-        if (context.isBlank()) return
-        queuedContext.add(context)
-        _status.update { it.copy(pendingContext = contextPreview(context)) }
+    /** Updates the automatically attached editor selection context. */
+    fun setEditorContext(context: String?) {
+        editorContext = context?.takeIf { it.isNotBlank() }
+        _status.update { it.copy(pendingContext = editorContext?.let(::contextPreview)) }
     }
 
-    private fun contextPreview(context: String): String =
-        context.lineSequence().firstOrNull { it.isNotBlank() }?.trim()?.take(240) ?: "editor context"
+    /** Compatibility entry point for the explicit “Send to pi” action. */
+    fun queueContext(context: String) = setEditorContext(context)
+
+    fun clearEditorContext() = setEditorContext(null)
+
+    fun refreshEditorContext() {
+        FileEditorManager.getInstance(project).selectedTextEditor?.let(::updateEditorContext)
+            ?: setEditorContext(null)
+    }
+
+    private fun updateEditorContext(editor: Editor) {
+        val selection = editor.selectionModel
+        if (!selection.hasSelection()) {
+            setEditorContext(null)
+            return
+        }
+        val document = editor.document
+        val file = FileDocumentManager.getInstance().getFile(document)
+        if (file == null) {
+            setEditorContext(null)
+            return
+        }
+        val startOffset = selection.selectionStart
+        val endOffset = selection.selectionEnd.coerceAtMost(document.textLength)
+        val startLine = document.getLineNumber(startOffset)
+        val endLine = document.getLineNumber((endOffset - 1).coerceAtLeast(startOffset))
+        val path = project.basePath?.let { base ->
+            val basePath = Paths.get(base).toAbsolutePath().normalize()
+            val filePath = Paths.get(file.path).toAbsolutePath().normalize()
+            runCatching { basePath.relativize(filePath).toString().replace('\\', '/') }.getOrNull()
+        } ?: file.path
+        val unsaved = FileDocumentManager.getInstance().isDocumentUnsaved(document)
+        val context = buildString {
+            append("--- ").append(path).append(":").append(startLine + 1)
+            if (endLine != startLine) append("-").append(endLine + 1)
+            append(if (unsaved) " (buffer) ---\n" else " ---\n")
+            if (unsaved) append(document.getText(com.intellij.openapi.util.TextRange(startOffset, endOffset)))
+        }
+        setEditorContext(context)
+    }
+
+    private fun contextPreview(context: String): String {
+        val first = context.lineSequence().firstOrNull { it.isNotBlank() }?.trim()
+            ?: return "editor context"
+        return first.removePrefix("--- ").removeSuffix(" ---").take(240)
+    }
 
     fun respondToExtensionUi(response: RpcExtensionUiResponse): Boolean =
         requireClient().respondToExtensionUi(response)

@@ -239,4 +239,5 @@ export type Outbound =
   | { type: "compact" }
   | { type: "set_auto_compaction"; enabled: boolean }
   | { type: "abort_retry" }
-  | { type: "get_commands" };
+  | { type: "get_commands" }
+  | { type: "clear_context" };

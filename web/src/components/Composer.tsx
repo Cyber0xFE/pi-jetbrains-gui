@@ -10,6 +10,8 @@ interface Props {
   busy: boolean;
   /** Discoverable commands from `get_commands` (plan M3.8). */
   commands: SlashCommand[];
+  pendingContext?: string | null;
+  onClearContext: () => void;
   images: PromptImage[];
   onAddImage: (image: PromptImage) => void;
   onRemoveImage: (index: number) => void;
@@ -25,6 +27,8 @@ export function Composer({
   disabled,
   busy,
   commands,
+  pendingContext,
+  onClearContext,
   images,
   onAddImage,
   onRemoveImage,
@@ -115,6 +119,16 @@ export function Composer({
 
   return (
     <div className="composer">
+      {pendingContext && (
+        <div className="context-attachment" title={pendingContext}>
+          <span className="context-attachment-icon">⌁</span>
+          <span className="context-attachment-label">{pendingContext}</span>
+          <span className="context-attachment-hint">selected code</span>
+          <button type="button" className="context-attachment-remove" onClick={onClearContext} aria-label="Remove selected code context">
+            ×
+          </button>
+        </div>
+      )}
       {images.length > 0 && (
         <div className="composer-images" aria-label="Attached images">
           {images.map((image, index) => (

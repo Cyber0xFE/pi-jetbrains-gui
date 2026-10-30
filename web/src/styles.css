@@ -720,6 +720,55 @@ body {
   flex-direction: column;
 }
 
+.context-attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  max-width: 100%;
+  margin-bottom: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.84em;
+}
+
+.context-attachment-icon {
+  color: var(--accent);
+  font-size: 1.15em;
+}
+
+.context-attachment-label {
+  max-width: 34ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+}
+
+.context-attachment-hint {
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+
+.context-attachment-remove {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+  font-size: 1.1em;
+  line-height: 16px;
+}
+
+.context-attachment-remove:hover {
+  color: var(--fg);
+}
+
 .composer-images {
   display: flex;
   gap: 6px;

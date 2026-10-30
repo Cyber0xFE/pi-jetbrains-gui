@@ -128,14 +128,6 @@ export function App(): JSX.Element {
           post({ type: "set_auto_compaction", enabled: state.status.autoCompaction === false })
         }
       />
-      {state.status.pendingContext && (
-        <div className="contextbar" title={state.status.pendingContext}>
-          <span className="contextbar-icon">⌁</span>
-          <span className="contextbar-label">Editor context queued</span>
-          <span className="contextbar-value">{state.status.pendingContext}</span>
-          <span className="contextbar-hint">will be included in the next message</span>
-        </div>
-      )}
       {retry && (
         <div className="retrybar">
           <span className="retrybar-message">
@@ -181,6 +173,8 @@ export function App(): JSX.Element {
         disabled={!ready || state.sending}
         busy={busy}
         commands={state.commands}
+        pendingContext={state.status.pendingContext}
+        onClearContext={() => post({ type: "clear_context" })}
         images={images}
         onAddImage={(image) => setImages((current) => [...current, image].slice(-4))}
         onRemoveImage={(index) => setImages((current) => current.filter((_, imageIndex) => imageIndex !== index))}
