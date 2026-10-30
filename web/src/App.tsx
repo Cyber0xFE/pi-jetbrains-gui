@@ -19,9 +19,26 @@ export function App(): JSX.Element {
   const [draft, setDraft] = useState("");
   const [dialog, setDialog] = useState<Dialog>(null);
   const [images, setImages] = useState<PromptImage[]>([]);
+  const [pendingPrompt, setPendingPrompt] = useState(false);
 
   useEffect(() => {
     onMessage((message) => {
+      // Keep the optimistic connection hint visible until pi actually starts handling the
+      // prompt. The first SSE record is often only the echoed user message, so clearing here
+      // would recreate the blank gap before agent_start / the assistant stream.
+      if (message.type === "records") {
+        const responseStarted = message.records.some(
+          (record) =>
+            record.type === "agent_start" ||
+            (record.type === "message_start" && record.message?.role === "assistant") ||
+            record.type === "message_update",
+        );
+        const requestFailed = message.records.some(
+          (record) => record.type === "response" && record.command === "prompt" && record.success === false,
+        );
+        if (responseStarted || requestFailed) window.requestAnimationFrame(() => setPendingPrompt(false));
+      }
+      if (message.type === "reset") setPendingPrompt(false);
       // `prefill` seeds the composer (fork returns the original user message text).
       if (message.type === "prefill") {
         setDraft(message.text);
@@ -71,8 +88,9 @@ export function App(): JSX.Element {
   const send = useCallback(() => {
     const text = draft.trim();
     if (text.length === 0 && images.length === 0) return;
-    post({ type: "prompt", message: text, images: images.length > 0 ? images : undefined });
+    setPendingPrompt(true);
     store.dispatch({ kind: "submit" });
+    post({ type: "prompt", message: text, images: images.length > 0 ? images : undefined });
     setDraft("");
     setImages([]);
   }, [draft, images, store]);
@@ -185,6 +203,7 @@ export function App(): JSX.Element {
         loadingHistory={state.historyLoading}
         emptyHint={ready ? "Ask pi about this project…" : state.status.message}
         thinkingLabel={state.thinkingLabel}
+        connecting={pendingPrompt || (state.sending && !state.busy)}
       />
       <Composer
         value={draft}

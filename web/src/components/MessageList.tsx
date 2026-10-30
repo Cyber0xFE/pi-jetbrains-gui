@@ -9,9 +9,10 @@ interface Props {
   loadingHistory: boolean;
   emptyHint: string;
   thinkingLabel: string | null;
+  connecting: boolean;
 }
 
-export function MessageList({ messages, tools, loadingHistory, emptyHint, thinkingLabel }: Props): JSX.Element {
+export function MessageList({ messages, tools, loadingHistory, emptyHint, thinkingLabel, connecting }: Props): JSX.Element {
   const scroller = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const [showLatestButton, setShowLatestButton] = useState(false);
@@ -46,7 +47,7 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
       aria-live="polite"
       aria-label="pi conversation"
     >
-      {messages.length === 0 && (
+      {messages.length === 0 && !connecting && (
         <div className="empty">{loadingHistory ? "loading transcript…" : emptyHint}</div>
       )}
       {messages.map((message, messageIndex) => (
@@ -62,6 +63,16 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
           thinkingLabel={thinkingLabel}
         />
       ))}
+      {connecting && (
+        <div className="connecting-status" role="status" aria-label="正在连接服务">
+          <span>正在连接服务</span>
+          <span className="connecting-dots" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+        </div>
+      )}
       {showLatestButton && (
         <button type="button" className="latest-button" onClick={scrollToLatest}>
           ↓ 回到最新

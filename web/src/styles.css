@@ -867,6 +867,46 @@ body {
   color: var(--fg-dim);
 }
 
+.connecting-status {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 7px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: linear-gradient(90deg, var(--bg-soft), transparent 85%);
+  color: var(--fg-dim);
+}
+
+.connecting-dots {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  height: 1em;
+}
+
+.connecting-dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: connecting-dot 1.2s ease-in-out infinite;
+}
+
+.connecting-dots i:nth-child(2) {
+  animation-delay: 160ms;
+}
+
+.connecting-dots i:nth-child(3) {
+  animation-delay: 320ms;
+}
+
+@keyframes connecting-dot {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+
 .extension-widget {
   flex: 0 0 auto;
   padding: 5px 10px;
@@ -1549,8 +1589,13 @@ body {
   .message,
   .button,
   .status-model,
-  .composer-input {
+  .composer-input,
+  .connecting-dots i {
     animation: none;
     transition: none;
+  }
+
+  .connecting-dots i {
+    opacity: 0.65;
   }
 }
