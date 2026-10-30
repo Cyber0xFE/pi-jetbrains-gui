@@ -14,7 +14,7 @@
         <projectService serviceImplementation="dev.pi.jetbrains.PiChatService"/>
         <applicationConfigurable instance="dev.pi.jetbrains.ui.PiSettingsConfigurable"/>
         <toolWindow
-                id="pi"
+                id="Pi"
                 anchor="right"
                 icon="/icons/toolWindowPi.png"
                 factoryClass="dev.pi.jetbrains.ui.ChatToolWindowFactory"/>

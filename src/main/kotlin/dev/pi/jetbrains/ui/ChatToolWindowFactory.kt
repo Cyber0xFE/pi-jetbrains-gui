@@ -10,7 +10,7 @@ import com.intellij.ui.content.ContentFactory
 class ChatToolWindowFactory : ToolWindowFactory {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val panel = ChatPanel(project)
-        val content = ContentFactory.getInstance().createContent(panel, "pi", false)
+        val content = ContentFactory.getInstance().createContent(panel, "Chat", false)
         toolWindow.contentManager.addContent(content)
         Disposer.register(content, panel)
     }

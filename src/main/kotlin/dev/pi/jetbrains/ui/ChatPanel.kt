@@ -564,7 +564,7 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
             }
             "setTitle" -> payload.string("title")?.let { title ->
                 ApplicationManager.getApplication().invokeLater {
-                    val window = com.intellij.openapi.wm.ToolWindowManager.getInstance(project).getToolWindow("pi")
+                    val window = com.intellij.openapi.wm.ToolWindowManager.getInstance(project).getToolWindow("Pi")
                     window?.stripeTitle = title
                 }
             }

@@ -361,7 +361,7 @@ class PiChatService(private val project: Project) : Disposable {
 
     fun showToolWindow() {
         ApplicationManager.getApplication().invokeLater {
-            ToolWindowManager.getInstance(project).getToolWindow("pi")?.show()
+            ToolWindowManager.getInstance(project).getToolWindow("Pi")?.show()
         }
     }
 

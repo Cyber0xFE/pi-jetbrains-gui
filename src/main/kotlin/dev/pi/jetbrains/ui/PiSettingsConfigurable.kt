@@ -16,10 +16,10 @@ import javax.swing.JTextField
 class PiSettingsConfigurable : Configurable {
     private val nodePath = JTextField()
     private val logDirectory = JTextField()
-    private val taskCompletionSound = JCheckBox("Play a sound when a task is completed")
+    private val taskCompletionSound = JCheckBox("任务完成时播放声音")
     private var panel: JPanel? = null
 
-    override fun getDisplayName(): String = "pi"
+    override fun getDisplayName(): String = "Pi"
 
     override fun createComponent(): JComponent {
         val result = JPanel(GridBagLayout())
@@ -33,9 +33,9 @@ class PiSettingsConfigurable : Configurable {
             weightx = 1.0
             insets = Insets(4, 4, 4, 4)
         }
-        result.add(JLabel("Node.js path (optional):"), labelConstraints)
+        result.add(JLabel("Node.js 路径（可选）："), labelConstraints)
         result.add(nodePath, fieldConstraints)
-        result.add(JLabel("Log directory (reserved for diagnostics):"), labelConstraints)
+        result.add(JLabel("日志目录（仅用于诊断）："), labelConstraints)
         result.add(logDirectory, fieldConstraints)
         result.add(taskCompletionSound, fieldConstraints)
         panel = result
