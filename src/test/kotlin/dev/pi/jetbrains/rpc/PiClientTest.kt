@@ -1,0 +1,175 @@
+package dev.pi.jetbrains.rpc
+
+import dev.pi.jetbrains.runtime.CommandRunner
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assumptions.assumeTrue
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.nio.file.Files
+import java.nio.file.Path
+import java.time.Duration
+import kotlin.test.assertFailsWith
+
+/** Drives [PiClient] against a scripted node process; no LLM involved (plan 9.3). */
+class PiClientTest {
+    @TempDir
+    lateinit var tempDir: Path
+
+    private var client: PiClient? = null
+
+    @BeforeEach
+    fun requireNode() {
+        assumeTrue(hasNode(), "node is required to run the fake pi harness")
+    }
+
+    @AfterEach
+    fun tearDown() {
+        client?.close()
+        client = null
+    }
+
+    @Test
+    fun `correlates a get_state response by id`() = runBlocking {
+        val client = startClient()
+
+        val response = withTimeout(TIMEOUT_MS) { client.send(RpcCommand(type = "get_state")).await() }
+
+        assertTrue(response.success, "response was $response")
+        assertEquals("get_state", response.command)
+        assertEquals("req-1", response.id)
+        val state = response.sessionState()
+        assertEquals("fake-session", state?.sessionId)
+        assertEquals("fake-model", state?.model?.id)
+        assertEquals("high", state?.thinkingLevel)
+    }
+
+    @Test
+    fun `delivers session events and ignores malformed records`() = runBlocking {
+        val client = startClient()
+        val started = async(start = CoroutineStart.UNDISPATCHED) {
+            client.events.filterIsInstance<PiEvent.Session>().first { it.type == "message_start" }
+        }
+
+        val response = withTimeout(TIMEOUT_MS) {
+            client.send(RpcCommand(type = "echo", message = "hello")).await()
+        }
+
+        assertTrue(response.success, "response was $response")
+        val event = withTimeout(TIMEOUT_MS) { started.await() }
+        assertEquals("user", event.payload.message()?.string("role"))
+        assertEquals("hello", event.payload.message()?.string("content"))
+    }
+
+    @Test
+    fun `keeps unicode line separators inside a record`() = runBlocking {
+        val client = startClient()
+        val started = async(start = CoroutineStart.UNDISPATCHED) {
+            client.events.filterIsInstance<PiEvent.Session>().first { it.type == "message_start" }
+        }
+
+        client.send(RpcCommand(type = "unicode_separator")).await()
+
+        val event = withTimeout(TIMEOUT_MS) { started.await() }
+        assertEquals("a\u2028b\u2029c", event.payload.message()?.string("content"))
+    }
+
+    @Test
+    fun `surfaces unknown commands as failed responses`() = runBlocking {
+        val client = startClient()
+
+        val response = withTimeout(TIMEOUT_MS) { client.send(RpcCommand(type = "nope")).await() }
+
+        assertEquals(false, response.success)
+        assertTrue(response.error.orEmpty().contains("unknown command"), response.error)
+    }
+
+    @Test
+    fun `times out a command that is never answered`() = runBlocking {
+        val client = startClient()
+
+        val deferred = client.send(RpcCommand(type = "hang"), timeout = Duration.ofMillis(300))
+
+        val failure = assertFailsWith<PiRequestTimeoutException> {
+            withTimeout(TIMEOUT_MS) { deferred.await() }
+        }
+        assertEquals("hang", failure.commandType)
+    }
+
+    @Test
+    fun `fails pending requests when the process exits`() = runBlocking {
+        val client = startClient()
+
+        val hanging = client.send(RpcCommand(type = "hang"), timeout = Duration.ofMinutes(5))
+        client.send(RpcCommand(type = "die"))
+
+        val failure = assertFailsWith<PiProcessExitedException> {
+            withTimeout(TIMEOUT_MS) { hanging.await() }
+        }
+        assertEquals(7, failure.exitCode)
+    }
+
+    @Test
+    fun `stop terminates the child process and reports the exit`() = runBlocking {
+        val exited = CompletableDeferred<Int?>()
+        val client = startClient(onExit = { exited.complete(it) })
+
+        client.stop()
+
+        withTimeout(TIMEOUT_MS) { exited.await() }
+        assertEquals(false, client.running.value)
+    }
+
+    private fun startClient(
+        onExit: (Int?) -> Unit = {},
+        requestTimeout: Duration = Duration.ofSeconds(30),
+    ): PiClient {
+        val script = copyScript()
+        val process = PiProcess(
+            command = listOf("node", script.toString()),
+            workDir = tempDir,
+            log = { println("[fake-pi] $it") },
+        )
+        val created = PiClient(
+            process = process,
+            log = { println("[client] $it") },
+            requestTimeout = requestTimeout,
+            onExit = onExit,
+        )
+        assertTrue(created.start(), "failed to start the fake pi process")
+        client = created
+        return created
+    }
+
+    private fun copyScript(): Path {
+        val resource = checkNotNull(javaClass.getResourceAsStream("/fake-pi/fake-pi.mjs")) {
+            "fake-pi.mjs test resource is missing"
+        }
+        val target = tempDir.resolve("fake-pi.mjs")
+        resource.use { Files.copy(it, target) }
+        return target
+    }
+
+    private fun hasNode(): Boolean = CommandRunner.Default.run(listOf("node", "-v")) != null
+
+    private fun JsonObject.message(): JsonObject? = this["message"] as? JsonObject
+
+    private fun JsonObject.string(key: String): String? =
+        (this[key] as? JsonPrimitive)?.contentOrNull
+
+    private companion object {
+        const val TIMEOUT_MS = 15_000L
+    }
+}

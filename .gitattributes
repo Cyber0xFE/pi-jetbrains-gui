@@ -1,0 +1,7 @@
+# Sources stay LF so Gradle/Node tooling behaves on every OS.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.jar binary
+*.png binary
+*.zip binary

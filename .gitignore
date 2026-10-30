@@ -1,0 +1,10 @@
+.gradle/
+build/
+out/
+.idea/
+*.iml
+.kotlin/
+node_modules/
+.intellijPlatform/
+web/node_modules/
+web/dist/

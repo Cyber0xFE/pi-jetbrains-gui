@@ -1,0 +1,17 @@
+<idea-plugin>
+    <id>dev.pi.jetbrains</id>
+    <name>pi</name>
+    <vendor>pi</vendor>
+    <description>Graphical front-end for the pi coding agent inside JetBrains IDEs.</description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <projectService serviceImplementation="dev.pi.jetbrains.PiChatService"/>
+        <toolWindow
+                id="pi"
+                anchor="right"
+                icon="AllIcons.Toolwindows.ToolWindowMessages"
+                factoryClass="dev.pi.jetbrains.ui.ChatToolWindowFactory"/>
+    </extensions>
+</idea-plugin>
