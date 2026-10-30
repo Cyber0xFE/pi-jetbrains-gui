@@ -9,6 +9,7 @@ import { StatusBar } from "./components/StatusBar";
 import { Toolbar } from "./components/Toolbar";
 import { formatTokens } from "./format";
 import { ChatStore } from "./store";
+import type { Block } from "./state/sessionReducer";
 
 type Dialog = "sessions" | "models" | "thinking" | null;
 
@@ -115,6 +116,18 @@ export function App(): JSX.Element {
   const needsStart = phase === "stopped" || phase === "failed";
   const retry = state.status.retry ?? null;
 
+  // Toolbar label fallback: the first user message of the live transcript wins so a brand-new
+  // session updates the moment the user sends, then falls back to the disk index.
+  const sessionFallback = useMemo<string | null>(() => {
+    const firstUser = state.messages.find((message) => message.role === "user");
+    const text = (firstUser?.blocks ?? [])
+      .filter((block): block is Extract<Block, { kind: "text" }> => block.kind === "text")
+      .map((block) => block.text)
+      .join(" ")
+      .trim();
+    return text || state.sessions.find((session) => session.current)?.firstMessage?.trim() || null;
+  }, [state.messages, state.sessions]);
+
   return (
     <div className="app">
       {needsStart && (
@@ -128,22 +141,10 @@ export function App(): JSX.Element {
       <Toolbar
         status={state.status}
         disabled={!ready}
-        modelCount={state.models.length}
-        sessionFallback={state.sessions.find((session) => session.current)?.firstMessage}
+        sessionFallback={sessionFallback}
         onOpenSessions={openSessions}
-        onOpenModels={() => {
-          post({ type: "get_models" });
-          setDialog("models");
-        }}
-        onOpenThinking={() => {
-          post({ type: "get_thinking_levels" });
-          setDialog("thinking");
-        }}
         onNewSession={() => post({ type: "new_session" })}
         onCompact={() => post({ type: "compact" })}
-        onToggleAutoCompaction={() =>
-          post({ type: "set_auto_compaction", enabled: state.status.autoCompaction === false })
-        }
       />
       {retry && (
         <div className="retrybar">
@@ -202,10 +203,23 @@ export function App(): JSX.Element {
       <StatusBar
         status={state.status}
         busy={state.busy}
+        disabled={!ready}
+        modelCount={state.models.length}
         cacheHitRate={state.cacheHitRate}
         extensionStatuses={state.extensionStatuses}
         onSend={send}
         onAbort={abort}
+        onOpenModels={() => {
+          post({ type: "get_models" });
+          setDialog("models");
+        }}
+        onOpenThinking={() => {
+          post({ type: "get_thinking_levels" });
+          setDialog("thinking");
+        }}
+        onToggleAutoCompaction={() =>
+          post({ type: "set_auto_compaction", enabled: state.status.autoCompaction === false })
+        }
         canSend={ready && !state.sending && (draft.trim().length > 0 || images.length > 0)}
       />
 

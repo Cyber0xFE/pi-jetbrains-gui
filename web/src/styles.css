@@ -97,12 +97,57 @@ body {
 }
 
 .status-model {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
   color: var(--fg);
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+  cursor: pointer;
+}
+
+.status-model:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.status-model:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.status-thinking {
+  font-weight: 400;
+  color: var(--fg-dim);
+}
+
+.status-thinking:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.status-auto {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+
+.status-auto:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.status-auto:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.status-auto-on {
+  color: var(--accent);
 }
 
 .status-context-warning {

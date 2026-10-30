@@ -99,13 +99,15 @@ describe("App", () => {
       { type: "notice", level: "error", message: "boom" },
     );
 
-    await waitFor(() => expect(screen.getByText("explain this repo")).toBeDefined());
+    // The first user message doubles as the session label in the toolbar.
+    await waitFor(() => expect(screen.getAllByText("explain this repo").length).toBeGreaterThan(0));
     expect(screen.getByText("It is a pi checkout.")).toBeDefined();
     expect(screen.getByText("streamed answer")).toBeDefined();
     expect(screen.getByText("file body")).toBeDefined();
     expect(screen.getByText("boom")).toBeDefined();
     expect(screen.getAllByText(/fake-model/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/1\.2%\/100k \(auto\)/)).toBeDefined();
+    expect(screen.getByText(/1\.2%\/100k/)).toBeDefined();
+    expect(screen.getByRole("button", { name: "(auto)" })).toBeDefined();
     // The TUI-style footer sits below the composer, not above the transcript.
     const app = document.querySelector(".app");
     expect(app?.lastElementChild?.className).toContain("statusbar");
@@ -132,6 +134,14 @@ describe("App", () => {
       ]),
     );
     expect((input as HTMLTextAreaElement).value).toBe("");
+
+    // The toolbar label switches from 未命名会话 to the first message once pi echoes it.
+    expect(screen.getByRole("button", { name: "未命名会话" })).toBeDefined();
+    deliver({
+      type: "records",
+      records: [{ type: "message_start", message: { role: "user", content: "hello pi", timestamp: 5 } }],
+    });
+    expect(await screen.findByRole("button", { name: "hello pi" })).toBeDefined();
   });
 
   it("lists sessions and switches to another one", async () => {
@@ -152,7 +162,9 @@ describe("App", () => {
       },
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "s1" }));
+    const sessionsButton = (await screen.findByRole("button", { name: "未命名会话" })) as HTMLButtonElement;
+    await waitFor(() => expect(sessionsButton.disabled).toBe(false));
+    fireEvent.click(sessionsButton);
     expect(await screen.findByRole("dialog", { name: "Sessions" })).toBeDefined();
 
     fireEvent.click(screen.getByText("older session"));
@@ -178,7 +190,9 @@ describe("App", () => {
       },
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "s1" }));
+    const renameSessionButton = (await screen.findByRole("button", { name: "未命名会话" })) as HTMLButtonElement;
+    await waitFor(() => expect(renameSessionButton.disabled).toBe(false));
+    fireEvent.click(renameSessionButton);
     fireEvent.click(await screen.findByRole("button", { name: "Rename" }));
     const input = await screen.findByPlaceholderText("Session title");
     fireEvent.change(input, { target: { value: "架构设计讨论" } });

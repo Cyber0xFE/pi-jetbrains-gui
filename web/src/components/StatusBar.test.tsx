@@ -10,10 +10,15 @@ function footer(status: WireStatus, overrides: Partial<Parameters<typeof StatusB
     <StatusBar
       status={status}
       busy={false}
+      disabled={false}
+      modelCount={0}
       cacheHitRate={null}
       extensionStatuses={{}}
       onSend={() => undefined}
       onAbort={() => undefined}
+      onOpenModels={() => undefined}
+      onOpenThinking={() => undefined}
+      onToggleAutoCompaction={() => undefined}
       canSend={true}
       {...overrides}
     />
@@ -45,17 +50,55 @@ describe("StatusBar", () => {
     expect(screen.getByText("W2.5k")).toBeDefined();
     expect(screen.getByText("CH99.4%")).toBeDefined();
     expect(screen.getByText("$0.043")).toBeDefined();
-    expect(screen.getByText("35.9%/524k (auto)")).toBeDefined();
-    expect(screen.getByText(/\(agent-plan\) deepseek-v4\.1-flash • high/)).toBeDefined();
+    expect(screen.getByText("35.9%/524k")).toBeDefined();
+    expect(screen.getByRole("button", { name: "(auto)" })).toBeDefined();
+    expect(screen.getByText(/agent-plan\/deepseek-v4\.1-flash ▾/)).toBeDefined();
+    expect(screen.getByRole("button", { name: "high ▾" })).toBeDefined();
+  });
+
+  it("opens the model picker from the footer model entry", () => {
+    const onOpenModels = vi.fn();
+    render(footer({ phase: "running", message: "ready", model: "m", provider: "p" }, { modelCount: 3, onOpenModels }));
+
+    const modelButton = screen.getByRole("button", { name: /p\/m ▾/ });
+    expect(modelButton.getAttribute("title")).toBe("3 available models");
+    fireEvent.click(modelButton);
+    expect(onOpenModels).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens the thinking picker from the footer thinking entry", () => {
+    const onOpenThinking = vi.fn();
+    render(
+      footer(
+        { phase: "running", message: "ready", model: "m", reasoning: true, thinkingLevel: "high" },
+        { onOpenThinking },
+      ),
+    );
+
+    const thinkingButton = screen.getByRole("button", { name: "high ▾" });
+    expect(thinkingButton.getAttribute("title")).toBe("Thinking level");
+    fireEvent.click(thinkingButton);
+    expect(onOpenThinking).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the thinking entry when reasoning is off or no level exists", () => {
+    const { rerender } = render(
+      footer({ phase: "running", message: "ready", model: "m", reasoning: false, thinkingLevel: "high" }),
+    );
+    expect(screen.queryByRole("button", { name: "high ▾" })).toBeNull();
+
+    rerender(footer({ phase: "running", message: "ready", model: "m", reasoning: true, thinkingLevel: null }));
+    expect(screen.queryByTitle("Thinking level")).toBeNull();
   });
 
   it("shows an unknown context share with the model context window", () => {
     render(footer({ phase: "running", message: "ready", model: "m", contextWindow: 524_000, context: null }));
 
-    expect(screen.getByText("?/524k (auto)")).toBeDefined();
+    expect(screen.getByText("?/524k")).toBeDefined();
+    expect(screen.getByRole("button", { name: "(auto)" })).toBeDefined();
   });
 
-  it("warns and errors based on context usage, and hides (auto) when disabled", () => {
+  it("warns and errors based on context usage, and shows (manual) when disabled", () => {
     const { container } = render(
       footer({
         phase: "running",
@@ -68,7 +111,21 @@ describe("StatusBar", () => {
 
     expect(screen.getByText("95.0%/1.0k")).toBeDefined();
     expect(container.querySelector(".status-context-critical")).not.toBeNull();
-    expect(screen.queryByText(/\(auto\)/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "(manual)" })).toBeDefined();
+  });
+
+  it("toggles auto-compaction from the footer (auto) entry", () => {
+    const onToggleAutoCompaction = vi.fn();
+    render(
+      footer(
+        { phase: "running", message: "ready", model: "m", autoCompaction: true },
+        { onToggleAutoCompaction },
+      ),
+    );
+
+    const autoButton = screen.getByRole("button", { name: "(auto)" });
+    fireEvent.click(autoButton);
+    expect(onToggleAutoCompaction).toHaveBeenCalledTimes(1);
   });
 
   it("renders extension statuses sorted by key", () => {
