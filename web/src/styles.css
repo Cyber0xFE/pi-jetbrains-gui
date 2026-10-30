@@ -158,6 +158,10 @@ body {
   color: var(--error);
 }
 
+.status-context {
+  cursor: help;
+}
+
 @media (prefers-color-scheme: dark) {
   .status-context-warning {
     color: #d19a66;
@@ -225,6 +229,7 @@ body {
 }
 
 .messages {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
@@ -265,8 +270,56 @@ body {
 }
 
 .message-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
   font-size: 0.8em;
   color: var(--fg-dim);
+}
+
+.message-copy {
+  margin-left: auto;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 1px 6px;
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease, background 120ms ease;
+}
+
+.message:hover .message-copy,
+.message-copy:focus-visible {
+  opacity: 1;
+}
+
+.message-copy:hover {
+  border-color: var(--border);
+  background: var(--bg-raised);
+  color: var(--fg);
+}
+
+.latest-button {
+  position: sticky;
+  right: 0;
+  bottom: 8px;
+  align-self: flex-end;
+  z-index: 2;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 5px 12px;
+  background: var(--bg);
+  color: var(--accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+  font: inherit;
+  cursor: pointer;
+}
+
+.latest-button:hover {
+  background: var(--bg-raised);
 }
 
 .message-error {
@@ -555,6 +608,11 @@ body {
   cursor: pointer;
   color: var(--fg-dim);
   font-size: 0.82em;
+  user-select: none;
+}
+
+.tool-section > summary:hover {
+  color: var(--fg);
 }
 
 .tool-actions {
@@ -856,7 +914,7 @@ body {
 
 .composer-input {
   flex: 1;
-  resize: vertical;
+  resize: none;
   min-height: 54px;
   max-height: 40vh;
   padding: 6px 8px;

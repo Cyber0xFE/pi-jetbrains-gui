@@ -201,6 +201,8 @@ function bashView(tool: ToolState): ToolView {
   const command = stringField(tool.args, "command");
   const timeout = numberField(tool.args, "timeout");
   const hasOutput = (tool.output ?? "").length > 0;
+  const outputLines = tool.output === undefined ? 0 : tool.output.split("\n").length;
+  const outputOpen = tool.isError || outputLines <= 3;
 
   return {
     title: (
@@ -213,8 +215,8 @@ function bashView(tool: ToolState): ToolView {
       <>
         {command !== undefined && <pre className="tool-command">$ {command}</pre>}
         {hasOutput && (
-          <details className="tool-section" open>
-            <summary>output</summary>
+          <details className="tool-section" open={outputOpen}>
+            <summary>output · {outputLines} lines</summary>
             <pre className="tool-output tool-terminal">{tool.output}</pre>
           </details>
         )}
@@ -338,8 +340,8 @@ function genericView(tool: ToolState): ToolView {
           </details>
         )}
         {tool.output !== undefined && (
-          <details className="tool-section" open={tool.isError}>
-            <summary>{tool.isError ? "error" : "result"}</summary>
+          <details className="tool-section" open={tool.isError || tool.output.split("\n").length <= 3}>
+            <summary>{tool.isError ? "error" : `result · ${tool.output.split("\n").length} lines`}</summary>
             <pre className="tool-output">{tool.output}</pre>
           </details>
         )}

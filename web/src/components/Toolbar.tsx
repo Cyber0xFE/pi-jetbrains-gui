@@ -7,12 +7,11 @@ interface Props {
   sessionFallback?: string | null;
   onOpenSessions: () => void;
   onNewSession: () => void;
-  onCompact: () => void;
 }
 
 /**
- * Top bar for the session/compaction controls (plan M3.2–M3.6).
- * The model and thinking-level pickers live in the footer; this bar holds the remaining actions.
+ * Top bar for the session controls (plan M3.2–M3.6).
+ * The model, thinking-level and compaction controls live in the composer/footer.
  */
 export function Toolbar({
   status,
@@ -20,7 +19,6 @@ export function Toolbar({
   sessionFallback,
   onOpenSessions,
   onNewSession,
-  onCompact,
 }: Props): JSX.Element {
 
   // Unnamed sessions stay "未命名会话" until the first message replaces the label.
@@ -33,22 +31,13 @@ export function Toolbar({
         className="toolbar-button toolbar-session"
         onClick={onOpenSessions}
         disabled={disabled}
-        title={status.sessionFile ?? "Open the session picker"}
+        title={status.sessionName?.trim() || sessionFallback?.trim() || status.sessionFile || "打开会话选择器"}
       >
         {sessionLabel}
       </button>
       <div className="toolbar-spacer" />
-      <button
-        type="button"
-        className="toolbar-button"
-        onClick={onCompact}
-        disabled={disabled || status.isStreaming || status.isCompacting}
-        title="Compact the conversation context"
-      >
-        {status.isCompacting ? "compacting…" : "Compact"}
-      </button>
-      <button type="button" className="toolbar-button" onClick={onNewSession} disabled={disabled} title="Start a new session">
-        New
+      <button type="button" className="toolbar-button" onClick={onNewSession} disabled={disabled} title="开始新会话">
+        新建
       </button>
     </header>
   );

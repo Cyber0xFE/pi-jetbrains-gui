@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Block, ChatMessage, ToolState } from "../state/sessionReducer";
 import { Markdown } from "./Markdown";
 import { ToolCard } from "./tools/ToolCard";
@@ -14,6 +14,7 @@ interface Props {
 export function MessageList({ messages, tools, loadingHistory, emptyHint, thinkingLabel }: Props): JSX.Element {
   const scroller = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
+  const [showLatestButton, setShowLatestButton] = useState(false);
 
   useEffect(() => {
     const element = scroller.current;
@@ -23,7 +24,17 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
   const handleScroll = (): void => {
     const element = scroller.current;
     if (!element) return;
-    stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 48;
+    const atBottom = element.scrollHeight - element.scrollTop - element.clientHeight < 48;
+    stickToBottom.current = atBottom;
+    setShowLatestButton(!atBottom);
+  };
+
+  const scrollToLatest = (): void => {
+    const element = scroller.current;
+    if (!element) return;
+    stickToBottom.current = true;
+    setShowLatestButton(false);
+    element.scrollTo({ top: element.scrollHeight, behavior: "smooth" });
   };
 
   return (
@@ -38,30 +49,99 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
       {messages.length === 0 && (
         <div className="empty">{loadingHistory ? "loading transcript…" : emptyHint}</div>
       )}
-      {messages.map((message) => (
-        <article key={message.id} className={`message message-${message.role}`}>
-          {message.blocks.map((block, index) => (
-            <BlockView
-              key={index}
-              block={block}
-              tools={tools}
-              streaming={message.streaming}
-              thinkingLabel={thinkingLabel}
-            />
-          ))}
-          {message.streaming && message.blocks.length === 0 && <div className="typing">…</div>}
-          {message.stopReason === "error" && (
-            <div className="message-error">{message.errorMessage ?? "the request failed"}</div>
-          )}
-          {message.role === "assistant" && message.model && (
-            <footer className="message-footer">
-              {message.model}
-              {message.streaming ? " · streaming" : ""}
-            </footer>
-          )}
-        </article>
+      {messages.map((message, messageIndex) => (
+        <MessageView
+          key={message.id}
+          message={message}
+          previousAssistantModel={
+            messageIndex > 0 && messages[messageIndex - 1]?.role === "assistant"
+              ? messages[messageIndex - 1]?.model
+              : null
+          }
+          tools={tools}
+          thinkingLabel={thinkingLabel}
+        />
       ))}
+      {showLatestButton && (
+        <button type="button" className="latest-button" onClick={scrollToLatest}>
+          ↓ 回到最新
+        </button>
+      )}
     </div>
+  );
+}
+
+interface MessageViewProps {
+  message: ChatMessage;
+  previousAssistantModel: string | null | undefined;
+  tools: Record<string, ToolState>;
+  thinkingLabel: string | null;
+}
+
+function MessageView({ message, previousAssistantModel, tools, thinkingLabel }: MessageViewProps): JSX.Element {
+  const showModel = message.role === "assistant" && message.model && message.model !== previousAssistantModel;
+  const copyableText = message.blocks
+    .filter((block): block is Extract<Block, { kind: "text" }> => block.kind === "text")
+    .map((block) => block.text)
+    .join("\n\n")
+    .trim();
+
+  return (
+    <article className={`message message-${message.role}`}>
+      {message.blocks.map((block, index) => (
+        <BlockView
+          key={index}
+          block={block}
+          tools={tools}
+          streaming={message.streaming}
+          thinkingLabel={thinkingLabel}
+        />
+      ))}
+      {message.streaming && message.blocks.length === 0 && <div className="typing">…</div>}
+      {message.stopReason === "error" && (
+        <div className="message-error">{message.errorMessage ?? "the request failed"}</div>
+      )}
+      {(showModel || copyableText.length > 0) && (
+        <footer className="message-footer">
+          {showModel && <span>{message.model}{message.streaming ? " · streaming" : ""}</span>}
+          {copyableText.length > 0 && !message.streaming && (
+            <CopyMessageButton text={copyableText} />
+          )}
+        </footer>
+      )}
+    </article>
+  );
+}
+
+
+function CopyMessageButton({ text }: { text: string }): JSX.Element {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async (): Promise<void> => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const input = document.createElement("textarea");
+        input.value = text;
+        input.style.position = "fixed";
+        input.style.opacity = "0";
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand("copy");
+        input.remove();
+      }
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <button type="button" className="message-copy" onClick={copy} title="Copy assistant message">
+      {copied ? "已复制" : "复制"}
+    </button>
   );
 }
 

@@ -89,7 +89,16 @@ export function StatusBar({
           {cacheWrite > 0 ? <span>W{formatTokens(cacheWrite)}</span> : null}
           {showCacheHit ? <span>CH{cacheHitRate.toFixed(1)}%</span> : null}
           {usage?.cost ? <span>{formatCost(usage.cost)}</span> : null}
-          <span className={contextClass}>{contextDisplay}</span>
+          <span
+            className={contextClass}
+            title={
+              percent === null || contextWindow === null
+                ? "Context usage is not available"
+                : `${formatTokens(usage?.input ?? 0)} input tokens · ${formatTokens(status.context?.tokens ?? 0)} used · ${formatTokens(Math.max(0, contextWindow - (status.context?.tokens ?? 0)))} remaining`
+            }
+          >
+            {contextDisplay}
+          </span>
           <button
             type="button"
             className={`status-auto ${autoCompaction ? "status-auto-on" : ""}`}

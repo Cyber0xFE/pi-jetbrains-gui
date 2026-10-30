@@ -144,7 +144,6 @@ export function App(): JSX.Element {
         sessionFallback={sessionFallback}
         onOpenSessions={openSessions}
         onNewSession={() => post({ type: "new_session" })}
-        onCompact={() => post({ type: "compact" })}
       />
       {retry && (
         <div className="retrybar">
@@ -189,8 +188,9 @@ export function App(): JSX.Element {
         onChange={setDraft}
         onSend={send}
         disabled={!ready || state.sending}
-        busy={busy}
+        busy={busy || Boolean(state.status.isStreaming || state.status.isCompacting)}
         commands={state.commands}
+        onCompact={() => post({ type: "compact" })}
         pendingContext={state.status.pendingContext}
         onClearContext={() => post({ type: "clear_context" })}
         images={images}

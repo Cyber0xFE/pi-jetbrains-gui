@@ -292,5 +292,10 @@ describe("App", () => {
     fireEvent.keyDown(input, { key: "Enter" });
     await waitFor(() => expect(input.value).toBe("/compact "));
     expect(window.__piSent?.filter((message) => message.type === "prompt")).toEqual([]);
+
+    fireEvent.change(input, { target: { value: "/compact" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(input.value).toBe("") );
+    expect(window.__piSent?.filter((message) => message.type === "compact")).toEqual([{ type: "compact" }]);
   });
 });
