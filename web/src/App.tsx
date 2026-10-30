@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { PromptImage } from "./types";
 import { onMessage, post } from "./bridge";
 import { Composer } from "./components/Composer";
@@ -20,25 +20,38 @@ export function App(): JSX.Element {
   const [dialog, setDialog] = useState<Dialog>(null);
   const [images, setImages] = useState<PromptImage[]>([]);
   const [pendingPrompt, setPendingPrompt] = useState(false);
+  const pendingPromptStartedAt = useRef<number | null>(null);
+  const pendingPromptTimer = useRef<number | null>(null);
 
   useEffect(() => {
+    const finishPendingPrompt = (minimumVisible = true): void => {
+      if (pendingPromptTimer.current !== null) window.clearTimeout(pendingPromptTimer.current);
+      const startedAt = pendingPromptStartedAt.current;
+      const remaining =
+        minimumVisible && startedAt !== null ? Math.max(0, 250 - (Date.now() - startedAt)) : 0;
+      pendingPromptTimer.current = window.setTimeout(() => {
+        pendingPromptStartedAt.current = null;
+        pendingPromptTimer.current = null;
+        setPendingPrompt(false);
+      }, remaining);
+    };
+
     onMessage((message) => {
-      // Keep the optimistic connection hint visible until pi actually starts handling the
-      // prompt. The first SSE record is often only the echoed user message, so clearing here
-      // would recreate the blank gap before agent_start / the assistant stream.
+      // Keep the optimistic connection hint visible until assistant content actually starts.
+      // `agent_start` only means the request was accepted; pi may still spend time preparing
+      // the model response after that event.
       if (message.type === "records") {
         const responseStarted = message.records.some(
           (record) =>
-            record.type === "agent_start" ||
             (record.type === "message_start" && record.message?.role === "assistant") ||
             record.type === "message_update",
         );
         const requestFailed = message.records.some(
           (record) => record.type === "response" && record.command === "prompt" && record.success === false,
         );
-        if (responseStarted || requestFailed) window.requestAnimationFrame(() => setPendingPrompt(false));
+        if (responseStarted || requestFailed) finishPendingPrompt(!requestFailed);
       }
-      if (message.type === "reset") setPendingPrompt(false);
+      if (message.type === "reset") finishPendingPrompt(false);
       // `prefill` seeds the composer (fork returns the original user message text).
       if (message.type === "prefill") {
         setDraft(message.text);
@@ -47,6 +60,9 @@ export function App(): JSX.Element {
       store.dispatch({ kind: "inbound", message });
     });
     post({ type: "ready" });
+    return () => {
+      if (pendingPromptTimer.current !== null) window.clearTimeout(pendingPromptTimer.current);
+    };
   }, [store]);
 
   useEffect(() => {
@@ -88,11 +104,18 @@ export function App(): JSX.Element {
   const send = useCallback(() => {
     const text = draft.trim();
     if (text.length === 0 && images.length === 0) return;
+    if (pendingPromptTimer.current !== null) window.clearTimeout(pendingPromptTimer.current);
+    pendingPromptStartedAt.current = Date.now();
     setPendingPrompt(true);
     store.dispatch({ kind: "submit" });
-    post({ type: "prompt", message: text, images: images.length > 0 ? images : undefined });
     setDraft("");
     setImages([]);
+    // Let React paint the optimistic indicator before entering the native bridge. The bridge
+    // can synchronously start the request, which otherwise consumes this event before the
+    // browser gets a repaint opportunity.
+    window.requestAnimationFrame(() => {
+      post({ type: "prompt", message: text, images: images.length > 0 ? images : undefined });
+    });
   }, [draft, images, store]);
 
   const abort = useCallback(() => post({ type: "abort" }), []);
