@@ -212,6 +212,10 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
                     }
                 }
             }
+            "delete_session" -> {
+                val path = message.path ?: return
+                scope.launch { deleteSession(path) }
+            }
 
             // ---- M3: model / thinking ----------------------------------------------------------
             "get_models" -> scope.launch { sendModels() }
@@ -297,6 +301,36 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
             emptyList()
         }
         activeBridge.send(HostMessages.sessions(sessions, service.status.value.sessionFile))
+    }
+
+    /**
+     * Removes a session file from disk. Deleting the active session switches to a fresh one first
+     * so pi stops appending to the file that is about to disappear; an extension can cancel that
+     * switch, which also cancels the delete.
+     */
+    private suspend fun deleteSession(path: String) {
+        val activeBridge = bridge ?: return
+        val wasCurrent = service.status.value.sessionFile == path
+        if (wasCurrent) {
+            val switched = request { service.newSession() } ?: return
+            if (switched.decodeDataAs<RpcSwitchResult>()?.cancelled == true) {
+                activeBridge.send(HostMessages.notice("session change was cancelled by an extension", level = "info"))
+                return
+            }
+        }
+        val deleted = try {
+            service.deleteSession(path)
+        } catch (t: Throwable) {
+            activeBridge.send(HostMessages.notice("failed to delete session: ${t.message}"))
+            false
+        }
+        if (!deleted) {
+            activeBridge.send(HostMessages.notice("failed to delete session: $path"))
+            return
+        }
+        if (wasCurrent) reloadTranscript("delete")
+        sendSessions()
+        sendTree()
     }
 
     private suspend fun sendTree() {

@@ -9,6 +9,8 @@ export interface PickerItem {
   disabled?: boolean;
   /** Tree rows are flattened with a depth; the picker indents them instead of nesting. */
   depth?: number;
+  /** Optional trailing delete affordance (session list); stop propagation so the row is not selected. */
+  onDelete?: () => void;
 }
 
 interface Props {
@@ -143,6 +145,30 @@ export function Picker({ title, items, placeholder, emptyText, actions, onSelect
                 <span className="picker-label">{item.label}</span>
                 {item.badge && <span className="picker-badge">{item.badge}</span>}
                 {item.detail && <span className="picker-detail">{item.detail}</span>}
+                {item.onDelete && (
+                  <span
+                    className="picker-delete"
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Delete session"
+                    title="Delete session"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      item.onDelete?.();
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        item.onDelete?.();
+                      }
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="M4 7h16M9 7V4h6v3m-9 0 1 13h8l1-13M10 11v5m4-5v5" />
+                    </svg>
+                  </span>
+                )}
               </button>
             );
           })}

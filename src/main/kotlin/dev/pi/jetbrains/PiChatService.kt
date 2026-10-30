@@ -423,6 +423,12 @@ class PiChatService(private val project: Project) : Disposable {
     suspend fun setSessionName(name: String): RpcResponse =
         requireClient().send(RpcCommand(type = "set_session_name", name = name)).await()
 
+    /** Deletes a session JSONL file on disk; call from `Dispatchers.IO`. */
+    fun deleteSession(sessionPath: String): Boolean {
+        val file = java.io.File(sessionPath)
+        return file.isFile && file.delete()
+    }
+
     suspend fun sessionTree(): RpcResponse =
         requireClient().send(RpcCommand(type = "get_tree")).await()
 

@@ -248,6 +248,9 @@ export function App(): JSX.Element {
             post({ type: "switch_session", path });
             closeDialog();
           }}
+          onDelete={(path) => {
+            post({ type: "delete_session", path });
+          }}
           onFork={(entryId) => {
             post({ type: "fork", entryId });
             closeDialog();

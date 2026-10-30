@@ -1286,7 +1286,7 @@ body {
 .picker-row {
   display: flex;
   gap: 8px;
-  align-items: baseline;
+  align-items: center;
   width: 100%;
   padding: 0 10px;
   border: none;
@@ -1349,6 +1349,46 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.picker-delete {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-left: 2px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--fg-dim);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 120ms ease, color 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.picker-delete svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.picker-row:hover .picker-delete,
+.picker-row:focus-within .picker-delete,
+.picker-delete:focus {
+  opacity: 1;
+}
+
+.picker-delete:hover,
+.picker-delete:focus-visible {
+  border-color: var(--error);
+  background: var(--error-bg);
+  color: var(--error);
+  outline: none;
 }
 
 .picker-empty {

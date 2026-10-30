@@ -13,6 +13,7 @@ interface Props {
   onRename: (name: string) => void;
   onRefresh: () => void;
   onSwitch: (path: string) => void;
+  onDelete: (path: string) => void;
   onFork: (entryId: string) => void;
 }
 
@@ -32,6 +33,7 @@ export function SessionDialog({
   onRename,
   onRefresh,
   onSwitch,
+  onDelete,
   onFork,
 }: Props): JSX.Element {
   const [tab, setTab] = useState<Tab>("sessions");
@@ -46,8 +48,9 @@ export function SessionDialog({
         detail: `${session.messageCount} messages · ${formatWhen(session.modified)}`,
         badge: session.current ? "current" : undefined,
         active: session.current,
+        onDelete: () => onDelete(session.path),
       })),
-    [sessions],
+    [sessions, onDelete],
   );
 
   const treeItems = useMemo<PickerItem[]>(
