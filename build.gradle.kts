@@ -63,7 +63,7 @@ intellijPlatform {
 
         description = """
             <p>Graphical front-end for the <code>pi</code> coding agent inside JetBrains IDEs.</p>
-            <p>M4: extension UI dialogs, editor context injection, clipboard images and diagnostics settings.</p>
+            <p>M5: resilient process recovery, protected tool output and IDE theme integration.</p>
         """.trimIndent()
     }
 }

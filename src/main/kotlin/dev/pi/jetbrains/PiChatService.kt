@@ -38,12 +38,14 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
@@ -126,9 +128,17 @@ class PiChatService(private val project: Project) : Disposable {
     }
     private var forwardJob: Job? = null
     private var startJob: Job? = null
+    private var heartbeatJob: Job? = null
+    private var recoveryJob: Job? = null
 
     @Volatile
     private var client: PiClient? = null
+
+    @Volatile
+    private var recoveryInProgress = false
+
+    @Volatile
+    private var pendingRecoverySession: String? = null
 
     @Volatile
     private var stopRequested = false
@@ -182,11 +192,16 @@ class PiChatService(private val project: Project) : Disposable {
                 workDir = workDir,
                 log = { diagnosticLog("[${project.name}] $it") },
             )
-            val newClient = PiClient(
+            lateinit var startedClient: PiClient
+            startedClient = PiClient(
                 process = process,
                 log = { diagnosticLog(it) },
-                onExit = ::onProcessExit,
+                onExit = { code ->
+                    // Ignore a late callback from a process replaced during recovery.
+                    if (client === startedClient) onProcessExit(code)
+                },
             )
+            val newClient = startedClient
             client = newClient
             forwardJob = scope.launch {
                 newClient.events.collect { event ->
@@ -204,7 +219,7 @@ class PiChatService(private val project: Project) : Disposable {
 
             _status.update {
                 it.copy(
-                    phase = Phase.RUNNING,
+                    phase = Phase.STARTING,
                     message = "waiting for pi state",
                     node = "${nodeRuntime.executable} (node ${nodeRuntime.version})",
                     pi = "${installation.cliEntry} (${installation.version ?: "unknown version"}, ${installation.origin})",
@@ -213,7 +228,15 @@ class PiChatService(private val project: Project) : Disposable {
             LOG.info("pi rpc started: pid=${process.pid} cwd=$workDir cli=${installation.cliEntry}")
 
             try {
-                requestState()
+                val stateResponse = requestState()
+                val restorePath = pendingRecoverySession
+                if (stateResponse.success && restorePath != null) {
+                    val restored = switchSession(restorePath)
+                    if (restored.success) requestState()
+                    else fail("recovery could not restore session: ${restored.error ?: "unknown error"}")
+                    pendingRecoverySession = null
+                }
+                if (_status.value.phase == Phase.RUNNING) startHeartbeat()
             } catch (t: Throwable) {
                 fail("get_state failed: ${t.message}")
             }
@@ -225,8 +248,13 @@ class PiChatService(private val project: Project) : Disposable {
         stopRequested = true
         startJob?.cancel()
         startJob = null
+        heartbeatJob?.cancel()
+        heartbeatJob = null
+        recoveryJob?.cancel()
+        recoveryJob = null
         forwardJob?.cancel()
         forwardJob = null
+        recoveryInProgress = false
 
         val active = client
         client = null
@@ -432,10 +460,37 @@ class PiChatService(private val project: Project) : Disposable {
         fileRefresher.dispose()
     }
 
+    private fun startHeartbeat() {
+        heartbeatJob?.cancel()
+        heartbeatJob = scope.launch {
+            var failures = 0
+            while (isActive && !stopRequested) {
+                delay(HEARTBEAT_INTERVAL_MS)
+                if (!isActive || stopRequested || _status.value.phase != Phase.RUNNING) continue
+                val healthy = runCatching {
+                    requireClient().send(RpcCommand(type = "get_state"), HEARTBEAT_TIMEOUT).await().success
+                }.getOrDefault(false)
+                if (healthy) {
+                    failures = 0
+                } else {
+                    failures++
+                    diagnosticLog("pi heartbeat failed ($failures/2)")
+                    if (failures >= HEARTBEAT_FAILURES_BEFORE_RECOVERY) {
+                        requestRecovery("pi heartbeat timed out")
+                        return@launch
+                    }
+                }
+            }
+        }
+    }
+
     private fun onProcessExit(code: Int?) {
+        heartbeatJob?.cancel()
+        heartbeatJob = null
         forwardJob?.cancel()
         forwardJob = null
         val stoppedDeliberately = stopRequested
+        val sessionToRecover = _status.value.sessionFile
         client = null
         _status.update {
             if (stoppedDeliberately) {
@@ -443,6 +498,37 @@ class PiChatService(private val project: Project) : Disposable {
             } else {
                 it.copy(phase = Phase.FAILED, message = "pi exited unexpectedly (code=$code)", retry = null)
             }
+        }
+        if (!stoppedDeliberately) {
+            requestRecovery("pi exited unexpectedly (code=${code ?: "unknown"})", sessionToRecover)
+        }
+    }
+
+    /** Restarts once after a crash/heartbeat failure and switches back to the last session file. */
+    private fun requestRecovery(reason: String, sessionPath: String? = _status.value.sessionFile) {
+        if (stopRequested || recoveryInProgress) return
+        synchronized(this) {
+            if (stopRequested || recoveryInProgress) return
+            recoveryInProgress = true
+        }
+        pendingRecoverySession = sessionPath
+        diagnosticLog("starting recovery: $reason")
+        _status.update { it.copy(phase = Phase.STARTING, message = "$reason; restarting pi…") }
+        val active = client
+        client = null
+        stopRequested = true
+        active?.let { thread(name = "pi-recovery-stop", isDaemon = true) { it.close() } }
+        recoveryJob = scope.launch {
+            delay(RECOVERY_DELAY_MS)
+            stopRequested = false
+            _status.update { it.copy(phase = Phase.STOPPED, message = "restarting pi…") }
+            start()
+            for (attempt in 0 until RECOVERY_START_WAIT_ATTEMPTS) {
+                if (_status.value.phase == Phase.RUNNING && _status.value.message == "ready") break
+                delay(RECOVERY_START_WAIT_MS)
+            }
+            recoveryInProgress = false
+            recoveryJob = null
         }
     }
 
@@ -551,5 +637,11 @@ class PiChatService(private val project: Project) : Disposable {
         private val LOG = Logger.getInstance(PiChatService::class.java)
         private val PLUGIN_ID = PluginId.getId("dev.pi.jetbrains")
         private val COMPACT_TIMEOUT: Duration = Duration.ofSeconds(300)
+        private val HEARTBEAT_TIMEOUT: Duration = Duration.ofSeconds(10)
+        private const val HEARTBEAT_INTERVAL_MS = 30_000L
+        private const val HEARTBEAT_FAILURES_BEFORE_RECOVERY = 2
+        private const val RECOVERY_DELAY_MS = 500L
+        private const val RECOVERY_START_WAIT_MS = 250L
+        private const val RECOVERY_START_WAIT_ATTEMPTS = 40
     }
 }

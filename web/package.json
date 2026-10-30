@@ -1,7 +1,7 @@
 {
   "name": "pi-jetbrains-webview",
   "private": true,
-  "version": "0.1.0-M4",
+  "version": "0.1.0-M5",
   "type": "module",
   "scripts": {
     "build": "tsc --noEmit && vite build && node scripts/inline.mjs",

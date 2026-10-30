@@ -27,7 +27,14 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
   };
 
   return (
-    <div className="messages" ref={scroller} onScroll={handleScroll}>
+    <div
+      className="messages"
+      ref={scroller}
+      onScroll={handleScroll}
+      role="log"
+      aria-live="polite"
+      aria-label="pi conversation"
+    >
       {messages.length === 0 && (
         <div className="empty">{loadingHistory ? "loading transcript…" : emptyHint}</div>
       )}

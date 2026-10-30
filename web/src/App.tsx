@@ -31,6 +31,23 @@ export function App(): JSX.Element {
     post({ type: "ready" });
   }, [store]);
 
+  useEffect(() => {
+    const theme = state.theme;
+    if (!theme) return;
+    const root = document.documentElement;
+    root.style.colorScheme = theme.dark ? "dark" : "light";
+    root.style.setProperty("--bg", theme.background);
+    root.style.setProperty("--fg", theme.foreground);
+    root.style.setProperty("--fg-dim", theme.foregroundDim);
+    root.style.setProperty("--bg-raised", theme.raisedBackground);
+    root.style.setProperty("--bg-soft", theme.raisedBackground);
+    root.style.setProperty("--border", theme.border);
+    root.style.setProperty("--accent", theme.accent);
+    root.style.setProperty("--error", theme.error);
+    root.style.setProperty("--error-bg", theme.errorBackground);
+    root.style.setProperty("--fs", `${Math.max(11, Math.min(24, theme.fontSize))}px`);
+  }, [state.theme]);
+
   const phase = state.status.phase;
 
   // Pickers are cheap to refresh, but only meaningful while pi answers commands.

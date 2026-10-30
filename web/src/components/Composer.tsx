@@ -164,6 +164,8 @@ export function Composer({
         </div>
       )}
       <textarea
+        aria-label="Message to pi"
+        aria-multiline="true"
         className="composer-input"
         value={value}
         onChange={(event) => handleChange(event.target.value)}

@@ -130,6 +130,19 @@ export interface PromptImage {
   mimeType: string;
 }
 
+export interface WireTheme {
+  background: string;
+  foreground: string;
+  foregroundDim: string;
+  raisedBackground: string;
+  border: string;
+  accent: string;
+  error: string;
+  errorBackground: string;
+  dark: boolean;
+  fontSize: number;
+}
+
 export interface WireStatus {
   phase: WirePhase;
   message: string;
@@ -199,6 +212,7 @@ export type NoticeLevel = "info" | "error";
 
 /** Kotlin -> webview. */
 export type Inbound =
+  | { type: "theme"; theme: WireTheme }
   | { type: "status"; status: WireStatus }
   | { type: "records"; records: WireRecord[] }
   | { type: "history"; messages: WireMessage[]; final: boolean }

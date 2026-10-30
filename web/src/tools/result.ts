@@ -36,6 +36,8 @@ export interface ToolResultParts {
   details?: JsonObject;
   /** Full output file for truncated `bash`/tool output. */
   fullOutputPath?: string;
+  /** True when the host replaced an oversized result with a summary. */
+  outputTruncated?: boolean;
 }
 
 /** Splits a `tool_execution_end.result` / `tool_execution_update.partialResult`. */
@@ -50,7 +52,12 @@ export function toolResultParts(result: unknown): ToolResultParts {
     stringField(details, "fullOutputPath") ??
     stringField(details, "full_output_path") ??
     stringField(structured, "full_output_path");
-  return { text: textOf(result), details, fullOutputPath };
+  return {
+    text: textOf(result),
+    details,
+    fullOutputPath,
+    outputTruncated: object.outputTruncated === true || object.output_truncated === true,
+  };
 }
 
 /** Best-effort text extraction from the loosely typed payloads. */

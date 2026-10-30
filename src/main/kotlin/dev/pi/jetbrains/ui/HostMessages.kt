@@ -95,6 +95,23 @@ data class HostStatus(
 }
 
 @Serializable
+data class HostTheme(
+    val background: String,
+    val foreground: String,
+    val foregroundDim: String,
+    val raisedBackground: String,
+    val border: String,
+    val accent: String,
+    val error: String,
+    val errorBackground: String,
+    val dark: Boolean,
+    val fontSize: Float,
+)
+
+@Serializable
+data class HostThemeMessage(val type: String = "theme", val theme: HostTheme)
+
+@Serializable
 data class HostStatusMessage(val type: String = "status", val status: HostStatus)
 
 @Serializable
@@ -286,6 +303,9 @@ data class ClientImage(
 
 /** Encodes host messages with the shared RPC JSON settings. */
 object HostMessages {
+    fun theme(theme: HostTheme): JsonElement =
+        PiJson.encodeToJsonElement(HostThemeMessage.serializer(), HostThemeMessage(theme = theme))
+
     fun status(status: PiChatService.Status): JsonElement =
         PiJson.encodeToJsonElement(HostStatusMessage.serializer(), HostStatusMessage(status = HostStatus.from(status)))
 

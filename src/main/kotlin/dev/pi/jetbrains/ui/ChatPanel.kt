@@ -4,7 +4,11 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.components.service
+import com.intellij.openapi.editor.colors.EditorColorsListener
+import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.UIUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.ui.jcef.JBCefApp
@@ -34,11 +38,13 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import java.awt.BorderLayout
+import java.awt.Color
 import java.awt.Component
 import java.util.concurrent.LinkedBlockingQueue
 import javax.swing.JLabel
@@ -87,6 +93,10 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
             unavailableView()
         }
         add(view, BorderLayout.CENTER)
+        project.messageBus.connect(this).subscribe(
+            EditorColorsManager.TOPIC,
+            EditorColorsListener { bridge?.send(themeMessage()) },
+        )
         startForwarding()
         // Opening the tool window is the M1 trigger for the child process (plan M1 acceptance).
         service.start()
@@ -103,6 +113,11 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
         browser = created
         bridge = createdBridge
         createdBridge.load(html)
+        // JCEF receives keyboard/IME composition events only after its native browser has focus.
+        created.component.isFocusable = true
+        created.component.accessibleContext.accessibleName = "pi chat"
+        created.cefBrowser.setFocus(true)
+        createdBridge.send(themeMessage())
         return created.component
     }
 
@@ -151,6 +166,7 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
         when (message.type) {
             "ready" -> {
                 bridge?.markReady()
+                bridge?.send(themeMessage())
                 bridge?.send(HostMessages.status(service.status.value))
             }
             "prompt" -> {
@@ -421,7 +437,8 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
         }
         var batch = ArrayList<JsonElement>()
         var size = 0
-        for (message in messages) {
+        for (rawMessage in messages) {
+            val message = protectLargeHistoryMessage(rawMessage)
             val length = message.toString().length
             if (batch.isNotEmpty() && size + length > HISTORY_CHUNK_CHARS) {
                 activeBridge.send(HostMessages.history(batch, final = false))
@@ -510,10 +527,83 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
     }
 
     private fun toRecord(event: PiEvent): JsonElement? = when (event) {
-        is PiEvent.Session -> event.payload
+        is PiEvent.Session -> protectLargeToolRecord(event.payload)
         is PiEvent.ExtensionUiRequest -> event.payload
         is PiEvent.Response -> PiJson.encodeToJsonElement(RpcResponse.serializer(), event.response)
         is PiEvent.Unknown -> null
+    }
+
+    /** Prevents a multi-megabyte tool result from being injected into JCEF and rendered at once. */
+    private fun protectLargeToolRecord(payload: JsonObject): JsonElement {
+        val type = payload.string("type") ?: return payload
+        if (type != "tool_execution_update" && type != "tool_execution_end") return payload
+        val resultKey = if (type == "tool_execution_update") "partialResult" else "result"
+        val result = payload[resultKey] ?: return payload
+        val protectedResult = compactLargeResult(result) ?: return payload
+        return JsonObject(payload.toMutableMap().apply { put(resultKey, protectedResult) })
+    }
+
+    private fun protectLargeHistoryMessage(message: JsonElement): JsonElement {
+        val objectMessage = message as? JsonObject ?: return message
+        if (objectMessage.string("role") != "toolResult") return message
+        val content = objectMessage["content"] ?: return message
+        val protectedContent = compactLargeResult(content) ?: return message
+        return JsonObject(objectMessage.toMutableMap().apply { put("content", protectedContent) })
+    }
+
+    private fun compactLargeResult(result: JsonElement): JsonObject? {
+        val encodedSize = result.toString().toByteArray(Charsets.UTF_8).size
+        if (encodedSize <= MAX_TOOL_RESULT_BYTES) return null
+        val resultObject = result as? JsonObject
+        return JsonObject(
+            linkedMapOf(
+                "output" to JsonPrimitive(
+                    "[output omitted: ${formatBytes(encodedSize)}; open the full output file to inspect it]",
+                ),
+                "outputTruncated" to JsonPrimitive(true),
+                "details" to (resultObject?.get("details") ?: JsonObject(emptyMap())),
+            ),
+        )
+    }
+
+    private fun formatBytes(bytes: Int): String =
+        if (bytes >= 1024 * 1024) "${bytes / (1024 * 1024)} MB" else "${bytes / 1024} KB"
+
+
+    private fun themeMessage(): JsonElement {
+        val scheme = EditorColorsManager.getInstance().globalScheme
+        val background = scheme.defaultBackground
+        val foreground = scheme.defaultForeground
+        val border = blend(background, foreground, 0.22f)
+        val raised = blend(background, foreground, if (EditorColorsManager.getInstance().isDarkEditor) 0.12f else 0.06f)
+        // Some headless/startup LAFs expose these UI colors as null. Theme delivery must never
+        // prevent the tool window from being created, so use stable IDE-like fallbacks.
+        val accent = UIUtil.getActiveTextColor() ?: Color(0x2563EB)
+        val error = UIUtil.getErrorForeground() ?: Color(0xB42318)
+        return HostMessages.theme(
+            HostTheme(
+                background = cssColor(background),
+                foreground = cssColor(foreground),
+                foregroundDim = cssColor(blend(foreground, background, 0.42f)),
+                raisedBackground = cssColor(raised),
+                border = cssColor(border),
+                accent = cssColor(accent),
+                error = cssColor(error),
+                errorBackground = cssColor(blend(background, error, 0.14f)),
+                dark = EditorColorsManager.getInstance().isDarkEditor,
+                // Convert the IDE editor point size to CSS pixels while respecting the IDE scale.
+                fontSize = JBUI.scale(scheme.editorFontSize).toFloat(),
+            ),
+        )
+    }
+
+    private fun cssColor(color: java.awt.Color): String =
+        "#%02x%02x%02x".format(color.red, color.green, color.blue)
+
+    private fun blend(first: java.awt.Color, second: java.awt.Color, amount: Float): java.awt.Color {
+        val ratio = amount.coerceIn(0f, 1f)
+        fun channel(a: Int, b: Int): Int = (a + (b - a) * ratio).toInt().coerceIn(0, 255)
+        return java.awt.Color(channel(first.red, second.red), channel(first.green, second.green), channel(first.blue, second.blue))
     }
 
     private fun readWebviewHtml(): String? =
@@ -534,5 +624,6 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
         private const val FLUSH_INTERVAL_MS = 16L
         private const val HISTORY_CHUNK_CHARS = 256 * 1024
         private const val COMPACT_TIMEOUT_NOTICE = "compaction did not finish in time"
+        private const val MAX_TOOL_RESULT_BYTES = 2 * 1024 * 1024
     }
 }

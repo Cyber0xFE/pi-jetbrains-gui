@@ -15,6 +15,7 @@ import type {
   WireTextContent,
   WireThinkingContent,
   WireToolCallContent,
+  WireTheme,
 } from "../types";
 
 export interface TextBlock {
@@ -65,6 +66,8 @@ export interface ToolState {
   details?: Record<string, unknown>;
   /** `details.fullOutputPath` when the tool truncated its output (plan M2.7). */
   fullOutputPath?: string;
+  /** The host replaced an oversized result with a summary to keep JCEF responsive. */
+  outputTruncated?: boolean;
   /** Set for calls a tool made through `ctx.executeTool()` (plan M2.6). */
   parentCallId?: string;
   isError?: boolean;
@@ -84,6 +87,7 @@ export interface ChatState {
   busy: boolean;
   sending: boolean;
   status: WireStatus;
+  theme: WireTheme | null;
   notices: Notice[];
   noticeSeq: number;
   historyLoading: boolean;
@@ -111,6 +115,7 @@ export const initialState: ChatState = {
   busy: false,
   sending: false,
   status: { phase: "stopped", message: "not started" },
+  theme: null,
   notices: [],
   noticeSeq: 0,
   historyLoading: true,
@@ -152,6 +157,8 @@ export function reduce(state: ChatState, action: Action): ChatState {
 
 function applyInbound(state: ChatState, message: Inbound): ChatState {
   switch (message.type) {
+    case "theme":
+      return { ...state, theme: message.theme };
     case "status":
       return { ...state, status: message.status };
     case "records":
@@ -445,6 +452,7 @@ function onToolUpdate(state: ChatState, record: WireRecord): ChatState {
         output: parts.text ?? previous.output,
         details: parts.details ?? previous.details,
         fullOutputPath: parts.fullOutputPath ?? previous.fullOutputPath,
+        outputTruncated: parts.outputTruncated ?? previous.outputTruncated,
       },
     },
   };
@@ -468,6 +476,7 @@ function onToolEnd(state: ChatState, record: WireRecord): ChatState {
         output: parts.text ?? previous?.output,
         details: parts.details ?? previous?.details,
         fullOutputPath: parts.fullOutputPath ?? previous?.fullOutputPath,
+        outputTruncated: parts.outputTruncated ?? previous?.outputTruncated,
         parentCallId: record.parentToolCallId ?? previous?.parentCallId,
         isError,
         durationMs: typeof record.durationMs === "number" ? record.durationMs : previous?.durationMs,
@@ -560,6 +569,7 @@ function attachToolResult(state: ChatState, message: WireMessage): ChatState {
         output: parts.text ?? previous?.output,
         details: parts.details ?? previous?.details,
         fullOutputPath: parts.fullOutputPath ?? previous?.fullOutputPath,
+        outputTruncated: parts.outputTruncated ?? previous?.outputTruncated,
         parentCallId: previous?.parentCallId,
         isError: message.isError,
         durationMs: message.durationMs ?? previous?.durationMs,

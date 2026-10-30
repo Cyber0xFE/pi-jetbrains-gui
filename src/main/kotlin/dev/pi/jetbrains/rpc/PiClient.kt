@@ -38,7 +38,11 @@ class PiClient(
     private val requestTimeout: Duration = DEFAULT_TIMEOUT,
     private val onExit: (Int?) -> Unit = {},
 ) {
-    private class Pending(val command: RpcCommand, val deferred: CompletableDeferred<RpcResponse>)
+    private class Pending(
+        val command: RpcCommand,
+        val deferred: CompletableDeferred<RpcResponse>,
+        val deadline: Duration,
+    )
 
     private val _events = MutableSharedFlow<PiEvent>(
         extraBufferCapacity = 1024,
@@ -73,7 +77,7 @@ class PiClient(
         val id = command.id ?: "req-${sequence.incrementAndGet()}"
         val request = command.copy(id = id)
         val deferred = CompletableDeferred<RpcResponse>()
-        pending[id] = Pending(request, deferred)
+        pending[id] = Pending(request, deferred, timeout)
 
         val payload = PiJson.encodeToString(RpcCommand.serializer(), request)
         if (!process.writeLine(payload)) {
@@ -117,7 +121,7 @@ class PiClient(
         val request = pending.remove(id) ?: return
         log("request $id (${request.command.type}) timed out")
         request.deferred.completeExceptionally(
-            PiRequestTimeoutException(id, request.command.type, requestTimeout),
+            PiRequestTimeoutException(id, request.command.type, request.deadline),
         )
     }
 

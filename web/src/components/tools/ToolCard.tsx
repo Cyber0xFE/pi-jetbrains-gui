@@ -218,6 +218,7 @@ function bashView(tool: ToolState): ToolView {
             <pre className="tool-output tool-terminal">{tool.output}</pre>
           </details>
         )}
+        {tool.outputTruncated && <div className="tool-note tool-output-warning">output truncated to keep the UI responsive</div>}
         {tool.fullOutputPath !== undefined && (
           <div className="tool-actions">
             <PathLink path={tool.fullOutputPath} label="Open full output" className="path-link-action" />
@@ -342,6 +343,7 @@ function genericView(tool: ToolState): ToolView {
             <pre className="tool-output">{tool.output}</pre>
           </details>
         )}
+        {tool.outputTruncated && <div className="tool-note tool-output-warning">output truncated to keep the UI responsive</div>}
         {tool.fullOutputPath !== undefined && (
           <div className="tool-actions">
             <PathLink path={tool.fullOutputPath} label="Open full output" className="path-link-action" />

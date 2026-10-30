@@ -498,6 +498,10 @@ body {
   color: var(--error);
 }
 
+.tool-output-warning {
+  color: #b76b01;
+}
+
 .tool-section {
   margin-top: 2px;
 }
