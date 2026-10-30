@@ -46,7 +46,10 @@ export function App(): JSX.Element {
     root.style.setProperty("--accent", theme.accent);
     root.style.setProperty("--error", theme.error);
     root.style.setProperty("--error-bg", theme.errorBackground);
-    root.style.setProperty("--fs", `${Math.max(11, Math.min(24, theme.fontSize))}px`);
+    // The IDE editor font can be large (for example 24px), but using it as the base
+    // size makes the whole chat UI feel oversized. Keep the chat readable without
+    // allowing tool cards and the composer to balloon vertically.
+    root.style.setProperty("--fs", `${Math.max(12, Math.min(16, theme.fontSize))}px`);
   }, [state.theme]);
 
   const phase = state.status.phase;
