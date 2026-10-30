@@ -8,3 +8,4 @@ node_modules/
 .intellijPlatform/
 web/node_modules/
 web/dist/
+JETBRAINS_GUI_PLAN.md
