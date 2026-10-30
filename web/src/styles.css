@@ -564,20 +564,6 @@ body {
   vertical-align: baseline;
 }
 
-.thinking-ellipsis::after {
-  content: "...";
-  display: inline-block;
-  width: 0.35em;
-  overflow: hidden;
-  white-space: nowrap;
-  animation: thinking-ellipsis 1.2s steps(3, end) infinite;
-}
-
-@keyframes thinking-ellipsis {
-  from { width: 0.35em; }
-  to { width: 1.05em; }
-}
-
 .thinking pre {
   white-space: pre-wrap;
   word-break: break-word;
@@ -907,20 +893,6 @@ body {
   width: 1.1em;
   overflow: hidden;
   white-space: nowrap;
-}
-
-.connecting-ellipsis::after {
-  content: "...";
-  display: inline-block;
-  width: 0.35em;
-  overflow: hidden;
-  white-space: nowrap;
-  animation: connecting-ellipsis 1.2s steps(3, end) infinite;
-}
-
-@keyframes connecting-ellipsis {
-  from { width: 0.35em; }
-  to { width: 1.05em; }
 }
 
 .extension-widget {
@@ -1605,9 +1577,7 @@ body {
   .message,
   .button,
   .status-model,
-  .composer-input,
-  .connecting-ellipsis::after,
-  .thinking-ellipsis::after {
+  .composer-input {
     animation: none;
     transition: none;
   }

@@ -68,7 +68,7 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
       {connecting && (
         <div className="connecting-status" role="status" aria-label="正在连接服务">
           <span>正在连接服务</span>
-          <span className="connecting-ellipsis" aria-hidden="true" />
+          <AnimatedEllipsis className="connecting-ellipsis" />
         </div>
       )}
       {showLatestButton && (
@@ -210,6 +210,21 @@ function sameToolStates(
   return true;
 }
 
+function AnimatedEllipsis({ className }: { className: string }): JSX.Element {
+  const [count, setCount] = useState(1);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCount((current) => (current % 3) + 1), 400);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <span className={className} aria-hidden="true">
+      {".".repeat(count)}
+    </span>
+  );
+}
+
 function CopyMessageButton({ text }: { text: string }): JSX.Element {
   const [copied, setCopied] = useState(false);
 
@@ -273,7 +288,7 @@ function BlockView({ block, tools, streaming, thinkingLabel }: BlockProps): JSX.
         <details className="thinking">
           <summary>
             <span>{thinkingLabel ?? (block.redacted ? "thinking (redacted)" : "thinking")}</span>
-            {streaming && <span className="thinking-ellipsis" aria-hidden="true" />}
+            {streaming && <AnimatedEllipsis className="thinking-ellipsis" />}
           </summary>
           <pre>{block.text}</pre>
         </details>
