@@ -10,15 +10,11 @@ interface Props {
   cacheHitRate: number | null;
   /** `ctx.ui.setStatus()` texts, keyed by extension key. */
   extensionStatuses: Record<string, string>;
-  /** Footer send/stop action, mirroring the composer's Enter key. */
-  onSend: () => void;
-  onAbort: () => void;
   onOpenModels: () => void;
   /** Footer thinking-level entry, opening the thinking picker. */
   onOpenThinking: () => void;
   /** Footer `(auto)` entry, toggling automatic context compaction. */
   onToggleAutoCompaction: () => void;
-  canSend: boolean;
 }
 
 /**
@@ -28,7 +24,7 @@ interface Props {
  *
  * followed by extension statuses. Everything is dim except the context percentage, which turns
  * warning/error above 70%/90%. The model entry doubles as the model picker trigger and the thinking level next to it opens the thinking picker
- * (both moved from the toolbar).
+ * (both moved from the toolbar). Send/stop lives on the composer's corner button instead.
  */
 export function StatusBar({
   status,
@@ -37,12 +33,9 @@ export function StatusBar({
   modelCount,
   cacheHitRate,
   extensionStatuses,
-  onSend,
-  onAbort,
   onOpenModels,
   onOpenThinking,
   onToggleAutoCompaction,
-  canSend,
 }: Props): JSX.Element {
   const usage = status.usage ?? null;
   const contextWindow = status.context?.contextWindow ?? status.contextWindow ?? null;
@@ -131,15 +124,6 @@ export function StatusBar({
               title="Thinking level"
             >
               {thinkingLabel} ▾
-            </button>
-          )}
-          {busy ? (
-            <button type="button" className="button button-secondary button-footer" onClick={onAbort}>
-              Stop
-            </button>
-          ) : (
-            <button type="button" className="button button-footer" onClick={onSend} disabled={!canSend}>
-              Send
             </button>
           )}
         </div>

@@ -241,6 +241,7 @@ export function App(): JSX.Element {
         images={images}
         onAddImage={(image) => setImages((current) => [...current, image].slice(-4))}
         onRemoveImage={(index) => setImages((current) => current.filter((_, imageIndex) => imageIndex !== index))}
+        onAbort={abort}
       />
       {Object.values(state.widgets).filter((widget) => widget.placement === "belowEditor").map((widget, index) => (
         <div className="extension-widget" key={`below:${index}`}>{widget.lines.map((line, lineIndex) => <div key={lineIndex}>{line}</div>)}</div>
@@ -252,8 +253,6 @@ export function App(): JSX.Element {
         modelCount={state.models.length}
         cacheHitRate={state.cacheHitRate}
         extensionStatuses={state.extensionStatuses}
-        onSend={send}
-        onAbort={abort}
         onOpenModels={() => {
           post({ type: "get_models" });
           setDialog("models");
@@ -265,7 +264,6 @@ export function App(): JSX.Element {
         onToggleAutoCompaction={() =>
           post({ type: "set_auto_compaction", enabled: state.status.autoCompaction === false })
         }
-        canSend={ready && !state.sending && (draft.trim().length > 0 || images.length > 0)}
       />
 
       {dialog === "sessions" && (

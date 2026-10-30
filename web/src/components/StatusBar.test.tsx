@@ -14,12 +14,9 @@ function footer(status: WireStatus, overrides: Partial<Parameters<typeof StatusB
       modelCount={0}
       cacheHitRate={null}
       extensionStatuses={{}}
-      onSend={() => undefined}
-      onAbort={() => undefined}
       onOpenModels={() => undefined}
       onOpenThinking={() => undefined}
       onToggleAutoCompaction={() => undefined}
-      canSend={true}
       {...overrides}
     />
   );
@@ -143,28 +140,5 @@ describe("StatusBar", () => {
     render(footer({ phase: "failed", message: "pi exited unexpectedly (code=1)" }));
 
     expect(screen.getByText("pi exited unexpectedly (code=1)")).toBeDefined();
-  });
-
-  it("hosts the send action in the footer", () => {
-    const onSend = vi.fn();
-    render(footer({ phase: "running", message: "ready", model: "m" }, { onSend }));
-
-    const button = screen.getByRole("button", { name: "Send" });
-    expect((button as HTMLButtonElement).disabled).toBe(false);
-    fireEvent.click(button);
-    expect(onSend).toHaveBeenCalledTimes(1);
-  });
-
-  it("disables Send when there is nothing to send and swaps it for Stop while busy", () => {
-    const { rerender } = render(
-      footer({ phase: "running", message: "ready", model: "m" }, { canSend: false }),
-    );
-    expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true);
-
-    const onAbort = vi.fn();
-    rerender(footer({ phase: "running", message: "ready", model: "m" }, { busy: true, onAbort }));
-    const stop = screen.getByRole("button", { name: "Stop" });
-    fireEvent.click(stop);
-    expect(onAbort).toHaveBeenCalledTimes(1);
   });
 });

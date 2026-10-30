@@ -16,6 +16,8 @@ interface Props {
   images: PromptImage[];
   onAddImage: (image: PromptImage) => void;
   onRemoveImage: (index: number) => void;
+  /** Abort action for the corner stop button, mirroring the composer's Escape semantics. */
+  onAbort: () => void;
 }
 
 const MAX_SUGGESTIONS = 8;
@@ -23,7 +25,7 @@ const BUILTIN_COMMANDS: SlashCommand[] = [
   { name: "compact", description: "Compact the session context", source: "built-in" },
 ];
 
-/** The textarea plus the `/` command menu; sending is triggered by Enter or the footer button. */
+/** The textarea, its corner send/stop button and the `/` command menu; sending is triggered by Enter or the corner button. */
 export function Composer({
   value,
   onChange,
@@ -37,6 +39,7 @@ export function Composer({
   images,
   onAddImage,
   onRemoveImage,
+  onAbort,
 }: Props): JSX.Element {
   const [highlight, setHighlight] = useState(0);
   const [dismissed, setDismissed] = useState(false);
@@ -189,23 +192,45 @@ export function Composer({
           ))}
         </div>
       )}
-      <textarea
-        aria-label="Message to pi"
-        aria-multiline="true"
-        ref={textarea}
-        className="composer-input"
-        value={value}
-        onChange={(event) => handleChange(event.target.value)}
-        onPaste={handlePaste}
-        onKeyDown={handleKeyDown}
-        placeholder={
-          disabled
-            ? "pi is not running"
-            : "Send a message to pi… (Enter to send, Shift+Enter for a newline, / for commands)"
-        }
-        rows={3}
-        spellCheck={false}
-      />
+      <div className="composer-input-wrap">
+        <textarea
+          aria-label="Message to pi"
+          aria-multiline="true"
+          ref={textarea}
+          className="composer-input"
+          value={value}
+          onChange={(event) => handleChange(event.target.value)}
+          onPaste={handlePaste}
+          onKeyDown={handleKeyDown}
+          placeholder={
+            disabled
+              ? "pi is not running"
+              : "Send a message to pi… (Enter to send, Shift+Enter for a newline, / for commands)"
+          }
+          rows={3}
+          spellCheck={false}
+        />
+        {busy ? (
+          <button type="button" className="composer-send composer-send-stop" onClick={onAbort} title="Stop" aria-label="Stop">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true">
+              <rect x="5" y="5" width="14" height="14" rx="2" />
+            </svg>
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="composer-send"
+            onClick={onSend}
+            disabled={disabled || (value.trim().length === 0 && images.length === 0)}
+            title="Send"
+            aria-label="Send"
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+              <path d="M3.4 20.4 22 12 3.4 3.6v6.53L15 12 3.39 13.87z" />
+            </svg>
+          </button>
+        )}
+      </div>
     </div>
   );
 }

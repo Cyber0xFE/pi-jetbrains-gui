@@ -1002,12 +1002,18 @@ body {
   line-height: 15px;
 }
 
+.composer-input-wrap {
+  position: relative;
+  display: flex;
+  flex: 1;
+}
+
 .composer-input {
   flex: 1;
   resize: none;
   min-height: 72px;
   max-height: 32vh;
-  padding: 10px 12px;
+  padding: 10px 44px 10px 12px;
   font-family: inherit;
   font-size: 0.98em;
   line-height: 1.5;
@@ -1023,6 +1029,45 @@ body {
 .composer-input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+/* Semi-transparent send/stop icon pinned to the textarea's bottom-right corner. */
+.composer-send {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--accent);
+  opacity: 0.45;
+  cursor: pointer;
+  transition: opacity 120ms ease, background 120ms ease;
+}
+
+.composer-send:hover:not(:disabled),
+.composer-send:focus-visible:not(:disabled) {
+  opacity: 1;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.composer-send:disabled {
+  opacity: 0.22;
+  cursor: default;
+}
+
+.composer-send-stop {
+  color: var(--fg);
+}
+
+.composer-send-stop:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--fg) 10%, transparent);
 }
 
 .button {
