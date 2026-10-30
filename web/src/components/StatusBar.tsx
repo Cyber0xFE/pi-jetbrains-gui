@@ -1,32 +1,102 @@
+import { formatCost, formatTokens } from "../format";
 import type { WireStatus } from "../types";
 
 interface Props {
   status: WireStatus;
   busy: boolean;
+  /** Latest assistant message cache read / prompt tokens, as a percentage. */
+  cacheHitRate: number | null;
+  /** `ctx.ui.setStatus()` texts, keyed by extension key. */
+  extensionStatuses: Record<string, string>;
+  /** Footer send/stop action, mirroring the composer's Enter key. */
+  onSend: () => void;
+  onAbort: () => void;
+  canSend: boolean;
 }
 
-export function StatusBar({ status, busy }: Props): JSX.Element {
-  const context = status.context;
-  const contextLabel =
-    context && context.tokens !== null && context.contextWindow !== null
-      ? `${formatTokens(context.tokens)} / ${formatTokens(context.contextWindow)}${context.percent !== null ? ` (${Math.round(context.percent)}%)` : ""}`
-      : null;
+/**
+ * TUI-style footer (plan M2), one line like pi's `FooterComponent` stats row:
+ *
+ * `↑12k ↓3.4k R99k W2k CH59.2% $0.043 35.9%/524k (auto)   (provider) model • high`
+ *
+ * followed by extension statuses. Everything is dim except the context percentage, which turns
+ * warning/error above 70%/90%.
+ */
+export function StatusBar({
+  status,
+  busy,
+  cacheHitRate,
+  extensionStatuses,
+  onSend,
+  onAbort,
+  canSend,
+}: Props): JSX.Element {
+  const usage = status.usage ?? null;
+  const contextWindow = status.context?.contextWindow ?? status.contextWindow ?? null;
+  const percent = status.context?.percent ?? null;
+  const auto = status.autoCompaction === false ? "" : " (auto)";
+
+  const contextDisplay =
+    percent === null
+      ? `?/${contextWindow === null ? "?" : formatTokens(contextWindow)}${auto}`
+      : `${percent.toFixed(1)}%/${contextWindow === null ? "?" : formatTokens(contextWindow)}${auto}`;
+  const contextClass =
+    percent !== null && percent > 90
+      ? "status-context status-context-critical"
+      : percent !== null && percent > 70
+        ? "status-context status-context-warning"
+        : "status-context";
+
+  const cacheRead = usage?.cacheRead ?? 0;
+  const cacheWrite = usage?.cacheWrite ?? 0;
+  const showCacheHit = (cacheRead > 0 || cacheWrite > 0) && cacheHitRate !== null;
+
+  const model = status.model ?? "no model";
+  const showThinking = status.reasoning !== false && status.thinkingLevel !== null && status.thinkingLevel !== undefined;
+  const thinkingLabel = status.thinkingLevel === "off" ? "thinking off" : (status.thinkingLevel ?? "off");
+  const modelLabel = `${status.provider ? `(${status.provider}) ` : ""}${model}`;
+
+  const extensionLine = Object.entries(extensionStatuses)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, text]) => text.replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim())
+    .filter((text) => text.length > 0)
+    .join(" ");
 
   return (
-    <div className={`statusbar statusbar-${status.phase}`}>
-      <span className="status-model" title={status.node ?? undefined}>
-        {status.model ?? "no model"}
-        {status.thinkingLevel ? ` · ${status.thinkingLevel}` : ""}
-      </span>
-      {contextLabel && <span className="status-context">{contextLabel}</span>}
-      {(busy || status.isStreaming) && <span className="status-streaming">running…</span>}
-      {status.phase !== "running" && <span className="status-phase">{status.message}</span>}
-    </div>
+    <footer className={`statusbar statusbar-${status.phase}`}>
+      <div className="status-main">
+        <div className="status-stats">
+          {usage?.input ? <span>↑{formatTokens(usage.input)}</span> : null}
+          {usage?.output ? <span>↓{formatTokens(usage.output)}</span> : null}
+          {cacheRead > 0 ? <span>R{formatTokens(cacheRead)}</span> : null}
+          {cacheWrite > 0 ? <span>W{formatTokens(cacheWrite)}</span> : null}
+          {showCacheHit ? <span>CH{cacheHitRate.toFixed(1)}%</span> : null}
+          {usage?.cost ? <span>{formatCost(usage.cost)}</span> : null}
+          <span className={contextClass}>{contextDisplay}</span>
+          {status.isCompacting && <span className="status-streaming">compacting…</span>}
+          {(busy || status.isStreaming) && <span className="status-streaming">running…</span>}
+        </div>
+        <div className="status-right">
+          <div
+            className="status-model"
+            title={status.provider ? `${status.provider} / ${model}` : model}
+          >
+            {modelLabel}
+            {showThinking ? ` • ${thinkingLabel}` : ""}
+          </div>
+          {busy ? (
+            <button type="button" className="button button-secondary button-footer" onClick={onAbort}>
+              Stop
+            </button>
+          ) : (
+            <button type="button" className="button button-footer" onClick={onSend} disabled={!canSend}>
+              Send
+            </button>
+          )}
+        </div>
+      </div>
+      {extensionLine.length > 0 && <div className="status-extensions">{extensionLine}</div>}
+      {status.phase !== "running" && <div className="status-phase">{status.message}</div>}
+    </footer>
   );
-}
-
-function formatTokens(tokens: number): string {
-  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
-  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
-  return String(tokens);
 }

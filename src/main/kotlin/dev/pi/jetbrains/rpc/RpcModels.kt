@@ -70,6 +70,8 @@ data class RpcModelInfo(
     val name: String? = null,
     val provider: String? = null,
     val api: String? = null,
+    val reasoning: Boolean? = null,
+    val contextWindow: Long? = null,
 )
 
 /** Subset of `RpcSessionState`; unknown fields are ignored. */
@@ -82,6 +84,7 @@ data class RpcSessionState(
     val sessionId: String? = null,
     val sessionFile: String? = null,
     val sessionName: String? = null,
+    val autoCompactionEnabled: Boolean? = null,
     val messageCount: Int = 0,
     val pendingMessageCount: Int = 0,
 )
@@ -99,8 +102,20 @@ data class RpcContextUsage(
     val percent: Double? = null,
 )
 
-/** Subset of `SessionStats`; only the fields the GUI shows. */
+/** Cumulative token usage from `get_session_stats`. */
+@Serializable
+data class RpcTokens(
+    val input: Long = 0,
+    val output: Long = 0,
+    val cacheRead: Long = 0,
+    val cacheWrite: Long = 0,
+    val total: Long = 0,
+)
+
+/** Subset of `SessionStats`; the footer shows totals, cost and context usage. */
 @Serializable
 data class RpcSessionStats(
+    val tokens: RpcTokens? = null,
+    val cost: Double? = null,
     val contextUsage: RpcContextUsage? = null,
 )

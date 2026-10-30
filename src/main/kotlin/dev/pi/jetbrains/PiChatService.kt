@@ -57,6 +57,11 @@ class PiChatService(private val project: Project) : Disposable {
         val tokens: Long? = null,
         val contextWindow: Long? = null,
         val percent: Double? = null,
+        val input: Long? = null,
+        val output: Long? = null,
+        val cacheRead: Long? = null,
+        val cacheWrite: Long? = null,
+        val cost: Double? = null,
     )
 
     data class Status(
@@ -66,8 +71,13 @@ class PiChatService(private val project: Project) : Disposable {
         val pi: String? = null,
         val sessionId: String? = null,
         val model: String? = null,
+        val provider: String? = null,
+        val reasoning: Boolean? = null,
         val thinkingLevel: String? = null,
         val isStreaming: Boolean = false,
+        val isCompacting: Boolean = false,
+        val autoCompaction: Boolean = true,
+        val contextWindow: Long? = null,
         val context: StatusUsage? = null,
     )
 
@@ -94,7 +104,8 @@ class PiChatService(private val project: Project) : Disposable {
     fun start() {
         if (_status.value.phase == Phase.STARTING || _status.value.phase == Phase.RUNNING) return
         stopRequested = false
-        _status.update { it.copy(phase = Phase.STARTING, message = "resolving node and pi") }
+        // Drop stats from a previous process so the footer never shows a stale session.
+        _status.update { Status(phase = Phase.STARTING, message = "resolving node and pi") }
 
         startJob = scope.launch {
             val nodeRuntime = when (val node = NodeRuntimeResolver(bundledNode = bundledNodeBinary()).resolve()) {
@@ -191,8 +202,13 @@ class PiChatService(private val project: Project) : Disposable {
                     message = "ready",
                     sessionId = state.sessionId,
                     model = state.model?.id,
+                    provider = state.model?.provider,
+                    reasoning = state.model?.reasoning,
+                    contextWindow = state.model?.contextWindow,
                     thinkingLevel = state.thinkingLevel,
                     isStreaming = state.isStreaming,
+                    isCompacting = state.isCompacting,
+                    autoCompaction = state.autoCompactionEnabled ?: it.autoCompaction,
                 )
             }
         }
@@ -206,14 +222,25 @@ class PiChatService(private val project: Project) : Disposable {
     suspend fun abort(): RpcResponse =
         requireClient().send(RpcCommand(type = "abort")).await()
 
-    /** Reads `get_session_stats` and refreshes the context-usage part of the status line. */
+    /** Reads `get_session_stats` and refreshes the usage/context part of the footer. */
     suspend fun requestStats(): RpcResponse {
         val response = requireClient().send(RpcCommand(type = "get_session_stats")).await()
         if (response.success) {
-            val usage = response.decodeDataAs<RpcSessionStats>()?.contextUsage
+            val stats = response.decodeDataAs<RpcSessionStats>()
             _status.update {
                 it.copy(
-                    context = usage?.let { StatusUsage(it.tokens, it.contextWindow, it.percent) },
+                    context = stats?.let { s ->
+                        StatusUsage(
+                            tokens = s.contextUsage?.tokens,
+                            contextWindow = s.contextUsage?.contextWindow,
+                            percent = s.contextUsage?.percent,
+                            input = s.tokens?.input,
+                            output = s.tokens?.output,
+                            cacheRead = s.tokens?.cacheRead,
+                            cacheWrite = s.tokens?.cacheWrite,
+                            cost = s.cost,
+                        )
+                    } ?: it.context,
                 )
             }
         }
@@ -267,6 +294,16 @@ class PiChatService(private val project: Project) : Disposable {
                     }
                 }
             }
+            "message_end" -> {
+                // Keep the token/cost totals moving during a run, not only at settle time.
+                val role = (event.payload["message"] as? JsonObject)
+                    ?.let { (it["role"] as? JsonPrimitive)?.contentOrNull }
+                if (role == "assistant" && !stopRequested) {
+                    scope.launch { runCatching { requestStats() } }
+                }
+            }
+            "compaction_start" -> _status.update { it.copy(isCompacting = true) }
+            "compaction_end" -> _status.update { it.copy(isCompacting = false) }
             "thinking_level_changed" -> {
                 val level = (event.payload["level"] as? JsonPrimitive)?.contentOrNull
                 if (level != null) _status.update { it.copy(thinkingLevel = level) }

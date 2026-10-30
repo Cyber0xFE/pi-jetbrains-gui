@@ -46,6 +46,7 @@ export interface WireMessage {
   toolName?: string;
   isError?: boolean;
   durationMs?: number;
+  usage?: WireUsage;
   details?: unknown;
 }
 
@@ -77,6 +78,16 @@ export interface WireRecord {
   success?: boolean;
   error?: string;
   level?: string;
+  /** `tool_execution_*` of a call another tool made (M2 nested cards). */
+  parentToolCallId?: string;
+  /** `bash_execution_update` correlation id and output delta. */
+  id?: string;
+  delta?: string;
+  /** `extension_ui_request` fields the UI understands. */
+  method?: string;
+  label?: string;
+  statusKey?: string;
+  statusText?: string;
   [key: string]: unknown;
 }
 
@@ -84,6 +95,24 @@ export interface ContextUsage {
   tokens: number | null;
   contextWindow: number | null;
   percent: number | null;
+}
+
+/** Cumulative session usage from `get_session_stats`. */
+export interface UsageTotals {
+  input?: number | null;
+  output?: number | null;
+  cacheRead?: number | null;
+  cacheWrite?: number | null;
+  cost?: number | null;
+}
+
+/** Per-message `usage` used to derive the cache hit rate (TUI `CH` stat). */
+export interface WireUsage {
+  input?: number;
+  output?: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+  cost?: { total?: number } | number;
 }
 
 export type WirePhase = "stopped" | "starting" | "running" | "failed";
@@ -95,8 +124,14 @@ export interface WireStatus {
   pi?: string | null;
   sessionId?: string | null;
   model?: string | null;
+  provider?: string | null;
+  reasoning?: boolean | null;
   thinkingLevel?: string | null;
   isStreaming?: boolean;
+  isCompacting?: boolean;
+  autoCompaction?: boolean;
+  usage?: UsageTotals | null;
+  contextWindow?: number | null;
   context?: ContextUsage | null;
 }
 
@@ -116,4 +151,6 @@ export type Outbound =
   | { type: "prompt"; message: string }
   | { type: "abort" }
   | { type: "request_state" }
+  | { type: "open_path"; path: string; line?: number }
+  | { type: "open_url"; url: string }
   | { type: "log"; message: string };

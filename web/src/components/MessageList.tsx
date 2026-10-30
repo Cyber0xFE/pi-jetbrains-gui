@@ -1,15 +1,17 @@
 import { useEffect, useRef } from "react";
 import type { Block, ChatMessage, ToolState } from "../state/sessionReducer";
-import { ToolCard } from "./ToolCard";
+import { Markdown } from "./Markdown";
+import { ToolCard } from "./tools/ToolCard";
 
 interface Props {
   messages: ChatMessage[];
   tools: Record<string, ToolState>;
   loadingHistory: boolean;
   emptyHint: string;
+  thinkingLabel: string | null;
 }
 
-export function MessageList({ messages, tools, loadingHistory, emptyHint }: Props): JSX.Element {
+export function MessageList({ messages, tools, loadingHistory, emptyHint, thinkingLabel }: Props): JSX.Element {
   const scroller = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
 
@@ -32,7 +34,13 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint }: Prop
       {messages.map((message) => (
         <article key={message.id} className={`message message-${message.role}`}>
           {message.blocks.map((block, index) => (
-            <BlockView key={index} block={block} tools={tools} />
+            <BlockView
+              key={index}
+              block={block}
+              tools={tools}
+              streaming={message.streaming}
+              thinkingLabel={thinkingLabel}
+            />
           ))}
           {message.streaming && message.blocks.length === 0 && <div className="typing">…</div>}
           {message.stopReason === "error" && (
@@ -50,19 +58,26 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint }: Prop
   );
 }
 
-function BlockView({ block, tools }: { block: Block; tools: Record<string, ToolState> }): JSX.Element | null {
+interface BlockProps {
+  block: Block;
+  tools: Record<string, ToolState>;
+  streaming: boolean;
+  thinkingLabel: string | null;
+}
+
+function BlockView({ block, tools, streaming, thinkingLabel }: BlockProps): JSX.Element | null {
   switch (block.kind) {
     case "text":
-      return <div className="text">{block.text}</div>;
+      return <Markdown text={block.text} streaming={streaming} />;
     case "thinking":
       return (
         <details className="thinking">
-          <summary>{block.redacted ? "thinking (redacted)" : "thinking"}</summary>
+          <summary>{thinkingLabel ?? (block.redacted ? "thinking (redacted)" : "thinking")}</summary>
           <pre>{block.text}</pre>
         </details>
       );
     case "tool":
-      return <ToolCard name={block.name} callId={block.callId} tool={tools[block.callId]} />;
+      return <ToolCard name={block.name} callId={block.callId} tool={tools[block.callId]} tools={tools} />;
     case "image":
       return <img className="image" alt="" src={`data:${block.mimeType};base64,${block.data}`} />;
     default:

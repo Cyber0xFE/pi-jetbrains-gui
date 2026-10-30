@@ -5,4 +5,4 @@ pluginManagement {
     }
 }
 
-rootProject.name = "pi-jetbrains"
+rootProject.name = "pi-jetbrains-gui"

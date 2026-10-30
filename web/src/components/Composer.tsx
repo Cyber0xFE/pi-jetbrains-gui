@@ -4,12 +4,12 @@ interface Props {
   value: string;
   onChange: (value: string) => void;
   onSend: () => void;
-  onAbort: () => void;
   disabled: boolean;
   busy: boolean;
 }
 
-export function Composer({ value, onChange, onSend, onAbort, disabled, busy }: Props): JSX.Element {
+/** The textarea only; sending is triggered by Enter or the footer button. */
+export function Composer({ value, onChange, onSend, disabled, busy }: Props): JSX.Element {
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
     if (event.key !== "Enter") return;
     if (event.shiftKey) return;
@@ -28,22 +28,6 @@ export function Composer({ value, onChange, onSend, onAbort, disabled, busy }: P
         rows={3}
         spellCheck={false}
       />
-      <div className="composer-actions">
-        {busy ? (
-          <button type="button" className="button button-secondary" onClick={onAbort}>
-            Stop
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="button"
-            onClick={onSend}
-            disabled={disabled || value.trim().length === 0}
-          >
-            Send
-          </button>
-        )}
-      </div>
     </div>
   );
 }

@@ -1,6 +1,8 @@
 package dev.pi.jetbrains.ui
 
 import dev.pi.jetbrains.PiChatService
+import dev.pi.jetbrains.rpc.PiJson
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -26,14 +28,26 @@ class WebviewBundleTest {
     }
 
     @Test
-    fun `status messages carry the fields the UI reads`() {
+    fun `status messages carry the fields the footer reads`() {
         val status = PiChatService.Status(
             phase = PiChatService.Phase.RUNNING,
             message = "ready",
             model = "claude-sonnet-4-5",
+            provider = "anthropic",
+            reasoning = true,
             thinkingLevel = "high",
             isStreaming = true,
-            context = PiChatService.StatusUsage(tokens = 1_000L, contextWindow = 200_000L, percent = 0.5),
+            autoCompaction = true,
+            context = PiChatService.StatusUsage(
+                tokens = 188_000L,
+                contextWindow = 524_000L,
+                percent = 35.9,
+                input = 197_000L,
+                output = 119_000L,
+                cacheRead = 13_000_000L,
+                cacheWrite = 2_500L,
+                cost = 0.043,
+            ),
         )
 
         val json = HostMessages.status(status).toString()
@@ -41,9 +55,13 @@ class WebviewBundleTest {
         assertTrue(json.contains("\"type\":\"status\""), json)
         assertTrue(json.contains("\"phase\":\"running\""), json)
         assertTrue(json.contains("\"model\":\"claude-sonnet-4-5\""), json)
+        assertTrue(json.contains("\"provider\":\"anthropic\""), json)
         assertTrue(json.contains("\"thinkingLevel\":\"high\""), json)
         assertTrue(json.contains("\"isStreaming\":true"), json)
-        assertTrue(json.contains("\"percent\":0.5"), json)
+        assertTrue(json.contains("\"input\":197000"), json)
+        assertTrue(json.contains("\"cacheRead\":13000000"), json)
+        assertTrue(json.contains("\"cost\":0.043"), json)
+        assertTrue(json.contains("\"percent\":35.9"), json)
     }
 
     @Test
@@ -52,6 +70,18 @@ class WebviewBundleTest {
 
         assertTrue(json.contains("\"type\":\"history\""), json)
         assertTrue(json.contains("\"final\":true"), json)
+    }
+
+    @Test
+    fun `open_path messages carry the file and line`() {
+        val message = PiJson.decodeFromString(
+            ClientMessage.serializer(),
+            """{"type":"open_path","path":"src/index.ts","line":42}""",
+        )
+
+        assertEquals("open_path", message.type)
+        assertEquals("src/index.ts", message.path)
+        assertEquals(42, message.line)
     }
 
     private fun readBundle(): String {

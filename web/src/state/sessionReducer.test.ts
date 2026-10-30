@@ -213,4 +213,109 @@ describe("sessionReducer", () => {
       { kind: "text", text: "answer" },
     ]);
   });
+
+  it("keeps tool details and the full-output path from the result", () => {
+    const state = apply(
+      initialState,
+      records({
+        type: "tool_execution_end",
+        toolCallId: "call-bash",
+        toolName: "bash",
+        result: {
+          content: [{ type: "text", text: "tail of output" }],
+          details: { fullOutputPath: "/tmp/out.log", truncation: { truncated: true } },
+        },
+        isError: false,
+      }),
+    );
+
+    expect(state.tools["call-bash"]?.output).toBe("tail of output");
+    expect(state.tools["call-bash"]?.fullOutputPath).toBe("/tmp/out.log");
+    expect(state.tools["call-bash"]?.details).toMatchObject({ truncation: { truncated: true } });
+  });
+
+  it("remembers parentToolCallId for nested calls", () => {
+    const state = apply(
+      initialState,
+      records(
+        {
+          type: "tool_execution_start",
+          toolCallId: "parent",
+          toolName: "task",
+          args: { goal: "x" },
+        },
+        {
+          type: "tool_execution_start",
+          toolCallId: "parent/1",
+          toolName: "read",
+          args: { path: "a.ts" },
+          parentToolCallId: "parent",
+        },
+      ),
+    );
+
+    expect(state.tools["parent/1"]?.parentCallId).toBe("parent");
+  });
+
+  it("appends bash_execution_update deltas to the matching card", () => {
+    const started = apply(
+      initialState,
+      records({ type: "tool_execution_start", toolCallId: "req-7", toolName: "bash", args: { command: "ls" } }),
+    );
+    const appended = apply(
+      started,
+      records(
+        { type: "bash_execution_update", id: "req-7", delta: "one\n" },
+        { type: "bash_execution_update", id: "req-7", delta: "two\n" },
+      ),
+    );
+
+    expect(appended.tools["req-7"]?.output).toBe("one\ntwo\n");
+  });
+
+  it("honours an extension-provided hidden thinking label", () => {
+    const labelled = apply(
+      initialState,
+      records({ type: "extension_ui_request", method: "setHiddenThinkingLabel", label: "reasoning" }),
+    );
+    expect(labelled.thinkingLabel).toBe("reasoning");
+
+    const cleared = apply(
+      labelled,
+      records({ type: "extension_ui_request", method: "setHiddenThinkingLabel" }),
+    );
+    expect(cleared.thinkingLabel).toBeNull();
+  });
+
+  it("recovers tool arguments from assistant history blocks", () => {
+    const state = apply(initialState, {
+      kind: "inbound",
+      message: {
+        type: "history",
+        final: true,
+        messages: [
+          {
+            role: "assistant",
+            timestamp: 20,
+            stopReason: "toolUse",
+            content: [
+              { type: "toolCall", id: "call-h", name: "edit", arguments: { path: "src/h.ts", edits: [] } },
+            ],
+          },
+          {
+            role: "toolResult",
+            toolCallId: "call-h",
+            toolName: "edit",
+            content: [{ type: "text", text: "edited" }],
+            details: { diff: "+1 changed", firstChangedLine: 1 },
+            timestamp: 21,
+          },
+        ],
+      },
+    });
+
+    expect(state.tools["call-h"]?.args).toEqual({ path: "src/h.ts", edits: [] });
+    expect(state.tools["call-h"]?.details).toEqual({ diff: "+1 changed", firstChangedLine: 1 });
+    expect(state.tools["call-h"]?.status).toBe("done");
+  });
 });

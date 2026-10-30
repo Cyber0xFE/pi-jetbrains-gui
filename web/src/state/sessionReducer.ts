@@ -1,3 +1,4 @@
+import { toolResultParts } from "../tools/result";
 import type {
   AssistantDelta,
   Inbound,
@@ -56,6 +57,12 @@ export interface ToolState {
   status: ToolStatus;
   args?: unknown;
   output?: string;
+  /** Structured `result.details`; `edit` keeps its display diff here. */
+  details?: Record<string, unknown>;
+  /** `details.fullOutputPath` when the tool truncated its output (plan M2.7). */
+  fullOutputPath?: string;
+  /** Set for calls a tool made through `ctx.executeTool()` (plan M2.6). */
+  parentCallId?: string;
   isError?: boolean;
   durationMs?: number;
 }
@@ -76,6 +83,12 @@ export interface ChatState {
   notices: Notice[];
   noticeSeq: number;
   historyLoading: boolean;
+  /** `extension_ui_request` / `setHiddenThinkingLabel`; null means the default label. */
+  thinkingLabel: string | null;
+  /** Cache-read share of the latest assistant prompt (`CH` in the TUI footer). */
+  cacheHitRate: number | null;
+  /** `ctx.ui.setStatus()` texts, keyed by extension key. */
+  extensionStatuses: Record<string, string>;
 }
 
 export const initialState: ChatState = {
@@ -88,6 +101,9 @@ export const initialState: ChatState = {
   notices: [],
   noticeSeq: 0,
   historyLoading: true,
+  thinkingLabel: null,
+  cacheHitRate: null,
+  extensionStatuses: {},
 };
 
 export type Action =
@@ -140,6 +156,10 @@ function applyRecord(state: ChatState, record: WireRecord): ChatState {
       return onToolUpdate(state, record);
     case "tool_execution_end":
       return onToolEnd(state, record);
+    case "bash_execution_update":
+      return onBashUpdate(state, record);
+    case "extension_ui_request":
+      return onExtensionUiRequest(state, record);
     case "agent_start":
       return { ...state, busy: true, sending: false };
     case "agent_settled":
@@ -201,13 +221,9 @@ function onMessageUpdate(state: ChatState, delta: AssistantDelta | undefined): C
     tools = {
       ...tools,
       [call.id]: {
-        callId: call.id,
+        ...(previous ?? { callId: call.id, name: call.name, status: "running" as ToolStatus }),
         name: call.name,
-        status: previous?.status ?? "running",
         args: call.arguments ?? previous?.args,
-        output: previous?.output,
-        isError: previous?.isError,
-        durationMs: previous?.durationMs,
       },
     };
   }
@@ -293,11 +309,43 @@ function onMessageEnd(state: ChatState, message: WireMessage | undefined): ChatS
     ? state.messages.map((candidate) => (candidate.id === existing.id ? rebuilt : candidate))
     : [...state.messages, rebuilt];
 
-  return {
-    ...state,
-    messages,
-    streamingMessageId: state.streamingMessageId === rebuilt.id ? null : state.streamingMessageId,
-  };
+  return withCacheHitRate(
+    seedToolCalls(
+      {
+        ...state,
+        messages,
+        streamingMessageId: state.streamingMessageId === rebuilt.id ? null : state.streamingMessageId,
+      },
+      message,
+      "running",
+    ),
+    message,
+  );
+}
+
+/**
+ * History only replays `toolCall` content blocks, not `tool_execution_start`, so the card's
+ * arguments are recovered from the assistant message itself. Without this, a reopened transcript
+ * would render every `read`/`edit`/`bash` card without its path, command or diff preview.
+ */
+function seedToolCalls(state: ChatState, message: WireMessage, fallbackStatus: ToolStatus): ChatState {
+  if (message.role !== "assistant" || !Array.isArray(message.content)) return state;
+  let tools = state.tools;
+  for (const content of message.content) {
+    if (content.type !== "toolCall") continue;
+    const call = content as WireToolCallContent;
+    if (typeof call.id !== "string" || call.id.length === 0) continue;
+    const previous = tools[call.id];
+    tools = {
+      ...tools,
+      [call.id]: {
+        ...(previous ?? { callId: call.id, name: call.name, status: fallbackStatus }),
+        name: call.name,
+        args: call.arguments ?? previous?.args,
+      },
+    };
+  }
+  return tools === state.tools ? state : { ...state, tools };
 }
 
 function onToolStart(state: ChatState, record: WireRecord): ChatState {
@@ -307,18 +355,35 @@ function onToolStart(state: ChatState, record: WireRecord): ChatState {
     ...state,
     tools: {
       ...state.tools,
-      [callId]: { callId, name: record.toolName ?? "tool", status: "running", args: record.args },
+      [callId]: {
+        callId,
+        name: record.toolName ?? "tool",
+        status: "running",
+        args: record.args,
+        parentCallId: record.parentToolCallId,
+      },
     },
   };
 }
 
+/** `tool_execution_update.partialResult` is a snapshot of the output so far, not a delta. */
 function onToolUpdate(state: ChatState, record: WireRecord): ChatState {
   const callId = record.toolCallId;
   const previous = callId ? state.tools[callId] : undefined;
   if (!callId || !previous) return state;
-  const output = textOf(record.partialResult);
-  if (!output) return state;
-  return { ...state, tools: { ...state.tools, [callId]: { ...previous, output } } };
+  const parts = toolResultParts(record.partialResult);
+  return {
+    ...state,
+    tools: {
+      ...state.tools,
+      [callId]: {
+        ...previous,
+        output: parts.text ?? previous.output,
+        details: parts.details ?? previous.details,
+        fullOutputPath: parts.fullOutputPath ?? previous.fullOutputPath,
+      },
+    },
+  };
 }
 
 function onToolEnd(state: ChatState, record: WireRecord): ChatState {
@@ -326,6 +391,7 @@ function onToolEnd(state: ChatState, record: WireRecord): ChatState {
   if (!callId) return state;
   const previous = state.tools[callId];
   const isError = record.isError === true;
+  const parts = toolResultParts(record.result);
   return {
     ...state,
     tools: {
@@ -335,7 +401,10 @@ function onToolEnd(state: ChatState, record: WireRecord): ChatState {
         name: record.toolName ?? previous?.name ?? "tool",
         status: isError ? "error" : "done",
         args: previous?.args,
-        output: textOf(record.result) ?? previous?.output,
+        output: parts.text ?? previous?.output,
+        details: parts.details ?? previous?.details,
+        fullOutputPath: parts.fullOutputPath ?? previous?.fullOutputPath,
+        parentCallId: record.parentToolCallId ?? previous?.parentCallId,
         isError,
         durationMs: typeof record.durationMs === "number" ? record.durationMs : previous?.durationMs,
       },
@@ -343,10 +412,65 @@ function onToolEnd(state: ChatState, record: WireRecord): ChatState {
   };
 }
 
+/**
+ * `bash_execution_update` is emitted by `executeBash` (the `bash` command), keyed by request id,
+ * and only carries deltas. Tool-issued `bash` calls stream through `tool_execution_update`
+ * snapshots instead, so both paths end up on the same card shape.
+ */
+function onBashUpdate(state: ChatState, record: WireRecord): ChatState {
+  const callId = record.id;
+  const previous = callId ? state.tools[callId] : undefined;
+  if (!callId || !previous || typeof record.delta !== "string") return state;
+  return {
+    ...state,
+    tools: {
+      ...state.tools,
+      [callId]: { ...previous, output: (previous.output ?? "") + record.delta },
+    },
+  };
+}
+
+function onExtensionUiRequest(state: ChatState, record: WireRecord): ChatState {
+  switch (record.method) {
+    case "setHiddenThinkingLabel": {
+      const label = typeof record.label === "string" && record.label.length > 0 ? record.label : null;
+      return { ...state, thinkingLabel: label };
+    }
+    case "setStatus": {
+      const key = typeof record.statusKey === "string" ? record.statusKey : undefined;
+      if (key === undefined) return state;
+      const text = typeof record.statusText === "string" ? record.statusText : undefined;
+      const extensionStatuses = { ...state.extensionStatuses };
+      if (text === undefined) delete extensionStatuses[key];
+      else extensionStatuses[key] = text;
+      return { ...state, extensionStatuses };
+    }
+    default:
+      return state;
+  }
+}
+
+/**
+ * Mirrors the TUI's `latestCacheHitRate`: cache reads over the whole prompt of the most recent
+ * assistant message (input + cacheRead + cacheWrite). Undefined until a message reports cache use.
+ */
+function withCacheHitRate(state: ChatState, message: WireMessage): ChatState {
+  if (message.role !== "assistant") return state;
+  const usage = message.usage;
+  if (!usage) return state;
+  const read = usage.cacheRead ?? 0;
+  const write = usage.cacheWrite ?? 0;
+  if (read <= 0 && write <= 0) return state;
+  const prompt = (usage.input ?? 0) + read + write;
+  if (prompt <= 0) return state;
+  return { ...state, cacheHitRate: (read / prompt) * 100 };
+}
+
 function attachToolResult(state: ChatState, message: WireMessage): ChatState {
   const callId = message.toolCallId;
   if (!callId) return state;
   const previous = state.tools[callId];
+  const parts = toolResultParts({ content: message.content, details: message.details });
   return {
     ...state,
     tools: {
@@ -356,7 +480,10 @@ function attachToolResult(state: ChatState, message: WireMessage): ChatState {
         name: message.toolName ?? previous?.name ?? "tool",
         status: message.isError ? "error" : "done",
         args: previous?.args,
-        output: textOf(message.content) ?? previous?.output,
+        output: parts.text ?? previous?.output,
+        details: parts.details ?? previous?.details,
+        fullOutputPath: parts.fullOutputPath ?? previous?.fullOutputPath,
+        parentCallId: previous?.parentCallId,
         isError: message.isError,
         durationMs: message.durationMs ?? previous?.durationMs,
       },
@@ -402,6 +529,8 @@ function applyHistory(state: ChatState, messages: WireMessage[], final: boolean)
         },
       ],
     };
+    next = seedToolCalls(next, message, "done");
+    next = withCacheHitRate(next, message);
   }
   return { ...next, historyLoading: !final };
 }
@@ -456,31 +585,6 @@ function blockFromContent(content: WireContent): Block | null {
     default:
       return null;
   }
-}
-
-/** Best-effort text extraction from the loosely typed tool payloads (plan 7.6). */
-export function textOf(value: unknown): string | undefined {
-  if (value === undefined || value === null) return undefined;
-  if (typeof value === "string") return value.length > 0 ? value : undefined;
-  if (Array.isArray(value)) {
-    const parts = value.map(textOf).filter((part): part is string => Boolean(part));
-    return parts.length > 0 ? parts.join("\n") : undefined;
-  }
-  if (typeof value === "object") {
-    const object = value as Record<string, unknown>;
-    if (typeof object.output === "string") return object.output;
-    if (Array.isArray(object.content)) {
-      const nested = textOf(object.content);
-      if (nested) return nested;
-    }
-    if (typeof object.text === "string") return object.text;
-    try {
-      return JSON.stringify(value, null, 2);
-    } catch {
-      return undefined;
-    }
-  }
-  return String(value);
 }
 
 function describeError(error: unknown): string {

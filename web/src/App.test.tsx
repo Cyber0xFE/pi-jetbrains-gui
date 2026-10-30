@@ -105,7 +105,10 @@ describe("App", () => {
     expect(screen.getByText("file body")).toBeDefined();
     expect(screen.getByText("boom")).toBeDefined();
     expect(screen.getByText(/fake-model/)).toBeDefined();
-    expect(screen.getByText(/1\.2k \/ 100\.0k/)).toBeDefined();
+    expect(screen.getByText(/1\.2%\/100k \(auto\)/)).toBeDefined();
+    // The TUI-style footer sits below the composer, not above the transcript.
+    const app = document.querySelector(".app");
+    expect(app?.lastElementChild?.className).toContain("statusbar");
   });
 
   it("sends a prompt and clears the composer", async () => {

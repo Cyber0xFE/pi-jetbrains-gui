@@ -8,6 +8,7 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
 import dev.pi.jetbrains.PiChatService
+import dev.pi.jetbrains.editor.EditorNavigator
 import dev.pi.jetbrains.rpc.PiEvent
 import dev.pi.jetbrains.rpc.PiJson
 import dev.pi.jetbrains.rpc.RpcResponse
@@ -33,7 +34,7 @@ import javax.swing.SwingConstants
  * Streams pi's session records to the webview, coalescing them into ~16 ms batches so a fast
  * `text_delta` stream costs one JS call per frame instead of one per token (plan 7.5).
  */
-class ChatPanel(project: Project) : JPanel(BorderLayout()), Disposable {
+class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposable {
     private val service = project.service<PiChatService>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -128,6 +129,12 @@ class ChatPanel(project: Project) : JPanel(BorderLayout()), Disposable {
                 request { service.requestState() }
                 request { service.requestStats() }
             }
+            "open_path" -> message.path?.let { path ->
+                EditorNavigator.open(project, path, message.line) { error ->
+                    bridge?.send(HostMessages.notice(error))
+                }
+            }
+            "open_url" -> message.url?.let { EditorNavigator.openUrl(it) }
             "log" -> message.message?.let { LOG.info("[webview] $it") }
             else -> LOG.debug("unknown webview message: ${message.type}")
         }

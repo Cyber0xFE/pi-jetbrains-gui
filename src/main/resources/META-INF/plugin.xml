@@ -1,6 +1,6 @@
 <idea-plugin>
     <id>dev.pi.jetbrains</id>
-    <name>pi</name>
+    <name>pi-jetbrains-gui</name>
     <vendor>pi</vendor>
     <description>Graphical front-end for the pi coding agent inside JetBrains IDEs.</description>
 

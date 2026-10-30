@@ -13,6 +13,16 @@ data class HostContextUsage(
     val percent: Double? = null,
 )
 
+/** Cumulative session usage shown in the TUI-style footer. */
+@Serializable
+data class HostUsage(
+    val input: Long? = null,
+    val output: Long? = null,
+    val cacheRead: Long? = null,
+    val cacheWrite: Long? = null,
+    val cost: Double? = null,
+)
+
 @Serializable
 data class HostStatus(
     val phase: String,
@@ -21,8 +31,14 @@ data class HostStatus(
     val pi: String? = null,
     val sessionId: String? = null,
     val model: String? = null,
+    val provider: String? = null,
+    val reasoning: Boolean? = null,
     val thinkingLevel: String? = null,
     val isStreaming: Boolean = false,
+    val isCompacting: Boolean = false,
+    val autoCompaction: Boolean = true,
+    val contextWindow: Long? = null,
+    val usage: HostUsage? = null,
     val context: HostContextUsage? = null,
 ) {
     companion object {
@@ -33,8 +49,22 @@ data class HostStatus(
             pi = status.pi,
             sessionId = status.sessionId,
             model = status.model,
+            provider = status.provider,
+            reasoning = status.reasoning,
             thinkingLevel = status.thinkingLevel,
             isStreaming = status.isStreaming,
+            isCompacting = status.isCompacting,
+            autoCompaction = status.autoCompaction,
+            contextWindow = status.contextWindow,
+            usage = status.context?.let { usage ->
+                HostUsage(
+                    input = usage.input,
+                    output = usage.output,
+                    cacheRead = usage.cacheRead,
+                    cacheWrite = usage.cacheWrite,
+                    cost = usage.cost,
+                )
+            },
             context = status.context?.let { usage ->
                 HostContextUsage(usage.tokens, usage.contextWindow, usage.percent)
             },
@@ -67,6 +97,10 @@ data class HostNoticeMessage(
 data class ClientMessage(
     val type: String,
     val message: String? = null,
+    /** `open_path` / `open_url` payloads (M2 editor navigation). */
+    val path: String? = null,
+    val line: Int? = null,
+    val url: String? = null,
 )
 
 /** Encodes host messages with the shared RPC JSON settings. */

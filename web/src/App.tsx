@@ -31,7 +31,6 @@ export function App(): JSX.Element {
 
   return (
     <div className="app">
-      <StatusBar status={state.status} busy={state.busy} />
       {needsStart && (
         <div className="startbar">
           <span className="startbar-message">{state.status.message}</span>
@@ -62,14 +61,23 @@ export function App(): JSX.Element {
         tools={state.tools}
         loadingHistory={state.historyLoading}
         emptyHint={ready ? "Ask pi about this project…" : state.status.message}
+        thinkingLabel={state.thinkingLabel}
       />
       <Composer
         value={draft}
         onChange={setDraft}
         onSend={send}
-        onAbort={abort}
         disabled={!ready || state.sending}
         busy={busy}
+      />
+      <StatusBar
+        status={state.status}
+        busy={state.busy}
+        cacheHitRate={state.cacheHitRate}
+        extensionStatuses={state.extensionStatuses}
+        onSend={send}
+        onAbort={abort}
+        canSend={ready && !state.sending && draft.trim().length > 0}
       />
     </div>
   );
