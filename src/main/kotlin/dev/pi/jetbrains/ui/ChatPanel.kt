@@ -591,8 +591,9 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
                 error = cssColor(error),
                 errorBackground = cssColor(blend(background, error, 0.14f)),
                 dark = EditorColorsManager.getInstance().isDarkEditor,
-                // Convert the IDE editor point size to CSS pixels while respecting the IDE scale.
-                fontSize = JBUI.scale(scheme.editorFontSize).toFloat(),
+                // CSS pixels in JCEF are logical pixels already handled by the OS scale,
+                // so pass the editor font size through without JBUI.scale (double-scaling).
+                fontSize = scheme.editorFontSize.toFloat(),
             ),
         )
     }
