@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { Block, ChatMessage, ToolState } from "../state/sessionReducer";
+import { normalizeTaggedBlocks, type Block, type ChatMessage, type ToolState } from "../state/sessionReducer";
 import { Markdown } from "./Markdown";
 import { ToolCard } from "./tools/ToolCard";
 
@@ -153,8 +153,24 @@ interface BlockProps {
 
 function BlockView({ block, tools, streaming, thinkingLabel }: BlockProps): JSX.Element | null {
   switch (block.kind) {
-    case "text":
-      return <Markdown text={block.text} streaming={streaming} />;
+    case "text": {
+      if (!/<\/?thinking\b/i.test(block.text)) {
+        return <Markdown text={block.text} streaming={streaming} />;
+      }
+      return (
+        <>
+          {normalizeTaggedBlocks([block]).map((nestedBlock, index) => (
+            <BlockView
+              key={index}
+              block={nestedBlock}
+              tools={tools}
+              streaming={streaming}
+              thinkingLabel={thinkingLabel}
+            />
+          ))}
+        </>
+      );
+    }
     case "thinking":
       return (
         <details className="thinking">

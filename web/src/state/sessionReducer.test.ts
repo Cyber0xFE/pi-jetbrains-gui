@@ -214,6 +214,41 @@ describe("sessionReducer", () => {
     ]);
   });
 
+  it("removes literal thinking tags from thinking content", () => {
+    const state = apply(
+      initialState,
+      records(
+        assistantStart(),
+        update({ type: "thinking_start", contentIndex: 0 }),
+        update({ type: "thinking_delta", contentIndex: 0, delta: "<thinking>Building plugin</thinking>" }),
+      ),
+    );
+
+    expect(state.messages[0]?.blocks).toEqual([{ kind: "thinking", text: "Building plugin" }]);
+  });
+
+  it("converts thinking tags embedded in text into a collapsed thinking block", () => {
+    const state = apply(initialState, {
+      kind: "inbound",
+      message: {
+        type: "history",
+        final: true,
+        messages: [
+          {
+            role: "assistant",
+            timestamp: 2,
+            content: [{ type: "text", text: "<thinking>Building plugin</thinking>\n\nDone" }],
+          },
+        ],
+      },
+    });
+
+    expect(state.messages[0]?.blocks).toEqual([
+      { kind: "thinking", text: "Building plugin" },
+      { kind: "text", text: "\n\nDone" },
+    ]);
+  });
+
   it("keeps tool details and the full-output path from the result", () => {
     const state = apply(
       initialState,

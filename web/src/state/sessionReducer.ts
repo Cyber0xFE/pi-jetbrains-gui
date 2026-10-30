@@ -336,11 +336,11 @@ function patchBlocks(message: ChatMessage, delta: AssistantDelta): ChatMessage {
     case "thinking_delta": {
       ensure("thinking");
       const block = blocks[index] as ThinkingBlock;
-      blocks[index] = { kind: "thinking", text: block.text + (delta.delta ?? "") };
+      blocks[index] = { kind: "thinking", text: stripThinkingTags(block.text + (delta.delta ?? "")) };
       break;
     }
     case "thinking_end":
-      if (delta.content !== undefined) blocks[index] = { kind: "thinking", text: delta.content };
+      if (delta.content !== undefined) blocks[index] = { kind: "thinking", text: stripThinkingTags(delta.content) };
       break;
     case "toolcall_start":
       blocks[index] = { kind: "tool", callId: delta.id ?? "", name: delta.toolName ?? "tool" };
@@ -663,11 +663,48 @@ function toRole(role: string): ChatMessage["role"] {
   return "system";
 }
 
+export function stripThinkingTags(text: string): string {
+  return text.replace(/<\/?thinking\b[^>]*>/gi, "");
+}
+
+/** Converts provider-emitted XML thinking tags into the same blocks as native reasoning output. */
+export function normalizeTaggedBlocks(blocks: Block[]): Block[] {
+  return blocks.flatMap((block) => {
+    if (block.kind !== "text") return [block];
+    return splitTaggedText(block.text);
+  });
+}
+
+function splitTaggedText(text: string): Block[] {
+  const tagPattern = /<thinking\b[^>]*>|<\/thinking\s*>/gi;
+  const blocks: Block[] = [];
+  let cursor = 0;
+  let thinking = false;
+  let match: RegExpExecArray | null;
+
+  while ((match = tagPattern.exec(text)) !== null) {
+    const segment = text.slice(cursor, match.index);
+    if (segment.length > 0) {
+      blocks.push(thinking ? { kind: "thinking", text: segment } : { kind: "text", text: segment });
+    }
+    thinking = !thinking;
+    cursor = match.index + match[0].length;
+  }
+
+  const remainder = text.slice(cursor);
+  if (remainder.length > 0) {
+    blocks.push(thinking ? { kind: "thinking", text: remainder } : { kind: "text", text: remainder });
+  }
+  return blocks.length > 0 ? blocks : [{ kind: "text", text: stripThinkingTags(text) }];
+}
+
 export function blocksFromMessage(message: WireMessage): Block[] {
   const content = message.content;
   if (content === undefined) return [];
-  if (typeof content === "string") return content.length > 0 ? [{ kind: "text", text: content }] : [];
-  return content.map(blockFromContent).filter((block): block is Block => block !== null);
+  if (typeof content === "string") {
+    return content.length > 0 ? normalizeTaggedBlocks([{ kind: "text", text: content }]) : [];
+  }
+  return normalizeTaggedBlocks(content.map(blockFromContent).filter((block): block is Block => block !== null));
 }
 
 function blockFromContent(content: WireContent): Block | null {
@@ -676,7 +713,7 @@ function blockFromContent(content: WireContent): Block | null {
       return { kind: "text", text: (content as WireTextContent).text ?? "" };
     case "thinking": {
       const thinking = content as WireThinkingContent;
-      return { kind: "thinking", text: thinking.thinking ?? "", redacted: thinking.redacted };
+      return { kind: "thinking", text: stripThinkingTags(thinking.thinking ?? ""), redacted: thinking.redacted };
     }
     case "toolCall": {
       const call = content as WireToolCallContent;
