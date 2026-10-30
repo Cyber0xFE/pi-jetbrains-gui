@@ -7,10 +7,7 @@
     <depends>com.intellij.modules.platform</depends>
 
     <actions>
-        <action id="dev.pi.jetbrains.SendToPi" class="dev.pi.jetbrains.editor.SendToPiAction">
-            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
-            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
-        </action>
+        <action id="dev.pi.jetbrains.SendToPi" class="dev.pi.jetbrains.editor.SendToPiAction"/>
     </actions>
 
     <extensions defaultExtensionNs="com.intellij">
