@@ -37,6 +37,67 @@
   box-sizing: border-box;
 }
 
+/* Firefox uses the standard scrollbar API; Chromium/JCEF uses the rules below. */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--fg-dim) 42%, transparent) transparent;
+  }
+}
+
+/* Keep every scrollable surface quiet and consistent with the chat palette. */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: transparent;
+}
+
+*::-webkit-scrollbar-corner {
+  border-radius: 999px;
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb,
+*::-webkit-scrollbar-thumb:vertical,
+*::-webkit-scrollbar-thumb:horizontal {
+  min-height: 32px;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: var(--fg-dim);
+  background-clip: content-box;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg-dim) 18%, transparent);
+  opacity: 0.42;
+}
+
+*::-webkit-scrollbar-thumb:hover,
+*::-webkit-scrollbar-thumb:vertical:hover,
+*::-webkit-scrollbar-thumb:horizontal:hover {
+  background: var(--accent);
+  background-clip: content-box;
+  box-shadow: none;
+  opacity: 0.82;
+}
+
+*::-webkit-scrollbar-button,
+*::-webkit-scrollbar-button:single-button,
+*::-webkit-scrollbar-button:vertical:decrement,
+*::-webkit-scrollbar-button:vertical:increment,
+*::-webkit-scrollbar-button:horizontal:decrement,
+*::-webkit-scrollbar-button:horizontal:increment {
+  display: none;
+  width: 0;
+  height: 0;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  -webkit-appearance: none;
+}
+
 html,
 body,
 #root {
