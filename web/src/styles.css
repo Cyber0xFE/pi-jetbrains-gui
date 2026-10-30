@@ -1053,11 +1053,12 @@ body {
 .toolbar {
   flex: 0 0 auto;
   display: flex;
-  gap: 8px;
+  gap: 12px;
   align-items: center;
-  padding: 9px clamp(12px, 2vw, 20px);
+  min-height: 62px;
+  padding: 8px clamp(14px, 2.5vw, 30px);
   border-bottom: 1px solid var(--border);
-  background: var(--bg);
+  background: linear-gradient(180deg, var(--bg) 0%, var(--bg-soft) 100%);
   overflow-x: auto;
 }
 
@@ -1071,7 +1072,7 @@ body {
   border-radius: var(--radius-sm);
   background: var(--bg-soft);
   color: var(--fg-dim);
-  padding: 5px 10px;
+  padding: 6px 11px;
   font: inherit;
   font-size: 0.84em;
   white-space: nowrap;
@@ -1079,11 +1080,14 @@ body {
   max-width: 34ch;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease, transform 120ms ease;
 }
 
 .toolbar-button:hover:not(:disabled) {
   background: var(--bg-raised);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
   color: var(--fg);
+  transform: translateY(-1px);
 }
 
 .toolbar-button:disabled {
@@ -1097,10 +1101,54 @@ body {
 }
 
 .toolbar-session {
-  color: var(--fg);
-  font-weight: 600;
-  max-width: min(42ch, 70vw);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  max-width: min(48ch, 72vw);
+  padding: 7px 13px 7px 10px;
+  border-color: transparent;
   background: transparent;
+  color: var(--fg);
+  font-size: 0.96em;
+  font-weight: 650;
+  text-align: left;
+}
+
+.toolbar-session:hover:not(:disabled) {
+  background: var(--bg);
+}
+
+.toolbar-session-mark {
+  flex: 0 0 auto;
+  width: 4px;
+  height: 25px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.toolbar-session-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolbar-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.toolbar-new-icon {
+  font-size: 1.15em;
+  font-weight: 400;
+  line-height: 0.8;
 }
 
 .contextbar {

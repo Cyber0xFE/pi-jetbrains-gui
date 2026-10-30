@@ -33,11 +33,13 @@ export function Toolbar({
         disabled={disabled}
         title={status.sessionName?.trim() || sessionFallback?.trim() || status.sessionFile || "打开会话选择器"}
       >
-        {sessionLabel}
+        <span className="toolbar-session-mark" aria-hidden="true" />
+        <span className="toolbar-session-label">{sessionLabel}</span>
       </button>
       <div className="toolbar-spacer" />
-      <button type="button" className="toolbar-button" onClick={onNewSession} disabled={disabled} title="开始新会话">
-        新建
+      <button type="button" className="toolbar-button toolbar-new" onClick={onNewSession} disabled={disabled} title="开始新会话">
+        <span className="toolbar-new-icon" aria-hidden="true">＋</span>
+        <span>新建</span>
       </button>
     </header>
   );
