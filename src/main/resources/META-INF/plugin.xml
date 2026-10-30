@@ -1,8 +1,8 @@
 <idea-plugin>
     <id>dev.pi.jetbrains</id>
-    <name>pi-jetbrains-gui</name>
+    <name>Pi Jetbrains GUI</name>
     <vendor>pi</vendor>
-    <description>Graphical front-end for the pi coding agent inside JetBrains IDEs.</description>
+    <description>JetBrains IDE 内 pi coding agent 的图形化前端。</description>
 
     <depends>com.intellij.modules.platform</depends>
 

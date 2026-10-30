@@ -62,8 +62,8 @@ intellijPlatform {
         }
 
         description = """
-            <p>Graphical front-end for the <code>pi</code> coding agent inside JetBrains IDEs.</p>
-            <p>M5: resilient process recovery, protected tool output and IDE theme integration.</p>
+            <p>JetBrains IDE 内 <code>pi</code> coding agent 的图形化前端。</p>
+            <p>M5：进程恢复更可靠、受保护的工具输出、IDE 主题集成。</p>
         """.trimIndent()
     }
 }
