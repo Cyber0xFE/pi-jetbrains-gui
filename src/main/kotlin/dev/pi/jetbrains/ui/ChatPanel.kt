@@ -76,6 +76,15 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
     private val hydrationQueue = ArrayDeque<JsonElement>()
     private val hydrationLock = Any()
     private val hydrateMutex = Mutex()
+
+    /**
+     * `tool_execution_update` carries a full output snapshot per event, so a chatty tool would
+     * re-send its whole output every few milliseconds. Only the latest snapshot per call is kept
+     * here and released to [pending] at most once per [TOOL_UPDATE_FLUSH_MS]; the matching
+     * `tool_execution_end` releases it immediately so the final card still sees the last output.
+     */
+    private val heldUpdates = LinkedHashMap<String, JsonObject>()
+    private val heldUpdatesLock = Any()
     private val soundExecutor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "pi-task-completion-sound").apply { isDaemon = true }
     }
@@ -154,16 +163,53 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
                 if (event is PiEvent.ExtensionUiRequest) handleExtensionUiRequest(event)
                 if (event is PiEvent.Session && event.type == "agent_settled") maybePlayTaskCompletionSound(event)
                 val record = toRecord(event) ?: return@collect
-                synchronized(hydrationLock) {
-                    if (!hydrated) {
-                        hydrationQueue.addLast(record)
-                        return@collect
+                if (record is JsonObject) {
+                    val callId = record.string("toolCallId")
+                    when (record.string("type")) {
+                        "tool_execution_update" -> {
+                            if (callId != null) {
+                                synchronized(heldUpdatesLock) { heldUpdates[callId] = record }
+                                return@collect
+                            }
+                        }
+                        "tool_execution_end" -> {
+                            // Route the last snapshot under the same lock the flusher uses so the
+                            // snapshot can never overtake this end record into the queue.
+                            synchronized(heldUpdatesLock) {
+                                val held = callId?.let { heldUpdates.remove(it) }
+                                if (held != null) routeRecord(held)
+                            }
+                        }
                     }
                 }
-                pending.add(record)
+                routeRecord(record)
             }
         }
         scope.launch { flushRecords() }
+        scope.launch { flushHeldUpdates() }
+    }
+
+    /** Queues a record for the webview, or parks it while the transcript is still hydrating. */
+    private fun routeRecord(record: JsonElement) {
+        synchronized(hydrationLock) {
+            if (!hydrated) {
+                hydrationQueue.addLast(record)
+                return
+            }
+        }
+        pending.add(record)
+    }
+
+    /** Releases throttled tool snapshots at a fixed cadence; each call keeps only its latest one. */
+    private suspend fun flushHeldUpdates() {
+        while (currentCoroutineContext().isActive) {
+            delay(TOOL_UPDATE_FLUSH_MS)
+            synchronized(heldUpdatesLock) {
+                val released = heldUpdates.values.toList()
+                heldUpdates.clear()
+                released.forEach(::routeRecord)
+            }
+        }
     }
 
     private suspend fun flushRecords() {
@@ -186,7 +232,8 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
             val now = System.nanoTime()
             if (now - lastDiagnosticAt >= DIAGNOSTIC_INTERVAL_NS) {
                 service.logDiagnostic(
-                    "[webview-perf] native_records batches=$batchCount records=$recordCount pending=${pending.size}",
+                    "[webview-perf] native_records batches=$batchCount records=$recordCount pending=${pending.size} " +
+                    "heldUpdates=${synchronized(heldUpdatesLock) { heldUpdates.size }}",
                 )
                 batchCount = 0
                 recordCount = 0
@@ -457,6 +504,7 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
             hydrationQueue.clear()
             pending.clear()
         }
+        synchronized(heldUpdatesLock) { heldUpdates.clear() }
         activeBridge.send(HostMessages.reset(reason))
         synchronized(hydrationLock) { resetting = false }
         hydrate()
@@ -786,6 +834,7 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
         private val LOG = Logger.getInstance(ChatPanel::class.java)
         private const val WEBVIEW_RESOURCE = "/webview/index.html"
         private const val FLUSH_INTERVAL_MS = 16L
+        private const val TOOL_UPDATE_FLUSH_MS = 100L
         private const val HISTORY_CHUNK_CHARS = 256 * 1024
         private const val COMPACT_TIMEOUT_NOTICE = "compaction did not finish in time"
         private const val MAX_TOOL_RESULT_BYTES = 512 * 1024
