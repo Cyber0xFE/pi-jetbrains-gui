@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { boostWheelScroll } from "../scroll";
+import { useSmoothWheelScroll } from "../scroll";
 
 export interface PickerItem {
   key: string;
@@ -46,6 +46,7 @@ export function Picker({ title, items, placeholder, emptyText, actions, onSelect
   const rowRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const scrollFrame = useRef<number | null>(null);
   const pendingScrollTop = useRef(0);
+  useSmoothWheelScroll(listRef);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -129,7 +130,6 @@ export function Picker({ title, items, placeholder, emptyText, actions, onSelect
           className="picker-list"
           ref={listRef}
           style={{ height: VIEWPORT_HEIGHT }}
-          onWheel={boostWheelScroll}
           onScroll={(event) => {
             pendingScrollTop.current = event.currentTarget.scrollTop;
             if (scrollFrame.current !== null) return;

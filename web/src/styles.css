@@ -345,45 +345,87 @@ body {
   overflow: visible;
 }
 
+.message-outline-window {
+  position: relative;
+  width: 100%;
+  height: min(72vh, 435px);
+  max-height: calc(100% - 32px);
+}
+
 .message-outline-track {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 7px;
+  gap: 12px;
   width: 100%;
-  height: min(72vh, 380px);
-  max-height: calc(100% - 32px);
+  height: 100%;
   overflow: hidden;
-  padding: 18px 0 24px 3px;
+  padding: 18px 0 24px;
   pointer-events: auto;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
 }
 
 .message-outline-track-dense {
   justify-content: flex-start;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--fg-dim) 56%, transparent) transparent;
 }
 
-.message-outline-track-dense::-webkit-scrollbar {
-  display: block;
-  width: 7px;
+.message-outline-track::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
-.message-outline-track-dense::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--fg-dim) 56%, transparent);
-  background-clip: content-box;
+.message-outline-track {
+  --outline-fade-top: #000;
+  --outline-fade-bottom: #000;
+  mask-image: linear-gradient(to bottom, var(--outline-fade-top), #000 26px, #000 calc(100% - 26px), var(--outline-fade-bottom));
+}
+
+.message-outline-track[data-more-above="true"] {
+  --outline-fade-top: transparent;
+}
+
+.message-outline-track[data-more-below="true"] {
+  --outline-fade-bottom: transparent;
+}
+
+.message-outline-scroll {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+
+.message-outline-scroll-up { top: 0; }
+.message-outline-scroll-down { bottom: 0; }
+
+.message-outline-scroll:hover,
+.message-outline-scroll:focus-visible {
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .message-outline-item {
   position: relative;
   z-index: 1;
   display: flex;
+  flex: 0 0 15px;
   align-items: center;
+  justify-content: center;
   width: 24px;
   height: 15px;
   padding: 0;
@@ -396,10 +438,9 @@ body {
   display: block;
   width: 6px;
   height: 6px;
-  margin-left: 6px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--fg-dim) 62%, transparent);
-  transition: width 120ms ease, height 120ms ease, margin 120ms ease, background 120ms ease;
+  transition: width 120ms ease, height 120ms ease, background 120ms ease;
 }
 
 .message-outline-item:hover .message-outline-marker,
@@ -407,7 +448,6 @@ body {
 .message-outline-item-active .message-outline-marker {
   width: 8px;
   height: 8px;
-  margin-left: 7px;
   background: var(--accent);
 }
 

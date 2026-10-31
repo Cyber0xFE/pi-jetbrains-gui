@@ -3,7 +3,7 @@ import { normalizeTaggedBlocks, type Block, type ChatMessage, type ToolState } f
 import { Markdown } from "./Markdown";
 import { ToolCard } from "./tools/ToolCard";
 import { recordPerf } from "../perfLog";
-import { boostWheelScroll } from "../scroll";
+import { useSmoothWheelScroll } from "../scroll";
 
 /** Older messages stay out of the DOM until asked for, keeping long sessions cheap to render. */
 const VISIBLE_BATCH = 60;
@@ -22,7 +22,15 @@ interface Props {
 export function MessageList({ messages, tools, loadingHistory, emptyHint, thinkingLabel, connecting }: Props): JSX.Element {
   recordPerf("message_list_render", 0, { messages: messages.length, tools: Object.keys(tools).length });
   const scroller = useRef<HTMLDivElement>(null);
+  const outlineScroller = useRef<HTMLDivElement>(null);
+  const [outlineEdges, setOutlineEdges] = useState({ up: false, down: false });
   const stickToBottom = useRef(true);
+  const scrollFrame = useRef<number | null>(null);
+  const previousScrollTop = useRef(0);
+  useSmoothWheelScroll(scroller, (delta) => {
+    previousScrollTop.current = scroller.current?.scrollTop ?? 0;
+    if (delta < 0) stickToBottom.current = false;
+  });
   const latestButtonVisible = useRef(false);
   const [showLatestButton, setShowLatestButton] = useState(false);
   const [visibleCount, setVisibleCount] = useState(VISIBLE_BATCH);
@@ -39,6 +47,23 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
   );
   const hiddenCount = messages.length - visible.length;
   const toolStatesByMessage = useMessageToolStates(visible, tools);
+
+  const updateOutlineEdges = (): void => {
+    const element = outlineScroller.current;
+    if (!element) return;
+    const up = element.scrollTop > 1;
+    const down = element.scrollHeight - element.clientHeight - element.scrollTop > 1;
+    setOutlineEdges((current) => current.up === up && current.down === down ? current : { up, down });
+  };
+
+  useEffect(() => {
+    const element = outlineScroller.current;
+    if (!element) return;
+    updateOutlineEdges();
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateOutlineEdges) : null;
+    observer?.observe(element);
+    return () => observer?.disconnect();
+  }, [userMessages.length]);
 
   // A session switch rebuilds the transcript from scratch; drop the old window size.
   useEffect(() => {
@@ -69,14 +94,23 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
 
   useEffect(() => {
     const element = scroller.current;
-    if (element && stickToBottom.current) element.scrollTop = element.scrollHeight;
+    if (element && stickToBottom.current) {
+      element.scrollTop = element.scrollHeight;
+      previousScrollTop.current = element.scrollTop;
+    }
   }, [messages, tools]);
 
-  const handleScroll = (): void => {
+  useEffect(() => () => {
+    if (scrollFrame.current !== null) window.cancelAnimationFrame(scrollFrame.current);
+  }, []);
+
+  const updateScrollPosition = (): void => {
     const element = scroller.current;
     if (!element) return;
     const atBottom = element.scrollHeight - element.scrollTop - element.clientHeight < 48;
-    stickToBottom.current = atBottom;
+    const movingUp = element.scrollTop < previousScrollTop.current;
+    previousScrollTop.current = element.scrollTop;
+    stickToBottom.current = atBottom && !movingUp;
     const nextLatestButtonVisible = !atBottom;
     if (latestButtonVisible.current !== nextLatestButtonVisible) {
       latestButtonVisible.current = nextLatestButtonVisible;
@@ -89,6 +123,14 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
       if (message.getBoundingClientRect().top <= containerTop + 96) current = message.dataset.messageId ?? current;
     }
     if (current && current !== activeMessageId) setActiveMessageId(current);
+  };
+
+  const handleScroll = (): void => {
+    if (scrollFrame.current !== null) return;
+    scrollFrame.current = window.requestAnimationFrame(() => {
+      scrollFrame.current = null;
+      updateScrollPosition();
+    });
   };
 
   const scrollToLatest = (): void => {
@@ -127,35 +169,58 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
             setHoverPreview(null);
           }}
         >
-          <div
-            className={`message-outline-track${
-              userMessages.length > OUTLINE_MAX_VISIBLE ? " message-outline-track-dense" : ""
-            }`}
-          >
-            {userMessages.map(({ message, index }, outlineIndex) => {
-              const preview = messagePreview(message);
-              const isActive = message.id === activeMessageId;
-              return (
-                <button
-                  type="button"
-                  className={`message-outline-item${isActive ? " message-outline-item-active" : ""}`}
-                  key={message.id}
-                  title={preview}
-                  aria-label={`Jump to user message ${outlineIndex + 1}: ${preview}`}
-                  aria-current={isActive ? "location" : undefined}
-                  onClick={() => jumpToMessage(message.id, index)}
-                  onMouseEnter={(event) =>
-                    setHoverPreview({ text: preview, x: event.clientX + 12, y: event.clientY + 12 })
-                  }
-                  onMouseMove={(event) =>
-                    setHoverPreview({ text: preview, x: event.clientX + 12, y: event.clientY + 12 })
-                  }
-                  onMouseLeave={() => setHoverPreview(null)}
-                >
-                  <span className="message-outline-marker" />
-                </button>
-              );
-            })}
+          <div className="message-outline-window">
+            <div
+              ref={outlineScroller}
+              onScroll={() => {
+                updateOutlineEdges();
+                setHoverPreview(null);
+              }}
+              data-more-above={outlineEdges.up}
+              data-more-below={outlineEdges.down}
+              className={`message-outline-track${
+                userMessages.length > OUTLINE_MAX_VISIBLE ? " message-outline-track-dense" : ""
+              }`}
+            >
+              {userMessages.map(({ message, index }, outlineIndex) => {
+                const preview = messagePreview(message);
+                const isActive = message.id === activeMessageId;
+                return (
+                  <button
+                    type="button"
+                    className={`message-outline-item${isActive ? " message-outline-item-active" : ""}`}
+                    key={message.id}
+                    title={preview}
+                    aria-label={`Jump to user message ${outlineIndex + 1}: ${preview}`}
+                    aria-current={isActive ? "location" : undefined}
+                    onClick={() => jumpToMessage(message.id, index)}
+                    onMouseEnter={(event) =>
+                      setHoverPreview({ text: preview, x: event.clientX + 12, y: event.clientY + 12 })
+                    }
+                    onMouseMove={(event) =>
+                      setHoverPreview({ text: preview, x: event.clientX + 12, y: event.clientY + 12 })
+                    }
+                    onMouseLeave={() => setHoverPreview(null)}
+                  >
+                    <span className="message-outline-marker" />
+                  </button>
+                );
+              })}
+            </div>
+            {outlineEdges.up && (
+              <button type="button" className="message-outline-scroll message-outline-scroll-up"
+                aria-label="向上浏览用户消息" title="向上浏览用户消息"
+                onClick={() => outlineScroller.current?.scrollBy({ top: -81, behavior: "smooth" })}>
+                <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m4 10 4-4 4 4" /></svg>
+              </button>
+            )}
+            {outlineEdges.down && (
+              <button type="button" className="message-outline-scroll message-outline-scroll-down"
+                aria-label="向下浏览用户消息" title="向下浏览用户消息"
+                onClick={() => outlineScroller.current?.scrollBy({ top: 81, behavior: "smooth" })}>
+                <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
+              </button>
+            )}
           </div>
           {hoverPreview && (
             <div
@@ -172,7 +237,6 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
         className="messages"
         ref={scroller}
         onScroll={handleScroll}
-        onWheel={boostWheelScroll}
         role="log"
         aria-live="polite"
         aria-label="pi conversation"
