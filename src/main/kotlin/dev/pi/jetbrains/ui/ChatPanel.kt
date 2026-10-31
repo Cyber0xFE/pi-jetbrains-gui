@@ -116,7 +116,10 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
             return null
         }
         val created = JBCefBrowser()
-        val createdBridge = WebViewBridge(created, ::onClientMessage, log = { LOG.debug(it) })
+        val createdBridge = WebViewBridge(created, ::onClientMessage, log = { text ->
+            LOG.debug(text)
+            scope.launch { service.logDiagnostic(text) }
+        })
         browser = created
         bridge = createdBridge
         createdBridge.load(html)
@@ -156,6 +159,9 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
     }
 
     private suspend fun flushRecords() {
+        var batchCount = 0
+        var recordCount = 0
+        var lastDiagnosticAt = System.nanoTime()
         while (currentCoroutineContext().isActive) {
             val startGeneration = synchronized(hydrationLock) { generation }
             val first = pending.take()
@@ -167,6 +173,17 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
             // belong to the old session and must not be appended after the reset.
             if (synchronized(hydrationLock) { generation } != startGeneration) continue
             bridge?.send(HostMessages.records(batch))
+            batchCount++
+            recordCount += batch.size
+            val now = System.nanoTime()
+            if (now - lastDiagnosticAt >= DIAGNOSTIC_INTERVAL_NS) {
+                service.logDiagnostic(
+                    "[webview-perf] native_records batches=$batchCount records=$recordCount pending=${pending.size}",
+                )
+                batchCount = 0
+                recordCount = 0
+                lastDiagnosticAt = now
+            }
         }
     }
 
@@ -194,7 +211,10 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
                 }
             }
             "open_url" -> message.url?.let { EditorNavigator.openUrl(it) }
-            "log" -> message.message?.let { LOG.info("[webview] $it") }
+            "log" -> message.message?.let { text ->
+                LOG.info("[webview] $text")
+                scope.launch { service.logDiagnostic(text) }
+            }
 
             // ---- M3: sessions ------------------------------------------------------------------
             "list_sessions" -> scope.launch { sendSessions() }
@@ -678,5 +698,6 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
         private const val HISTORY_CHUNK_CHARS = 256 * 1024
         private const val COMPACT_TIMEOUT_NOTICE = "compaction did not finish in time"
         private const val MAX_TOOL_RESULT_BYTES = 2 * 1024 * 1024
+        private const val DIAGNOSTIC_INTERVAL_NS = 1_000_000_000L
     }
 }

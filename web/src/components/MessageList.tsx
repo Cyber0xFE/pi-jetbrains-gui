@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { normalizeTaggedBlocks, type Block, type ChatMessage, type ToolState } from "../state/sessionReducer";
 import { Markdown } from "./Markdown";
 import { ToolCard } from "./tools/ToolCard";
+import { recordPerf } from "../perfLog";
 
 interface Props {
   messages: ChatMessage[];
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function MessageList({ messages, tools, loadingHistory, emptyHint, thinkingLabel, connecting }: Props): JSX.Element {
+  recordPerf("message_list_render", 0, { messages: messages.length, tools: Object.keys(tools).length });
   const scroller = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const [showLatestButton, setShowLatestButton] = useState(false);
@@ -161,6 +163,7 @@ function useMessageToolStates(
 ): Map<string, readonly (ToolState | undefined)[]> {
   const cache = useRef(new Map<string, CachedToolStates>());
   return useMemo(() => {
+    const startedAt = performance.now();
     const children = new Map<string, string[]>();
     for (const tool of Object.values(tools)) {
       if (!tool.parentCallId) continue;
@@ -193,6 +196,10 @@ function useMessageToolStates(
       result.set(message.id, states);
     }
     cache.current = nextCache;
+    recordPerf("tool_dependency_index", performance.now() - startedAt, {
+      messages: messages.length,
+      tools: Object.keys(tools).length,
+    });
     return result;
   }, [messages, tools]);
 }

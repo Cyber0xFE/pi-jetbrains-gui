@@ -17,6 +17,7 @@ import typescript from "highlight.js/lib/languages/typescript";
 import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import { post } from "../bridge";
+import { recordPerf } from "../perfLog";
 
 hljs.registerLanguage("bash", bash);
 hljs.registerLanguage("sh", bash);
@@ -85,8 +86,14 @@ const finalRenderer = createRenderer(true);
 export function Markdown({ text, streaming }: { text: string; streaming: boolean }): JSX.Element {
   const shown = useThrottled(text, STREAM_THROTTLE_MS, streaming);
   const html = useMemo(() => {
-    if (!streaming) return finalRenderer.render(text);
-    return streamingRenderer.render(closeOpenFence(shown));
+    const startedAt = performance.now();
+    const source = streaming ? closeOpenFence(shown) : text;
+    const rendered = streaming ? streamingRenderer.render(source) : finalRenderer.render(source);
+    recordPerf("markdown_render", performance.now() - startedAt, {
+      chars: source.length,
+      streaming: streaming ? 1 : 0,
+    });
+    return rendered;
   }, [shown, streaming, text]);
 
   const handleClick = (event: MouseEvent<HTMLDivElement>): void => {

@@ -1,4 +1,5 @@
 import { initialState, reduce, type Action, type ChatState } from "./state/sessionReducer";
+import { recordPerf } from "./perfLog";
 
 /**
  * Holds the transcript and coalesces inbound actions into one React render per animation frame
@@ -32,7 +33,9 @@ export class ChatStore {
     if (actions.length === 0) return;
 
     let next = this.state;
+    const startedAt = performance.now();
     for (const action of actions) next = reduce(next, action);
+    recordPerf("store_reduce", performance.now() - startedAt, { actions: actions.length });
     if (next === this.state) return;
 
     this.state = next;

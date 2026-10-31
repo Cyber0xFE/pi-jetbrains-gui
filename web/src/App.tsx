@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { PromptImage } from "./types";
 import { onMessage, post } from "./bridge";
+import { recordPerf } from "./perfLog";
 import { Composer } from "./components/Composer";
 import { MessageList } from "./components/MessageList";
 import { Picker, type PickerItem } from "./components/Picker";
@@ -37,6 +38,11 @@ export function App(): JSX.Element {
     };
 
     onMessage((message) => {
+      if (message.type === "records") {
+        recordPerf("inbound_records", 0, { records: message.records.length });
+      } else if (message.type === "history") {
+        recordPerf("inbound_history", 0, { messages: message.messages.length, final: message.final ? 1 : 0 });
+      }
       // Keep the optimistic connection hint visible until assistant content actually starts.
       // `agent_start` only means the request was accepted; pi may still spend time preparing
       // the model response after that event.

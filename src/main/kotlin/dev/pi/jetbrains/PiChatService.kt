@@ -14,6 +14,7 @@ import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.PathManager
 import dev.pi.jetbrains.editor.ToolFileRefresher
 import dev.pi.jetbrains.rpc.PiClient
 import dev.pi.jetbrains.rpc.PiEvent
@@ -559,20 +560,26 @@ class PiChatService(private val project: Project) : Disposable {
         }
     }
 
+    /** Writes a diagnostic line to the configured log file. Safe to call from background threads. */
+    fun logDiagnostic(message: String) = diagnosticLog(message)
+
     private fun diagnosticLog(message: String) {
         LOG.debug(message)
-        val directory = PiSettings.get().getState().logDirectory.trim().takeIf { it.isNotEmpty() } ?: return
-        runCatching {
-            val path = Paths.get(directory).resolve("pi.log")
-            Files.createDirectories(path.parent)
-            Files.writeString(
-                path,
-                "${java.time.Instant.now()} $message${System.lineSeparator()}",
-                Charsets.UTF_8,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.WRITE,
-                StandardOpenOption.APPEND,
-            )
+        val configuredDirectory = PiSettings.get().getState().logDirectory.trim()
+        val directory = configuredDirectory.takeIf { it.isNotEmpty() } ?: PathManager.getLogPath()
+        synchronized(diagnosticLogLock) {
+            runCatching {
+                val path = Paths.get(directory).resolve("pi.log")
+                Files.createDirectories(path.parent)
+                Files.writeString(
+                    path,
+                    "${java.time.Instant.now()} $message${System.lineSeparator()}",
+                    Charsets.UTF_8,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.WRITE,
+                    StandardOpenOption.APPEND,
+                )
+            }
         }
     }
 
@@ -662,6 +669,7 @@ class PiChatService(private val project: Project) : Disposable {
 
     companion object {
         private val LOG = Logger.getInstance(PiChatService::class.java)
+        private val diagnosticLogLock = Any()
         private val PLUGIN_ID = PluginId.getId("dev.pi.jetbrains")
         private val COMPACT_TIMEOUT: Duration = Duration.ofSeconds(300)
         private val HEARTBEAT_TIMEOUT: Duration = Duration.ofSeconds(10)

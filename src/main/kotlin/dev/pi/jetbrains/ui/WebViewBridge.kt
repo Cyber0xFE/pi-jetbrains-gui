@@ -8,6 +8,11 @@ import com.intellij.ui.jcef.JBCefBrowserBase
 import com.intellij.ui.jcef.JBCefJSQuery
 import dev.pi.jetbrains.rpc.PiJson
 import kotlinx.serialization.json.JsonElement
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Two-way bridge between the JCEF webview and Kotlin (plan 7.4).
@@ -29,6 +34,20 @@ class WebViewBridge(
     private val pending = ArrayDeque<JsonElement>()
     @Volatile
     private var ready = false
+
+    /** Number of JCEF delivery callbacks currently queued on the IntelliJ EDT. */
+    private val queuedDeliveries = AtomicInteger()
+    private val lastQueueDiagnosticAt = AtomicLong(System.nanoTime())
+    private val serializationExecutor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "pi-webview-serialization").apply { isDaemon = true }
+    }
+    private val deliveryStatsLock = Any()
+    private var deliveryCount = 0
+    private var maxSerializationQueueMs = 0.0
+    private var maxEdtQueueMs = 0.0
+    private var maxSerializationMs = 0.0
+    private var maxDispatchMs = 0.0
+    private var lastDeliveryDiagnosticAt = System.nanoTime()
 
     init {
         query.addHandler { payload ->
@@ -80,23 +99,117 @@ class WebViewBridge(
         }
     }
 
+    /** Serializes off the EDT, then schedules only the JCEF call on the EDT. */
     private fun execute(message: JsonElement) {
-        ApplicationManager.getApplication().invokeLater {
-            val frame = browser.cefBrowser.mainFrame ?: return@invokeLater
-            // U+2028/U+2029 are legal inside JSON strings but are JS line terminators in source.
-            val payload = message.toString()
-                .replace("\u2028", "\\u2028")
-                .replace("\u2029", "\\u2029")
-            frame.executeJavaScript("window.__piDeliver && window.__piDeliver($payload)", frame.url, 0)
+        val serializationQueuedAt = System.nanoTime()
+        try {
+            serializationExecutor.execute {
+                val serializationStartedAt = System.nanoTime()
+                val serializationQueueMs = (serializationStartedAt - serializationQueuedAt) / 1_000_000.0
+                // U+2028/U+2029 are legal inside JSON strings but are JS line terminators in source.
+                val payload = message.toString()
+                    .replace("\u2028", "\\u2028")
+                    .replace("\u2029", "\\u2029")
+                val serializationMs = (System.nanoTime() - serializationStartedAt) / 1_000_000.0
+                val edtQueuedAt = System.nanoTime()
+                val queued = queuedDeliveries.incrementAndGet()
+                val previousQueueDiagnosticAt = lastQueueDiagnosticAt.get()
+                if (queued >= QUEUE_WARNING_THRESHOLD &&
+                    edtQueuedAt - previousQueueDiagnosticAt >= DIAGNOSTIC_INTERVAL_NS &&
+                    lastQueueDiagnosticAt.compareAndSet(previousQueueDiagnosticAt, edtQueuedAt)
+                ) {
+                    log("[webview-bridge] edt_queue pending=$queued message=${messageType(message)}")
+                }
+
+                ApplicationManager.getApplication().invokeLater {
+                    val callbackStartedAt = System.nanoTime()
+                    val edtQueueMs = (callbackStartedAt - edtQueuedAt) / 1_000_000.0
+                    val outstanding = queuedDeliveries.decrementAndGet()
+                    val frame = browser.cefBrowser.mainFrame
+                    if (frame == null) {
+                        recordDelivery(
+                            serializationQueueMs,
+                            edtQueueMs,
+                            serializationMs,
+                            0.0,
+                            outstanding,
+                            message,
+                        )
+                        return@invokeLater
+                    }
+                    frame.executeJavaScript("window.__piDeliver && window.__piDeliver($payload)", frame.url, 0)
+                    val dispatchMs = (System.nanoTime() - callbackStartedAt) / 1_000_000.0
+                    recordDelivery(
+                        serializationQueueMs,
+                        edtQueueMs,
+                        serializationMs,
+                        dispatchMs,
+                        outstanding,
+                        message,
+                    )
+                }
+            }
+        } catch (_: RejectedExecutionException) {
+            // The bridge is being disposed; no further delivery is needed.
         }
     }
 
+    private fun recordDelivery(
+        serializationQueueMs: Double,
+        edtQueueMs: Double,
+        serializationMs: Double,
+        dispatchMs: Double,
+        outstanding: Int,
+        message: JsonElement,
+    ) {
+        synchronized(deliveryStatsLock) {
+            deliveryCount++
+            maxSerializationQueueMs = maxOf(maxSerializationQueueMs, serializationQueueMs)
+            maxEdtQueueMs = maxOf(maxEdtQueueMs, edtQueueMs)
+            maxSerializationMs = maxOf(maxSerializationMs, serializationMs)
+            maxDispatchMs = maxOf(maxDispatchMs, dispatchMs)
+            val now = System.nanoTime()
+            val shouldReport =
+                serializationQueueMs >= SERIALIZATION_QUEUE_WARNING_MS ||
+                    edtQueueMs >= QUEUE_DELAY_WARNING_MS ||
+                    serializationMs >= SERIALIZATION_WARNING_MS ||
+                    dispatchMs >= DISPATCH_WARNING_MS ||
+                    now - lastDeliveryDiagnosticAt >= DIAGNOSTIC_INTERVAL_NS
+            if (!shouldReport) return
+            log(
+                "[webview-bridge] delivery count=$deliveryCount serializeQueueMs=${serializationQueueMs.rounded()} " +
+                    "edtQueueMs=${edtQueueMs.rounded()} serializeMs=${serializationMs.rounded()} " +
+                    "dispatchMs=${dispatchMs.rounded()} maxSerializeQueueMs=${maxSerializationQueueMs.rounded()} " +
+                    "maxEdtQueueMs=${maxEdtQueueMs.rounded()} maxSerializeMs=${maxSerializationMs.rounded()} " +
+                    "maxDispatchMs=${maxDispatchMs.rounded()} outstanding=$outstanding message=${messageType(message)}",
+            )
+            deliveryCount = 0
+            maxSerializationQueueMs = 0.0
+            maxEdtQueueMs = 0.0
+            maxSerializationMs = 0.0
+            maxDispatchMs = 0.0
+            lastDeliveryDiagnosticAt = now
+        }
+    }
+
+    private fun messageType(message: JsonElement): String =
+        (message as? kotlinx.serialization.json.JsonObject)?.get("type")?.toString() ?: "unknown"
+
+    private fun Double.rounded(): String = "%.1f".format(this)
+
     override fun dispose() {
+        serializationExecutor.shutdownNow()
         Disposer.dispose(query)
     }
 
     companion object {
         const val BRIDGE_MARKER: String = "/*__PI_BRIDGE__*/"
         private const val MAX_PENDING = 64
+        private const val QUEUE_WARNING_THRESHOLD = 20
+        private const val QUEUE_DELAY_WARNING_MS = 100.0
+        private const val SERIALIZATION_QUEUE_WARNING_MS = 100.0
+        private const val SERIALIZATION_WARNING_MS = 20.0
+        private const val DISPATCH_WARNING_MS = 50.0
+        private const val DIAGNOSTIC_INTERVAL_NS = 1_000_000_000L
     }
 }
