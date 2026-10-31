@@ -312,17 +312,129 @@ body {
   padding: 0 2px;
 }
 
+.conversation-shell {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
 .messages {
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
+  min-width: 0;
   overflow-y: auto;
   overscroll-behavior-y: contain;
-  padding: 20px clamp(14px, 3vw, 42px) 28px;
+  padding: 20px clamp(14px, 3vw, 42px) 28px 0;
   display: flex;
   flex-direction: column;
   gap: 14px;
   scrollbar-gutter: stable;
+}
+
+/* Compact Codex-style conversation outline. Each marker represents one user message and stays
+   pinned to the left edge while the transcript itself scrolls. */
+.message-outline {
+  position: relative;
+  flex: 0 0 34px;
+  display: flex;
+  align-items: center;
+  min-height: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.message-outline-track {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 7px;
+  width: 100%;
+  height: min(72vh, 380px);
+  max-height: calc(100% - 32px);
+  overflow: hidden;
+  padding: 18px 0 24px 3px;
+  pointer-events: auto;
+}
+
+.message-outline-track-dense {
+  justify-content: flex-start;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--fg-dim) 56%, transparent) transparent;
+}
+
+.message-outline-track-dense::-webkit-scrollbar {
+  display: block;
+  width: 7px;
+}
+
+.message-outline-track-dense::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fg-dim) 56%, transparent);
+  background-clip: content-box;
+}
+
+.message-outline-item {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  width: 24px;
+  height: 15px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.message-outline-marker {
+  display: block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fg-dim) 62%, transparent);
+  transition: width 120ms ease, height 120ms ease, margin 120ms ease, background 120ms ease;
+}
+
+.message-outline-item:hover .message-outline-marker,
+.message-outline-item:focus-visible .message-outline-marker,
+.message-outline-item-active .message-outline-marker {
+  width: 8px;
+  height: 8px;
+  margin-left: 7px;
+  background: var(--accent);
+}
+
+.message-outline-tooltip {
+  position: fixed;
+  z-index: 200;
+  max-width: min(360px, 46vw);
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--fg);
+  box-shadow: 0 6px 18px rgba(20, 30, 45, 0.18);
+  font-size: 0.86em;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+.message-outline-item-active .message-outline-marker {
+  background: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.message-outline-item:focus-visible {
+  outline: none;
 }
 
 .empty {
@@ -379,40 +491,6 @@ body {
   color: var(--fg-dim);
   border-top: 1px solid var(--border);
   padding-top: 5px;
-}
-
-.message-copy {
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  padding: 1px 5px;
-  background: var(--bg);
-  color: var(--fg-dim);
-  font: inherit;
-  font-size: 0.8em;
-  line-height: 1.2;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 120ms ease, background 120ms ease;
-}
-
-.message:hover .message-copy,
-.message-copy:focus-visible {
-  opacity: 1;
-}
-
-.message-copy:hover {
-  border-color: var(--border);
-  background: var(--bg-raised);
-  color: var(--fg);
-}
-
-.message-user .message-copy {
-  right: 5px;
-  bottom: 4px;
-  background: var(--bg-raised);
 }
 
 .latest-button {
@@ -518,6 +596,17 @@ body {
   overflow: auto;
   max-height: 420px;
   box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.markdown-card {
+  position: relative;
+}
+
+.markdown-card-copy {
+  position: absolute;
+  z-index: 1;
+  top: 10px;
+  right: 8px;
 }
 
 .markdown pre code {
@@ -704,6 +793,31 @@ body {
 
 .tool-card-error .tool-status {
   color: var(--error);
+}
+
+.card-copy {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 7px;
+  background: var(--bg);
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 0.78em;
+  line-height: 1.25;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.card-copy:hover,
+.card-copy:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  outline: none;
+}
+
+.tool-card-copy {
+  align-self: flex-end;
 }
 
 .tool-info {
@@ -1708,8 +1822,12 @@ body {
 /* Keep the dense footer usable in a narrow tool window. */
 @media (max-width: 760px) {
   .messages {
-    padding: 14px 10px 20px;
+    padding: 14px 10px 20px 0;
     gap: 10px;
+  }
+
+  .message-outline {
+    flex-basis: 30px;
   }
 
   .message-user {

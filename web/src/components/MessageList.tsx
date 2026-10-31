@@ -7,6 +7,8 @@ import { boostWheelScroll } from "../scroll";
 
 /** Older messages stay out of the DOM until asked for, keeping long sessions cheap to render. */
 const VISIBLE_BATCH = 60;
+/** Keep the outline readable; larger histories scroll inside the outline itself. */
+const OUTLINE_MAX_VISIBLE = 15;
 
 interface Props {
   messages: ChatMessage[];
@@ -24,6 +26,13 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
   const latestButtonVisible = useRef(false);
   const [showLatestButton, setShowLatestButton] = useState(false);
   const [visibleCount, setVisibleCount] = useState(VISIBLE_BATCH);
+  const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
+  const [pendingMessageId, setPendingMessageId] = useState<string | null>(null);
+  const [hoverPreview, setHoverPreview] = useState<{ text: string; x: number; y: number } | null>(null);
+  const userMessages = useMemo(
+    () => messages.flatMap((message, index) => (message.role === "user" ? [{ message, index }] : [])),
+    [messages],
+  );
   const visible = useMemo(
     () => (messages.length <= visibleCount ? messages : messages.slice(messages.length - visibleCount)),
     [messages, visibleCount],
@@ -35,6 +44,28 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
   useEffect(() => {
     if (messages.length === 0) setVisibleCount(VISIBLE_BATCH);
   }, [messages.length]);
+
+  useEffect(() => {
+    const lastUserMessage = userMessages[userMessages.length - 1]?.message;
+    if (!lastUserMessage) {
+      setActiveMessageId(null);
+    } else if (!activeMessageId || !userMessages.some(({ message }) => message.id === activeMessageId)) {
+      setActiveMessageId(lastUserMessage.id);
+    }
+  }, [activeMessageId, userMessages]);
+
+  useEffect(() => {
+    const messageId = pendingMessageId;
+    if (!messageId) return;
+    const frame = window.requestAnimationFrame(() => {
+      const target = scroller.current?.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
+      if (!target) return;
+      setPendingMessageId(null);
+      stickToBottom.current = false;
+      target.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [pendingMessageId, visible]);
 
   useEffect(() => {
     const element = scroller.current;
@@ -51,6 +82,13 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
       latestButtonVisible.current = nextLatestButtonVisible;
       setShowLatestButton(nextLatestButtonVisible);
     }
+
+    const containerTop = element.getBoundingClientRect().top;
+    let current: string | null = null;
+    for (const message of Array.from(element.querySelectorAll<HTMLElement>(".message-user[data-message-id]"))) {
+      if (message.getBoundingClientRect().top <= containerTop + 96) current = message.dataset.messageId ?? current;
+    }
+    if (current && current !== activeMessageId) setActiveMessageId(current);
   };
 
   const scrollToLatest = (): void => {
@@ -73,49 +111,106 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
     });
   };
 
+  const jumpToMessage = (messageId: string, messageIndex: number): void => {
+    setPendingMessageId(messageId);
+    setActiveMessageId(messageId);
+    setVisibleCount((current) => Math.max(current, messages.length - messageIndex));
+  };
+
   return (
-    <div
-      className="messages"
-      ref={scroller}
-      onScroll={handleScroll}
-      onWheel={boostWheelScroll}
-      role="log"
-      aria-live="polite"
-      aria-label="pi conversation"
-    >
-      {messages.length === 0 && !connecting && (
-        <div className="empty">{loadingHistory ? "loading transcript…" : emptyHint}</div>
+    <div className="conversation-shell">
+      {userMessages.length > 0 && (
+        <aside
+          className="message-outline"
+          aria-label="User message navigation"
+          onMouseLeave={() => {
+            setHoverPreview(null);
+          }}
+        >
+          <div
+            className={`message-outline-track${
+              userMessages.length > OUTLINE_MAX_VISIBLE ? " message-outline-track-dense" : ""
+            }`}
+          >
+            {userMessages.map(({ message, index }, outlineIndex) => {
+              const preview = messagePreview(message);
+              const isActive = message.id === activeMessageId;
+              return (
+                <button
+                  type="button"
+                  className={`message-outline-item${isActive ? " message-outline-item-active" : ""}`}
+                  key={message.id}
+                  title={preview}
+                  aria-label={`Jump to user message ${outlineIndex + 1}: ${preview}`}
+                  aria-current={isActive ? "location" : undefined}
+                  onClick={() => jumpToMessage(message.id, index)}
+                  onMouseEnter={(event) =>
+                    setHoverPreview({ text: preview, x: event.clientX + 12, y: event.clientY + 12 })
+                  }
+                  onMouseMove={(event) =>
+                    setHoverPreview({ text: preview, x: event.clientX + 12, y: event.clientY + 12 })
+                  }
+                  onMouseLeave={() => setHoverPreview(null)}
+                >
+                  <span className="message-outline-marker" />
+                </button>
+              );
+            })}
+          </div>
+          {hoverPreview && (
+            <div
+              className="message-outline-tooltip"
+              role="tooltip"
+              style={{ left: `${hoverPreview.x}px`, top: `${hoverPreview.y}px` }}
+            >
+              {hoverPreview.text}
+            </div>
+          )}
+        </aside>
       )}
-      {hiddenCount > 0 && (
-        <button type="button" className="load-earlier" onClick={loadEarlier}>
-          ↑ 加载更早的消息（剩余 {hiddenCount} 条）
-        </button>
-      )}
-      {visible.map((message, index) => (
-        <MemoMessageView
-          key={message.id}
-          message={message}
-          previousAssistantModel={
-            index + hiddenCount > 0 && messages[index + hiddenCount - 1]?.role === "assistant"
-              ? messages[index + hiddenCount - 1]?.model
-              : null
-          }
-          tools={tools}
-          toolStates={toolStatesByMessage.get(message.id) ?? EMPTY_TOOL_STATES}
-          thinkingLabel={thinkingLabel}
-        />
-      ))}
-      {connecting && (
-        <div className="connecting-status" role="status" aria-label="正在连接服务">
-          <span>正在连接服务</span>
-          <AnimatedEllipsis className="connecting-ellipsis" />
-        </div>
-      )}
-      {showLatestButton && (
-        <button type="button" className="latest-button" onClick={scrollToLatest}>
-          ↓ 回到最新
-        </button>
-      )}
+      <div
+        className="messages"
+        ref={scroller}
+        onScroll={handleScroll}
+        onWheel={boostWheelScroll}
+        role="log"
+        aria-live="polite"
+        aria-label="pi conversation"
+      >
+        {messages.length === 0 && !connecting && (
+          <div className="empty">{loadingHistory ? "loading transcript" : emptyHint}</div>
+        )}
+        {hiddenCount > 0 && (
+          <button type="button" className="load-earlier" onClick={loadEarlier}>
+            Load earlier messages ({hiddenCount} remaining)
+          </button>
+        )}
+        {visible.map((message, index) => (
+          <MemoMessageView
+            key={message.id}
+            message={message}
+            previousAssistantModel={
+              index + hiddenCount > 0 && messages[index + hiddenCount - 1]?.role === "assistant"
+                ? messages[index + hiddenCount - 1]?.model
+                : null
+            }
+            tools={tools}
+            toolStates={toolStatesByMessage.get(message.id) ?? EMPTY_TOOL_STATES}
+            thinkingLabel={thinkingLabel}
+          />
+        ))}
+        {connecting && (
+          <div className="connecting-status" role="status" aria-label="正在连接服务">
+            <span>正在连接服务</span>
+            <AnimatedEllipsis className="connecting-ellipsis" />
+          </div>
+        )}
+        {showLatestButton && (
+          <button type="button" className="latest-button" onClick={scrollToLatest}>
+            Back to latest
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -131,15 +226,9 @@ interface MessageViewProps {
 
 function MessageView({ message, previousAssistantModel, tools, thinkingLabel }: MessageViewProps): JSX.Element {
   const showModel = message.role === "assistant" && message.model && message.model !== previousAssistantModel;
-  const copyableText = message.blocks
-    .filter((block): block is Extract<Block, { kind: "text" }> => block.kind === "text")
-    .map((block) => block.text)
-    .join("\n\n")
-    .trim();
-  const canCopy = copyableText.length > 0 && !message.streaming;
 
   return (
-    <article className={`message message-${message.role}`}>
+    <article className={`message message-${message.role}`} data-message-id={message.id}>
       {message.blocks.map((block, index) => (
         <BlockView
           key={index}
@@ -149,18 +238,28 @@ function MessageView({ message, previousAssistantModel, tools, thinkingLabel }: 
           thinkingLabel={thinkingLabel}
         />
       ))}
-      {message.streaming && message.blocks.length === 0 && <div className="typing">…</div>}
+      {message.streaming && message.blocks.length === 0 && <div className="typing">...</div>}
       {message.stopReason === "error" && (
         <div className="message-error">{message.errorMessage ?? "the request failed"}</div>
       )}
       {showModel && (
         <footer className="message-footer">
-          <span>{message.model}{message.streaming ? " · streaming" : ""}</span>
+          <span>{message.model}{message.streaming ? " - streaming" : ""}</span>
         </footer>
       )}
-      {canCopy && <CopyMessageButton text={copyableText} />}
     </article>
   );
+}
+
+function messagePreview(message: ChatMessage): string {
+  const text = message.blocks
+    .filter((block): block is Extract<Block, { kind: "text" }> => block.kind === "text")
+    .map((block) => block.text)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (text.length > 72) return `${text.slice(0, 72)}...`;
+  return text || "Image or attachment";
 }
 
 /**
@@ -267,37 +366,6 @@ function AnimatedEllipsis({ className }: { className: string }): JSX.Element {
     <span className={className} aria-hidden="true">
       {".".repeat(count)}
     </span>
-  );
-}
-
-function CopyMessageButton({ text }: { text: string }): JSX.Element {
-  const [copied, setCopied] = useState(false);
-
-  const copy = async (): Promise<void> => {
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-      } else {
-        const input = document.createElement("textarea");
-        input.value = text;
-        input.style.position = "fixed";
-        input.style.opacity = "0";
-        document.body.appendChild(input);
-        input.select();
-        document.execCommand("copy");
-        input.remove();
-      }
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1200);
-    } catch {
-      setCopied(false);
-    }
-  };
-
-  return (
-    <button type="button" className="message-copy" onClick={copy} title="Copy assistant message">
-      {copied ? "已复制" : "复制"}
-    </button>
   );
 }
 

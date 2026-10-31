@@ -18,6 +18,7 @@ import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import { post } from "../bridge";
 import { recordPerf } from "../perfLog";
+import { copyText } from "./CopyButton";
 
 hljs.registerLanguage("bash", bash);
 hljs.registerLanguage("sh", bash);
@@ -88,7 +89,7 @@ export function Markdown({ text, streaming }: { text: string; streaming: boolean
   const html = useMemo(() => {
     const startedAt = performance.now();
     const source = streaming ? closeOpenFence(shown) : text;
-    const rendered = streaming ? streamingRenderer.render(source) : finalRenderer.render(source);
+    const rendered = addCodeCopyButtons(streaming ? streamingRenderer.render(source) : finalRenderer.render(source));
     recordPerf("markdown_render", performance.now() - startedAt, {
       chars: source.length,
       streaming: streaming ? 1 : 0,
@@ -97,7 +98,22 @@ export function Markdown({ text, streaming }: { text: string; streaming: boolean
   }, [shown, streaming, text]);
 
   const handleClick = (event: MouseEvent<HTMLDivElement>): void => {
-    const anchor = (event.target as HTMLElement | null)?.closest("a");
+    const target = event.target as HTMLElement | null;
+    const copyButton = target?.closest<HTMLButtonElement>("[data-copy-code]");
+    if (copyButton) {
+      const code = copyButton.parentElement?.querySelector("pre")?.textContent ?? "";
+      void copyText(code).then((success) => {
+        if (!success) return;
+        const original = copyButton.textContent;
+        copyButton.textContent = "已复制";
+        window.setTimeout(() => {
+          copyButton.textContent = original ?? "复制";
+        }, 1200);
+      });
+      return;
+    }
+
+    const anchor = target?.closest("a");
     const href = anchor?.getAttribute("href");
     if (!href) return;
     // `#anchor`-style links have no target in a single-document webview.
@@ -107,6 +123,14 @@ export function Markdown({ text, streaming }: { text: string; streaming: boolean
   };
 
   return <div className="markdown" onClick={handleClick} dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+function addCodeCopyButtons(html: string): string {
+  return html.replace(
+    /<pre(\b[^>]*)>([\s\S]*?)<\/pre>/g,
+    (_match, attributes: string, body: string) =>
+      `<div class="markdown-card"><button type="button" class="card-copy markdown-card-copy" data-copy-code="true" title="Copy code block">复制</button><pre${attributes}>${body}</pre></div>`,
+  );
 }
 
 /** True when the text ends inside an unterminated fenced code block. */

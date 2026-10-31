@@ -27,6 +27,7 @@ describe("Markdown", () => {
       <Markdown text={"```ts\nconst answer: number = 42;\n```"} streaming={false} />,
     );
     expect(container.querySelector("pre code .hljs-keyword")).not.toBeNull();
+    expect(container.querySelector(".markdown-card-copy")).not.toBeNull();
   });
 
   it("keeps a still-open fence inside the code block while streaming", () => {

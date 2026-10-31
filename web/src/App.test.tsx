@@ -101,6 +101,8 @@ describe("App", () => {
 
     // The first user message doubles as the session label in the toolbar.
     await waitFor(() => expect(screen.getAllByText("explain this repo").length).toBeGreaterThan(0));
+    expect(screen.getByRole("complementary", { name: "User message navigation" })).toBeDefined();
+    expect(screen.getByRole("button", { name: /Jump to user message 1: explain this repo/ })).toBeDefined();
     expect(screen.getByText("It is a pi checkout.")).toBeDefined();
     expect(screen.getByText("streamed answer")).toBeDefined();
     expect(screen.getByText("file body")).toBeDefined();
