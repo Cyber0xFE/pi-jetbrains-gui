@@ -7,7 +7,11 @@ import com.intellij.ui.jcef.JBCefBrowser
 import com.intellij.ui.jcef.JBCefBrowserBase
 import com.intellij.ui.jcef.JBCefJSQuery
 import dev.pi.jetbrains.rpc.PiJson
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
@@ -111,6 +115,9 @@ class WebViewBridge(
                     .replace("\u2028", "\\u2028")
                     .replace("\u2029", "\\u2029")
                 val serializationMs = (System.nanoTime() - serializationStartedAt) / 1_000_000.0
+                val payloadChars = payload.length
+                val payloadBytes = payload.toByteArray(Charsets.UTF_8).size
+                val recordCount = recordCount(message)
                 val edtQueuedAt = System.nanoTime()
                 val queued = queuedDeliveries.incrementAndGet()
                 val previousQueueDiagnosticAt = lastQueueDiagnosticAt.get()
@@ -134,6 +141,9 @@ class WebViewBridge(
                             0.0,
                             outstanding,
                             message,
+                            payloadChars,
+                            payloadBytes,
+                            recordCount,
                         )
                         return@invokeLater
                     }
@@ -146,6 +156,9 @@ class WebViewBridge(
                         dispatchMs,
                         outstanding,
                         message,
+                        payloadChars,
+                        payloadBytes,
+                        recordCount,
                     )
                 }
             }
@@ -161,6 +174,9 @@ class WebViewBridge(
         dispatchMs: Double,
         outstanding: Int,
         message: JsonElement,
+        payloadChars: Int,
+        payloadBytes: Int,
+        recordCount: Int?,
     ) {
         synchronized(deliveryStatsLock) {
             deliveryCount++
@@ -174,6 +190,7 @@ class WebViewBridge(
                     edtQueueMs >= QUEUE_DELAY_WARNING_MS ||
                     serializationMs >= SERIALIZATION_WARNING_MS ||
                     dispatchMs >= DISPATCH_WARNING_MS ||
+                    payloadBytes >= PAYLOAD_WARNING_BYTES ||
                     now - lastDeliveryDiagnosticAt >= DIAGNOSTIC_INTERVAL_NS
             if (!shouldReport) return
             log(
@@ -181,7 +198,8 @@ class WebViewBridge(
                     "edtQueueMs=${edtQueueMs.rounded()} serializeMs=${serializationMs.rounded()} " +
                     "dispatchMs=${dispatchMs.rounded()} maxSerializeQueueMs=${maxSerializationQueueMs.rounded()} " +
                     "maxEdtQueueMs=${maxEdtQueueMs.rounded()} maxSerializeMs=${maxSerializationMs.rounded()} " +
-                    "maxDispatchMs=${maxDispatchMs.rounded()} outstanding=$outstanding message=${messageType(message)}",
+                    "maxDispatchMs=${maxDispatchMs.rounded()} payloadChars=$payloadChars payloadBytes=$payloadBytes " +
+                    "recordCount=${recordCount ?: "-"} outstanding=$outstanding message=${messageType(message)}",
             )
             deliveryCount = 0
             maxSerializationQueueMs = 0.0
@@ -193,7 +211,12 @@ class WebViewBridge(
     }
 
     private fun messageType(message: JsonElement): String =
-        (message as? kotlinx.serialization.json.JsonObject)?.get("type")?.toString() ?: "unknown"
+        ((message as? JsonObject)?.get("type") as? JsonPrimitive)?.contentOrNull ?: "unknown"
+
+    private fun recordCount(message: JsonElement): Int? =
+        ((message as? JsonObject)?.get("type") as? JsonPrimitive)?.contentOrNull
+            ?.takeIf { it == "records" }
+            ?.let { ((message as JsonObject)["records"] as? JsonArray)?.size }
 
     private fun Double.rounded(): String = "%.1f".format(this)
 
@@ -210,6 +233,7 @@ class WebViewBridge(
         private const val SERIALIZATION_QUEUE_WARNING_MS = 100.0
         private const val SERIALIZATION_WARNING_MS = 20.0
         private const val DISPATCH_WARNING_MS = 50.0
+        private const val PAYLOAD_WARNING_BYTES = 128 * 1024
         private const val DIAGNOSTIC_INTERVAL_NS = 1_000_000_000L
     }
 }
