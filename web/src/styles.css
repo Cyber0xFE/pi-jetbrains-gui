@@ -1187,10 +1187,10 @@ body {
 .toolbar {
   flex: 0 0 auto;
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
-  min-height: 62px;
-  padding: 8px clamp(14px, 2.5vw, 30px);
+  min-height: 44px;
+  padding: 4px clamp(14px, 2.5vw, 30px);
   border-bottom: 1px solid var(--border);
   background: linear-gradient(180deg, var(--bg) 0%, var(--bg-soft) 100%);
   overflow-x: auto;
@@ -1237,10 +1237,10 @@ body {
 .toolbar-session {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
   max-width: min(48ch, 72vw);
-  padding: 7px 13px 7px 10px;
+  padding: 4px 10px 4px 8px;
   border-color: transparent;
   background: transparent;
   color: var(--fg);
@@ -1256,7 +1256,7 @@ body {
 .toolbar-session-mark {
   flex: 0 0 auto;
   width: 4px;
-  height: 25px;
+  height: 20px;
   border-radius: 999px;
   background: var(--accent);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent);
@@ -1272,7 +1272,10 @@ body {
 .toolbar-new {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
   border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
   background: var(--accent-soft);
   color: var(--accent);
@@ -1280,9 +1283,12 @@ body {
 }
 
 .toolbar-new-icon {
-  font-size: 1.15em;
-  font-weight: 400;
-  line-height: 0.8;
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 2;
 }
 
 .contextbar {

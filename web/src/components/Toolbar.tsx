@@ -37,9 +37,17 @@ export function Toolbar({
         <span className="toolbar-session-label">{sessionLabel}</span>
       </button>
       <div className="toolbar-spacer" />
-      <button type="button" className="toolbar-button toolbar-new" onClick={onNewSession} disabled={disabled} title="开始新会话">
-        <span className="toolbar-new-icon" aria-hidden="true">＋</span>
-        <span>新建</span>
+      <button
+        type="button"
+        className="toolbar-button toolbar-new"
+        onClick={onNewSession}
+        disabled={disabled}
+        title="开始新会话"
+        aria-label="新建会话"
+      >
+        <svg className="toolbar-new-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
       </button>
     </header>
   );
