@@ -112,6 +112,10 @@ class PiChatService(private val project: Project) : Disposable {
     private val _status = MutableStateFlow(Status())
     val status: StateFlow<Status> = _status.asStateFlow()
 
+    /** Text selected in a console and waiting to be placed in the chat composer. */
+    private val _prefill = MutableStateFlow<String?>(null)
+    val prefill: StateFlow<String?> = _prefill.asStateFlow()
+
     private val _events = MutableSharedFlow<PiEvent>(
         extraBufferCapacity = 1024,
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
@@ -331,6 +335,14 @@ class PiChatService(private val project: Project) : Disposable {
     }
 
     fun clearEditorContext() = setEditorContext(null)
+
+    fun prefillComposer(text: String) {
+        if (text.isNotBlank()) _prefill.value = text
+    }
+
+    fun clearPrefill(text: String) {
+        _prefill.compareAndSet(text, null)
+    }
 
     fun refreshEditorContext() {
         FileEditorManager.getInstance(project).selectedTextEditor?.let(::updateEditorContext)

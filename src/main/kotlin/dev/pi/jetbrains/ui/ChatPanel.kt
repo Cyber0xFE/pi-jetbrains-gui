@@ -136,6 +136,13 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
 
     private fun startForwarding() {
         scope.launch {
+            service.prefill.collect { text ->
+                if (text == null) return@collect
+                bridge?.send(HostMessages.prefill(text))
+                service.clearPrefill(text)
+            }
+        }
+        scope.launch {
             service.status.collect { status ->
                 bridge?.send(HostMessages.status(status))
                 if (status.phase == PiChatService.Phase.RUNNING) maybeHydrate()

@@ -5,6 +5,8 @@ import type { PromptImage, SlashCommand } from "../types";
 interface Props {
   value: string;
   onChange: (value: string) => void;
+  /** Incremented when native actions place text in the composer. */
+  focusRequest: number;
   onSend: () => void;
   disabled: boolean;
   busy: boolean;
@@ -33,6 +35,7 @@ const BUILTIN_COMMANDS: SlashCommand[] = [
 export function Composer({
   value,
   onChange,
+  focusRequest,
   onSend,
   disabled,
   busy,
@@ -106,6 +109,14 @@ export function Composer({
     element.style.height = `${Math.min(element.scrollHeight, window.innerHeight * 0.4)}px`;
     element.style.overflowY = element.scrollHeight > element.clientHeight ? "auto" : "hidden";
   }, [value]);
+
+  useEffect(() => {
+    if (focusRequest === 0) return;
+    const element = textarea.current;
+    if (!element) return;
+    element.focus();
+    element.setSelectionRange(element.value.length, element.value.length);
+  }, [focusRequest]);
 
   const handlePaste = (event: ClipboardEvent<HTMLTextAreaElement>): void => {
     for (const item of Array.from(event.clipboardData.items)) {

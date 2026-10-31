@@ -19,6 +19,7 @@ export function App(): JSX.Element {
   const store = useMemo(() => new ChatStore(), []);
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const [draft, setDraft] = useState("");
+  const [focusDraftRequest, setFocusDraftRequest] = useState(0);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [sessionDialogTab, setSessionDialogTab] = useState<SessionDialogTab>("sessions");
   const [images, setImages] = useState<PromptImage[]>([]);
@@ -63,6 +64,7 @@ export function App(): JSX.Element {
       // `prefill` seeds the composer (fork returns the original user message text).
       if (message.type === "prefill") {
         setDraft(message.text);
+        setFocusDraftRequest((current) => current + 1);
         return;
       }
       store.dispatch({ kind: "inbound", message });
@@ -244,6 +246,7 @@ export function App(): JSX.Element {
       <Composer
         value={draft}
         onChange={setDraft}
+        focusRequest={focusDraftRequest}
         onSend={send}
         disabled={!ready || state.sending}
         busy={busy || Boolean(state.status.isStreaming || state.status.isCompacting)}

@@ -17,7 +17,7 @@ const readAsset = (url) => readFileSync(join(dist, url.replace(/^\//, "")), "utf
 
 let bundle = null;
 html = html.replace(/<script[^>]*\bsrc="([^"]+)"[^>]*>\s*<\/script>/g, (_match, src) => {
-	bundle = escapeForScript(readAsset(src));
+	bundle = escapeForScript(readAsset(src)).trim();
 	return "";
 });
 
@@ -40,5 +40,5 @@ if (/\bsrc="|\bhref="\/(assets|src)\//.test(html)) {
 	throw new Error("webview bundle still references external assets; check the inlining step");
 }
 
-writeFileSync(htmlPath, html);
+writeFileSync(htmlPath, html.trimEnd());
 console.log(`inlined webview bundle: ${htmlPath} (${Buffer.byteLength(html)} bytes)`);

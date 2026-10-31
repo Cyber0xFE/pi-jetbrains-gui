@@ -22,6 +22,12 @@
 
     <depends>com.intellij.modules.platform</depends>
 
+    <actions>
+        <action id="dev.pi.jetbrains.SendConsoleSelectionToPi" class="dev.pi.jetbrains.editor.SendConsoleSelectionToPiAction">
+            <add-to-group group-id="ConsoleView.PopupMenu" anchor="last"/>
+        </action>
+    </actions>
+
     <extensions defaultExtensionNs="com.intellij">
         <projectService serviceImplementation="dev.pi.jetbrains.PiChatService"/>
         <applicationConfigurable instance="dev.pi.jetbrains.ui.PiSettingsConfigurable"/>
