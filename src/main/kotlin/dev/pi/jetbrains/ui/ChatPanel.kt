@@ -11,6 +11,9 @@ import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
 import dev.pi.jetbrains.PiChatService
@@ -113,6 +116,14 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
         project.messageBus.connect(this).subscribe(
             EditorColorsManager.TOPIC,
             EditorColorsListener { bridge?.send(themeMessage()) },
+        )
+        project.messageBus.connect(this).subscribe(
+            VirtualFileManager.VFS_CHANGES,
+            object : BulkFileListener {
+                override fun after(events: List<com.intellij.openapi.vfs.newvfs.events.VFileEvent>) {
+                    if (events.any { isProjectFileEvent(it.file) }) refreshProjectFiles()
+                }
+            },
         )
         startForwarding()
         // Opening the tool window is the M1 trigger for the child process (plan M1 acceptance).
@@ -345,7 +356,7 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
                 if (response?.success == true) request { service.requestState() }
             }
             "get_commands" -> scope.launch { sendCommands() }
-            "list_files" -> scope.launch { bridge?.send(HostMessages.files(service.projectFiles())) }
+            "list_files" -> refreshProjectFiles()
             "clear_context" -> service.clearEditorContext()
 
             else -> LOG.debug("unknown webview message: ${message.type}")
@@ -647,6 +658,21 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
             }
             "set_editor_text" -> payload.string("text")?.let { bridge?.send(HostMessages.prefill(it)) }
         }
+    }
+
+    private fun refreshProjectFiles() {
+        scope.launch {
+            val files = service.projectFiles()
+            ApplicationManager.getApplication().invokeLater {
+                bridge?.send(HostMessages.files(files))
+            }
+        }
+    }
+
+    private fun isProjectFileEvent(file: VirtualFile?): Boolean {
+        val basePath = project.basePath ?: return false
+        val eventPath = file?.path ?: return false
+        return eventPath == basePath || eventPath.startsWith("$basePath/") || eventPath.startsWith("$basePath\\")
     }
 
     private fun respond(response: RpcExtensionUiResponse) {
