@@ -317,6 +317,7 @@ body {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
   padding: 20px clamp(14px, 3vw, 42px) 28px;
   display: flex;
   flex-direction: column;
@@ -1436,6 +1437,7 @@ body {
 
 .picker-list {
   overflow-y: auto;
+  overscroll-behavior-y: contain;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
 }

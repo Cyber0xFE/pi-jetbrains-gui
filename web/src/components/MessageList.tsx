@@ -3,6 +3,7 @@ import { normalizeTaggedBlocks, type Block, type ChatMessage, type ToolState } f
 import { Markdown } from "./Markdown";
 import { ToolCard } from "./tools/ToolCard";
 import { recordPerf } from "../perfLog";
+import { boostWheelScroll } from "../scroll";
 
 /** Older messages stay out of the DOM until asked for, keeping long sessions cheap to render. */
 const VISIBLE_BATCH = 60;
@@ -20,6 +21,7 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
   recordPerf("message_list_render", 0, { messages: messages.length, tools: Object.keys(tools).length });
   const scroller = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
+  const latestButtonVisible = useRef(false);
   const [showLatestButton, setShowLatestButton] = useState(false);
   const [visibleCount, setVisibleCount] = useState(VISIBLE_BATCH);
   const visible = useMemo(
@@ -37,20 +39,25 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
   useEffect(() => {
     const element = scroller.current;
     if (element && stickToBottom.current) element.scrollTop = element.scrollHeight;
-  });
+  }, [messages, tools]);
 
   const handleScroll = (): void => {
     const element = scroller.current;
     if (!element) return;
     const atBottom = element.scrollHeight - element.scrollTop - element.clientHeight < 48;
     stickToBottom.current = atBottom;
-    setShowLatestButton(!atBottom);
+    const nextLatestButtonVisible = !atBottom;
+    if (latestButtonVisible.current !== nextLatestButtonVisible) {
+      latestButtonVisible.current = nextLatestButtonVisible;
+      setShowLatestButton(nextLatestButtonVisible);
+    }
   };
 
   const scrollToLatest = (): void => {
     const element = scroller.current;
     if (!element) return;
     stickToBottom.current = true;
+    latestButtonVisible.current = false;
     setShowLatestButton(false);
     element.scrollTo({ top: element.scrollHeight, behavior: "smooth" });
   };
@@ -71,6 +78,7 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
       className="messages"
       ref={scroller}
       onScroll={handleScroll}
+      onWheel={boostWheelScroll}
       role="log"
       aria-live="polite"
       aria-label="pi conversation"

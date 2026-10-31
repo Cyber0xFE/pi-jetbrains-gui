@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { boostWheelScroll } from "../scroll";
 
 export interface PickerItem {
   key: string;
@@ -43,6 +44,8 @@ export function Picker({ title, items, placeholder, emptyText, actions, onSelect
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const scrollFrame = useRef<number | null>(null);
+  const pendingScrollTop = useRef(0);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -63,6 +66,12 @@ export function Picker({ title, items, placeholder, emptyText, actions, onSelect
   useEffect(() => {
     rowRefs.current[selected]?.scrollIntoView?.({ block: "nearest" });
   }, [selected]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollFrame.current !== null) window.cancelAnimationFrame(scrollFrame.current);
+    };
+  }, []);
 
   const start = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
   const end = Math.min(filtered.length, Math.ceil((scrollTop + VIEWPORT_HEIGHT) / ROW_HEIGHT) + OVERSCAN);
@@ -120,7 +129,15 @@ export function Picker({ title, items, placeholder, emptyText, actions, onSelect
           className="picker-list"
           ref={listRef}
           style={{ height: VIEWPORT_HEIGHT }}
-          onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+          onWheel={boostWheelScroll}
+          onScroll={(event) => {
+            pendingScrollTop.current = event.currentTarget.scrollTop;
+            if (scrollFrame.current !== null) return;
+            scrollFrame.current = window.requestAnimationFrame(() => {
+              scrollFrame.current = null;
+              setScrollTop(pendingScrollTop.current);
+            });
+          }}
           role="listbox"
           aria-label={title}
         >
@@ -140,7 +157,7 @@ export function Picker({ title, items, placeholder, emptyText, actions, onSelect
                 className={`picker-row ${index === selected ? "picker-row-selected" : ""} ${item.active ? "picker-row-active" : ""}`}
                 style={{ height: ROW_HEIGHT, paddingLeft: 10 + (item.depth ?? 0) * 14 }}
                 disabled={item.disabled}
-                onMouseMove={() => setSelected(index)}
+                onMouseEnter={() => setSelected(index)}
                 onClick={() => choose(item)}
               >
                 <span className="picker-marker">{item.active ? "●" : ""}</span>
