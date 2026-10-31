@@ -296,8 +296,8 @@ export function App(): JSX.Element {
             post({ type: "new_session" });
             closeDialog();
           }}
-          onRename={(name) => {
-            post({ type: "rename_session", name });
+          onRename={(name, path) => {
+            post(path ? { type: "rename_session", name, path } : { type: "rename_session", name });
           }}
           onRefresh={() => {
             post({ type: "list_sessions" });

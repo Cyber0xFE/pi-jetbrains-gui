@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { formatWhen } from "../format";
 import type { SessionSummary, TreeEntry } from "../types";
 import { Picker, type PickerItem } from "./Picker";
@@ -11,7 +11,7 @@ interface Props {
   initialTab?: Tab;
   onClose: () => void;
   onNewSession: () => void;
-  onRename: (name: string) => void;
+  onRename: (name: string, path?: string) => void;
   onRefresh: () => void;
   onSwitch: (path: string) => void;
   onDelete: (path: string) => void;
@@ -41,6 +41,13 @@ export function SessionDialog({
   const [tab, setTab] = useState<Tab>(initialTab);
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState("");
+  const [renameTarget, setRenameTarget] = useState<SessionSummary | null>(null);
+
+  const openRename = useCallback((session: SessionSummary): void => {
+    setRenameTarget(session);
+    setRenameValue(session.name?.trim() ?? "");
+    setRenameOpen(true);
+  }, []);
 
   const sessionItems = useMemo<PickerItem[]>(
     () =>
@@ -50,9 +57,10 @@ export function SessionDialog({
         detail: `${session.messageCount} messages · ${formatWhen(session.modified)}`,
         badge: session.current ? "current" : undefined,
         active: session.current,
+        onRename: () => openRename(session),
         onDelete: () => onDelete(session.path),
       })),
-    [sessions, onDelete],
+    [sessions, onDelete, openRename],
   );
 
   const treeItems = useMemo<PickerItem[]>(
@@ -70,18 +78,12 @@ export function SessionDialog({
   );
 
   const items = tab === "sessions" ? sessionItems : treeItems;
-  const currentSession = sessions.find((session) => session.current);
-
-  const openRename = (): void => {
-    setRenameValue(currentSession?.name?.trim() ?? "");
-    setRenameOpen(true);
-  };
-
   const submitRename = (): void => {
     const name = renameValue.trim();
-    if (!name) return;
-    onRename(name);
+    if (!name || !renameTarget) return;
+    onRename(name, renameTarget.current ? undefined : renameTarget.path);
     setRenameOpen(false);
+    setRenameTarget(null);
   };
 
   return (
@@ -116,9 +118,6 @@ export function SessionDialog({
           <button type="button" className="button button-secondary" onClick={onRefresh}>
             Refresh
           </button>
-          <button type="button" className="button button-secondary" onClick={openRename} disabled={!currentSession}>
-            Rename
-          </button>
           <button type="button" className="button" onClick={onNewSession}>
             New session
           </button>
@@ -152,10 +151,17 @@ export function SessionDialog({
           />
           <div className="rename-hint">A title makes this session easier to find later.</div>
           <footer className="picker-footer">
-            <button type="button" className="button button-secondary" onClick={() => setRenameOpen(false)}>
+            <button
+              type="button"
+              className="button button-secondary"
+              onClick={() => {
+                setRenameOpen(false);
+                setRenameTarget(null);
+              }}
+            >
               Cancel
             </button>
-            <button type="submit" className="button" disabled={!renameValue.trim()}>
+            <button type="submit" className="button" disabled={!renameValue.trim() || !renameTarget}>
               Save
             </button>
           </footer>

@@ -453,6 +453,34 @@ class PiChatService(private val project: Project) : Disposable {
     suspend fun setSessionName(name: String): RpcResponse =
         requireClient().send(RpcCommand(type = "set_session_name", name = name)).await()
 
+    /**
+     * Renames a session that is not currently loaded by pi. The RPC command only targets the
+     * active session, so inactive sessions receive the same append-only `session_info` record that
+     * pi writes for an active rename.
+     */
+    fun renameSessionFile(sessionPath: String, name: String): Boolean {
+        val file = runCatching { Paths.get(sessionPath) }.getOrNull() ?: return false
+        if (!Files.isRegularFile(file)) return false
+        val record = JsonObject(
+            mapOf(
+                "type" to JsonPrimitive("session_info"),
+                "id" to JsonPrimitive(java.util.UUID.randomUUID().toString()),
+                "parentId" to kotlinx.serialization.json.JsonNull,
+                "timestamp" to JsonPrimitive(java.time.Instant.now().toString()),
+                "name" to JsonPrimitive(name),
+            ),
+        )
+        return runCatching {
+            Files.writeString(
+                file,
+                PiJson.encodeToString(JsonObject.serializer(), record) + System.lineSeparator(),
+                Charsets.UTF_8,
+                StandardOpenOption.APPEND,
+            )
+            true
+        }.getOrDefault(false)
+    }
+
     /** Deletes a session JSONL file on disk; call from `Dispatchers.IO`. */
     fun deleteSession(sessionPath: String): Boolean {
         val file = java.io.File(sessionPath)

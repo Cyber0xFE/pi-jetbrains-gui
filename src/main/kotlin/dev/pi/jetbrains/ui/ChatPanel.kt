@@ -299,10 +299,17 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
             "rename_session" -> {
                 val name = message.name?.trim() ?: return
                 scope.launch {
-                    val response = request { service.setSessionName(name) }
-                    if (response?.success == true) {
-                        request { service.requestState() }
-                        sendSessions()
+                    val targetPath = message.path
+                    val currentPath = service.status.value.sessionFile
+                    if (targetPath != null && targetPath != currentPath) {
+                        if (service.renameSessionFile(targetPath, name)) sendSessions()
+                        else bridge?.send(HostMessages.notice("failed to rename session: $targetPath"))
+                    } else {
+                        val response = request { service.setSessionName(name) }
+                        if (response?.success == true) {
+                            request { service.requestState() }
+                            sendSessions()
+                        }
                     }
                 }
             }

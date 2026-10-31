@@ -9,6 +9,8 @@ export interface PickerItem {
   disabled?: boolean;
   /** Tree rows are flattened with a depth; the picker indents them instead of nesting. */
   depth?: number;
+  /** Optional trailing rename affordance (session list); stop propagation so the row is not selected. */
+  onRename?: () => void;
   /** Optional trailing delete affordance (session list); stop propagation so the row is not selected. */
   onDelete?: () => void;
 }
@@ -145,6 +147,30 @@ export function Picker({ title, items, placeholder, emptyText, actions, onSelect
                 <span className="picker-label">{item.label}</span>
                 {item.badge && <span className="picker-badge">{item.badge}</span>}
                 {item.detail && <span className="picker-detail">{item.detail}</span>}
+                {item.onRename && (
+                  <span
+                    className="picker-rename"
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Rename"
+                    title="Rename session"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      item.onRename?.();
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        item.onRename?.();
+                      }
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="m4 16.5-.7 3.2 3.2-.7L18.7 6.8a2.2 2.2 0 0 0-3.1-3.1L3.4 15.9M14.4 5.6l4 4" />
+                    </svg>
+                  </span>
+                )}
                 {item.onDelete && (
                   <span
                     className="picker-delete"
