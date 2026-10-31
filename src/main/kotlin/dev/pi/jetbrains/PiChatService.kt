@@ -325,14 +325,10 @@ class PiChatService(private val project: Project) : Disposable {
         }.getOrDefault(emptyList())
     }
 
-    /** Updates the automatically attached editor selection context. */
     fun setEditorContext(context: String?) {
         editorContext = context?.takeIf { it.isNotBlank() }
         _status.update { it.copy(pendingContext = editorContext?.let(::contextPreview)) }
     }
-
-    /** Compatibility entry point for the explicit “Send to pi” action. */
-    fun queueContext(context: String) = setEditorContext(context)
 
     fun clearEditorContext() = setEditorContext(null)
 

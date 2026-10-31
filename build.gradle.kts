@@ -57,13 +57,23 @@ intellijPlatform {
         }
 
         vendor {
-            name = "pi"
-            url = "https://github.com/earendil-works/pi"
+            name = "Cyber0xFE"
+            url = "https://github.com/Cyber0xFE/pi-jetbrains-gui"
         }
 
         description = """
-            <p>JetBrains IDE 内 <code>pi</code> coding agent 的图形化前端。</p>
-            <p>M5：进程恢复更可靠、受保护的工具输出、IDE 主题集成。</p>
+            <p>JetBrains IDE 内 pi coding agent（<a href="https://github.com/badlogic/pi-mono">pi</a>）的图形化前端。</p>
+            <b>功能特性</b>
+            <ul>
+              <li>内置 Pi 工具窗口，直接在 IDE 内与 pi coding agent 对话</li>
+              <li>会话持久化与进程恢复，重启 IDE 后可继续历史会话</li>
+              <li>受保护的工具输出展示（读文件、终端、补丁等）</li>
+              <li>IDE 主题集成，界面跟随编辑器明暗主题自动切换</li>
+              <li>自动识别编辑器选中的区域，作为上下文附到对话中</li>
+              <li>可配置 pi CLI 路径与工作目录</li>
+            </ul>
+            <p><b>使用前提</b>：本机已安装 pi CLI（<code>npm install -g @mariozechner/pi</code>）。</p>
+            <p>源码与问题反馈：<a href="https://github.com/Cyber0xFE/pi-jetbrains-gui">https://github.com/Cyber0xFE/pi-jetbrains-gui</a></p>
         """.trimIndent()
     }
 }
