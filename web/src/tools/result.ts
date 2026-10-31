@@ -9,6 +9,25 @@
 
 export type JsonObject = Record<string, unknown>;
 
+/** Keep a second safety limit in the renderer even if the host-side limit is bypassed. */
+export const MAX_TOOL_DISPLAY_CHARS = 256 * 1024;
+export const MAX_DIFF_INPUT_CHARS = 64 * 1024;
+
+export function truncateToolText(value: string, maxChars = MAX_TOOL_DISPLAY_CHARS): string {
+  if (value.length <= maxChars) return value;
+  const suffix = `\n[… output truncated for UI; ${value.length.toLocaleString()} chars total …]`;
+  return `${value.slice(0, Math.max(0, maxChars - suffix.length))}${suffix}`;
+}
+
+/** Bounds retained tool arguments/details as well as their final DOM representation. */
+export function truncateToolValue(value: unknown, depth = 0): unknown {
+  if (typeof value === "string") return truncateToolText(value, MAX_DIFF_INPUT_CHARS);
+  if (depth >= 5 || value === null || typeof value !== "object") return value;
+  if (Array.isArray(value)) return value.slice(0, 1000).map((item) => truncateToolValue(item, depth + 1));
+  const object = value as Record<string, unknown>;
+  return Object.fromEntries(Object.entries(object).map(([key, item]) => [key, truncateToolValue(item, depth + 1)]));
+}
+
 export function asObject(value: unknown): JsonObject | undefined {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
   return value as JsonObject;
@@ -52,11 +71,14 @@ export function toolResultParts(result: unknown): ToolResultParts {
     stringField(details, "fullOutputPath") ??
     stringField(details, "full_output_path") ??
     stringField(structured, "full_output_path");
+  const text = textOf(result);
+  const truncatedText = text === undefined ? undefined : truncateToolText(text);
   return {
-    text: textOf(result),
+    text: truncatedText,
     details,
     fullOutputPath,
-    outputTruncated: object.outputTruncated === true || object.output_truncated === true,
+    outputTruncated:
+      object.outputTruncated === true || object.output_truncated === true || truncatedText !== text,
   };
 }
 

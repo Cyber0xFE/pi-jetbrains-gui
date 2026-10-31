@@ -1,7 +1,15 @@
 import { useMemo } from "react";
 import type { ToolState, ToolStatus } from "../../state/sessionReducer";
 import { parseDetailsDiff, previewDiff } from "../../tools/diff";
-import { arrayField, formatJson, asObject, numberField, stringField } from "../../tools/result";
+import {
+  arrayField,
+  formatJson,
+  asObject,
+  numberField,
+  stringField,
+  truncateToolText,
+  MAX_DIFF_INPUT_CHARS,
+} from "../../tools/result";
 import { DiffView } from "./DiffView";
 import { PathLink } from "./PathLink";
 
@@ -103,7 +111,7 @@ function readView(tool: ToolState): ToolView {
         {range !== undefined && <span className="chip">{range}</span>}
       </>
     ),
-    body: tool.output ? <pre className="tool-output">{tool.output}</pre> : null,
+    body: tool.output ? <pre className="tool-output">{truncateToolText(tool.output)}</pre> : null,
   };
 }
 
@@ -135,11 +143,11 @@ function editView(tool: ToolState): ToolView {
   const details = tool.details;
   const detailDiff = typeof details?.diff === "string" ? details.diff : undefined;
 
-  const rows = detailDiff !== undefined ? parseDetailsDiff(detailDiff) : [];
+  const rows = detailDiff !== undefined ? parseDetailsDiff(truncateToolText(detailDiff)) : [];
   const isPreview = detailDiff === undefined;
 
   const body = tool.isError ? (
-    tool.output ? <pre className="tool-output tool-output-error">{tool.output}</pre> : null
+    tool.output ? <pre className="tool-output tool-output-error">{truncateToolText(tool.output)}</pre> : null
   ) : detailDiff !== undefined ? (
     <DiffView rows={rows} path={path} />
   ) : edits.length > 0 ? (
@@ -147,7 +155,12 @@ function editView(tool: ToolState): ToolView {
       {edits.map((edit, index) => (
         <div key={index} className="diff-group">
           {edits.length > 1 && <div className="diff-caption">edit {index + 1}</div>}
-          <DiffView rows={previewDiff(edit.oldText, edit.newText)} />
+          <DiffView
+            rows={previewDiff(
+              edit.oldText.slice(0, MAX_DIFF_INPUT_CHARS),
+              edit.newText.slice(0, MAX_DIFF_INPUT_CHARS),
+            )}
+          />
         </div>
       ))}
       <div className="tool-note">preview from args; pi applies edits fuzzily (BOM/whitespace tolerant)</div>
@@ -183,11 +196,11 @@ function writeView(tool: ToolState): ToolView {
       </>
     ),
     body: tool.isError ? (
-      tool.output ? <pre className="tool-output tool-output-error">{tool.output}</pre> : null
+      tool.output ? <pre className="tool-output tool-output-error">{truncateToolText(tool.output)}</pre> : null
     ) : content !== undefined ? (
       <details className="tool-section">
         <summary>written content</summary>
-        <pre className="tool-output">{content}</pre>
+        <pre className="tool-output">{truncateToolText(content)}</pre>
       </details>
     ) : null,
   };
@@ -217,7 +230,7 @@ function bashView(tool: ToolState): ToolView {
         {hasOutput && (
           <details className="tool-section" open={outputOpen}>
             <summary>output · {outputLines} lines</summary>
-            <pre className="tool-output tool-terminal">{tool.output}</pre>
+            <pre className="tool-output tool-terminal">{truncateToolText(tool.output ?? "")}</pre>
           </details>
         )}
         {tool.outputTruncated && <div className="tool-note tool-output-warning">output truncated to keep the UI responsive</div>}
@@ -242,6 +255,7 @@ interface GrepHit {
 }
 
 const GREP_LINE = /^(.*?):(\d+):\s?(.*)$/;
+const MAX_VISIBLE_HITS = 1000;
 
 function grepView(tool: ToolState): ToolView {
   const pattern = stringField(tool.args, "pattern");
@@ -260,7 +274,7 @@ function grepView(tool: ToolState): ToolView {
     ),
     body:
       tool.isError && tool.output ? (
-        <pre className="tool-output tool-output-error">{tool.output}</pre>
+        <pre className="tool-output tool-output-error">{truncateToolText(tool.output)}</pre>
       ) : hits.length > 0 ? (
         <div className="hits">
           {hits.map((hit, index) => (
@@ -271,7 +285,7 @@ function grepView(tool: ToolState): ToolView {
           ))}
         </div>
       ) : tool.output ? (
-        <pre className="tool-output">{tool.output}</pre>
+        <pre className="tool-output">{truncateToolText(tool.output)}</pre>
       ) : null,
   };
 }
@@ -279,7 +293,8 @@ function grepView(tool: ToolState): ToolView {
 function parseGrepHits(output: string | undefined): GrepHit[] {
   if (!output) return [];
   const hits: GrepHit[] = [];
-  for (const raw of output.split("\n")) {
+  for (const raw of truncateToolText(output).split("\n")) {
+    if (hits.length >= MAX_VISIBLE_HITS) break;
     const match = GREP_LINE.exec(raw);
     if (!match) continue;
     const path = match[1];
@@ -293,7 +308,9 @@ function parseGrepHits(output: string | undefined): GrepHit[] {
 function findView(tool: ToolState): ToolView {
   const pattern = stringField(tool.args, "pattern");
   const searchPath = stringField(tool.args, "path");
-  const files = tool.output ? tool.output.split("\n").filter((line) => line.length > 0) : [];
+  const files = tool.output
+    ? truncateToolText(tool.output).split("\n").filter((line) => line.length > 0).slice(0, MAX_VISIBLE_HITS)
+    : [];
 
   return {
     title: (
@@ -311,7 +328,7 @@ function findView(tool: ToolState): ToolView {
           ))}
         </div>
       ) : tool.output ? (
-        <pre className="tool-output">{tool.output}</pre>
+        <pre className="tool-output">{truncateToolText(tool.output)}</pre>
       ) : null,
   };
 }
@@ -320,7 +337,7 @@ function lsView(tool: ToolState): ToolView {
   const path = stringField(tool.args, "path");
   return {
     title: <PathLink path={path ?? "."} label={path ?? "cwd"} />,
-    body: tool.output ? <pre className="tool-output">{tool.output}</pre> : null,
+    body: tool.output ? <pre className="tool-output">{truncateToolText(tool.output)}</pre> : null,
   };
 }
 
@@ -336,13 +353,13 @@ function genericView(tool: ToolState): ToolView {
         {tool.args !== undefined && (
           <details className="tool-section">
             <summary>arguments</summary>
-            <pre className="tool-output">{formatJson(tool.args)}</pre>
+            <pre className="tool-output">{truncateToolText(formatJson(tool.args))}</pre>
           </details>
         )}
         {tool.output !== undefined && (
           <details className="tool-section" open={tool.isError || tool.output.split("\n").length <= 3}>
             <summary>{tool.isError ? "error" : `result · ${tool.output.split("\n").length} lines`}</summary>
-            <pre className="tool-output">{tool.output}</pre>
+            <pre className="tool-output">{truncateToolText(tool.output)}</pre>
           </details>
         )}
         {tool.outputTruncated && <div className="tool-note tool-output-warning">output truncated to keep the UI responsive</div>}

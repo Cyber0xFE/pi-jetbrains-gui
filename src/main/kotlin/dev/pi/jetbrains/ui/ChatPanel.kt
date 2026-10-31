@@ -41,6 +41,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -508,8 +509,8 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
         var batch = ArrayList<JsonElement>()
         var size = 0
         for (rawMessage in messages) {
-            val message = protectLargeHistoryMessage(rawMessage)
-            val length = message.toString().length
+            val message = capJsonDepth(protectLargeHistoryMessage(rawMessage))
+            val length = estimateJsonBytes(message)
             if (batch.isNotEmpty() && size + length > HISTORY_CHUNK_CHARS) {
                 activeBridge.send(HostMessages.history(batch, final = false))
                 batch = ArrayList()
@@ -605,11 +606,60 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
     }
 
     private fun toRecord(event: PiEvent): JsonElement? = when (event) {
-        is PiEvent.Session -> protectLargeToolRecord(event.payload)
-        is PiEvent.ExtensionUiRequest -> event.payload
-        is PiEvent.Response -> PiJson.encodeToJsonElement(RpcResponse.serializer(), event.response)
+        is PiEvent.Session -> capJsonDepth(protectLargeToolRecord(event.payload))
+        is PiEvent.ExtensionUiRequest -> capJsonDepth(event.payload)
+        is PiEvent.Response -> {
+            val cappedData = event.response.data?.let(::capJsonDepth)
+            val response = if (cappedData === event.response.data) event.response
+            else event.response.copy(data = cappedData)
+            PiJson.encodeToJsonElement(RpcResponse.serializer(), response)
+        }
         is PiEvent.Unknown -> null
     }
+
+    /**
+     * Rebuilds the tree with a depth cap, iteratively. Both kotlinx's tree encoder and
+     * JsonElement.toString() recurse per nesting level, so an arbitrarily deep tool payload can
+     * overflow the Dispatchers.IO thread stack; replacing over-deep subtrees with a placeholder
+     * keeps every later serialization (bridge, history, diagnostics) safe.
+     */
+    private fun capJsonDepth(root: JsonElement): JsonElement {
+        var result: JsonElement = JsonNull
+        val tasks = ArrayDeque<JsonDepthWork>()
+        tasks.addLast(JsonDepthWork(root, 0) { result = it })
+        while (tasks.isNotEmpty()) {
+            val work = tasks.removeLast()
+            val element = work.element
+            when {
+                element is JsonObject && work.depth < MAX_JSON_DEPTH -> {
+                    val values = LinkedHashMap<String, JsonElement>(element.size)
+                    work.assign(JsonObject(values))
+                    for ((key, value) in element) {
+                        tasks.addLast(JsonDepthWork(value, work.depth + 1) { cloned -> values[key] = cloned })
+                    }
+                }
+                element is JsonArray && work.depth < MAX_JSON_DEPTH -> {
+                    val values = ArrayList<JsonElement>(element.size)
+                    work.assign(JsonArray(values))
+                    for (value in element) {
+                        values.add(JsonNull)
+                        val index = values.lastIndex
+                        tasks.addLast(JsonDepthWork(value, work.depth + 1) { cloned -> values[index] = cloned })
+                    }
+                }
+                element is JsonObject || element is JsonArray ->
+                    work.assign(JsonPrimitive("[nested JSON omitted: depth limit]"))
+                else -> work.assign(element)
+            }
+        }
+        return result
+    }
+
+    private class JsonDepthWork(
+        val element: JsonElement,
+        val depth: Int,
+        val assign: (JsonElement) -> Unit,
+    )
 
     /** Prevents a multi-megabyte tool result from being injected into JCEF and rendered at once. */
     private fun protectLargeToolRecord(payload: JsonObject): JsonElement {
@@ -629,20 +679,54 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
         return JsonObject(objectMessage.toMutableMap().apply { put("content", protectedContent) })
     }
 
+    /**
+     * Estimates JSON size iteratively. Calling JsonElement.toString() here is recursive and can
+     * overflow the IO thread stack when a tool returns a very deeply nested JSON value.
+     */
     private fun compactLargeResult(result: JsonElement): JsonObject? {
-        val encodedSize = result.toString().toByteArray(Charsets.UTF_8).size
-        if (encodedSize <= MAX_TOOL_RESULT_BYTES) return null
+        val estimatedSize = estimateJsonBytes(result)
+        if (estimatedSize <= MAX_TOOL_RESULT_BYTES) return null
         val resultObject = result as? JsonObject
+        val details = resultObject?.get("details")?.takeIf { estimateJsonBytes(it) <= MAX_TOOL_RESULT_BYTES }
+            ?: JsonObject(emptyMap())
         return JsonObject(
             linkedMapOf(
                 "output" to JsonPrimitive(
-                    "[output omitted: ${formatBytes(encodedSize)}; open the full output file to inspect it]",
+                    "[output omitted: approximately ${formatBytes(estimatedSize)}; open the full output file to inspect it]",
                 ),
                 "outputTruncated" to JsonPrimitive(true),
-                "details" to (resultObject?.get("details") ?: JsonObject(emptyMap())),
+                "details" to details,
             ),
         )
     }
+
+    private fun estimateJsonBytes(root: JsonElement): Int {
+        val pending = ArrayDeque<JsonWork>()
+        pending.addLast(JsonWork(root, 0))
+        var estimate = 0L
+        while (pending.isNotEmpty() && estimate <= MAX_TOOL_RESULT_BYTES) {
+            val work = pending.removeLast()
+            if (work.depth > MAX_JSON_DEPTH) return MAX_TOOL_RESULT_BYTES + 1
+            when (val element = work.element) {
+                is JsonObject -> {
+                    estimate += 2
+                    for ((key, value) in element) {
+                        // Quoted keys and escaped characters: use a conservative estimate.
+                        estimate += key.length.toLong() * 2 + 4
+                        pending.addLast(JsonWork(value, work.depth + 1))
+                    }
+                }
+                is JsonArray -> {
+                    estimate += 2
+                    element.forEach { pending.addLast(JsonWork(it, work.depth + 1)) }
+                }
+                is JsonPrimitive -> estimate += element.content.length.toLong() * 2 + 8
+            }
+        }
+        return estimate.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+    }
+
+    private data class JsonWork(val element: JsonElement, val depth: Int)
 
     private fun formatBytes(bytes: Int): String =
         if (bytes >= 1024 * 1024) "${bytes / (1024 * 1024)} MB" else "${bytes / 1024} KB"
@@ -704,7 +788,8 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
         private const val FLUSH_INTERVAL_MS = 16L
         private const val HISTORY_CHUNK_CHARS = 256 * 1024
         private const val COMPACT_TIMEOUT_NOTICE = "compaction did not finish in time"
-        private const val MAX_TOOL_RESULT_BYTES = 2 * 1024 * 1024
+        private const val MAX_TOOL_RESULT_BYTES = 512 * 1024
+        private const val MAX_JSON_DEPTH = 64
         private const val DIAGNOSTIC_INTERVAL_NS = 1_000_000_000L
     }
 }

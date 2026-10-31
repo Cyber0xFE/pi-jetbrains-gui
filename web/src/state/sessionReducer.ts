@@ -1,4 +1,4 @@
-import { toolResultParts } from "../tools/result";
+import { toolResultParts, truncateToolValue } from "../tools/result";
 import type {
   AssistantDelta,
   Inbound,
@@ -298,7 +298,7 @@ function onMessageUpdate(state: ChatState, delta: AssistantDelta | undefined): C
       [call.id]: {
         ...(previous ?? { callId: call.id, name: call.name, status: "running" as ToolStatus }),
         name: call.name,
-        args: call.arguments ?? previous?.args,
+        args: call.arguments === undefined ? previous?.args : truncateToolValue(call.arguments),
       },
     };
   }
@@ -416,7 +416,7 @@ function seedToolCalls(state: ChatState, message: WireMessage, fallbackStatus: T
       [call.id]: {
         ...(previous ?? { callId: call.id, name: call.name, status: fallbackStatus }),
         name: call.name,
-        args: call.arguments ?? previous?.args,
+        args: call.arguments === undefined ? previous?.args : truncateToolValue(call.arguments),
       },
     };
   }
@@ -434,7 +434,7 @@ function onToolStart(state: ChatState, record: WireRecord): ChatState {
         callId,
         name: record.toolName ?? "tool",
         status: "running",
-        args: record.args,
+        args: truncateToolValue(record.args),
         parentCallId: record.parentToolCallId,
       },
     },
