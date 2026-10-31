@@ -222,6 +222,7 @@ export type Inbound =
   | { type: "models"; models: ModelInfo[]; currentProvider: string | null; currentModel: string | null }
   | { type: "thinking_levels"; levels: string[]; current: string | null }
   | { type: "commands"; commands: SlashCommand[] }
+  | { type: "files"; files: string[] }
   | { type: "reset"; reason: string }
   | { type: "prefill"; text: string }
   | { type: "widget"; key: string; lines: string[]; placement: "aboveEditor" | "belowEditor" }
@@ -255,4 +256,5 @@ export type Outbound =
   | { type: "set_auto_compaction"; enabled: boolean }
   | { type: "abort_retry" }
   | { type: "get_commands" }
+  | { type: "list_files" }
   | { type: "clear_context" };

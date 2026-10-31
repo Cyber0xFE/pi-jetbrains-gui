@@ -266,6 +266,9 @@ data class HostCommand(
 @Serializable
 data class HostCommandsMessage(val type: String = "commands", val commands: List<HostCommand>)
 
+@Serializable
+data class HostFilesMessage(val type: String = "files", val files: List<String>)
+
 /** Clears the transcript after `switch_session` / `new_session` / `fork`. */
 @Serializable
 data class HostResetMessage(val type: String = "reset", val reason: String = "session")
@@ -373,6 +376,9 @@ object HostMessages {
             HostCommandsMessage.serializer(),
             HostCommandsMessage(commands = commands.map { HostCommand.from(it) }),
         )
+
+    fun files(files: List<String>): JsonElement =
+        PiJson.encodeToJsonElement(HostFilesMessage.serializer(), HostFilesMessage(files = files))
 
     fun reset(reason: String = "session"): JsonElement =
         PiJson.encodeToJsonElement(HostResetMessage.serializer(), HostResetMessage(reason = reason))

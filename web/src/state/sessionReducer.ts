@@ -106,6 +106,7 @@ export interface ChatState {
   models: ModelInfo[];
   thinkingLevels: string[];
   commands: SlashCommand[];
+  files: string[];
 }
 
 export const initialState: ChatState = {
@@ -130,6 +131,7 @@ export const initialState: ChatState = {
   models: [],
   thinkingLevels: [],
   commands: [],
+  files: [],
 };
 
 export type Action =
@@ -177,6 +179,8 @@ function applyInbound(state: ChatState, message: Inbound): ChatState {
       return { ...state, thinkingLevels: message.levels };
     case "commands":
       return { ...state, commands: message.commands };
+    case "files":
+      return { ...state, files: message.files };
     case "reset":
       return resetTranscript(state);
     case "prefill":

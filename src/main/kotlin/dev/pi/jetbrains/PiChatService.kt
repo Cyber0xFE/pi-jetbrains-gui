@@ -303,6 +303,27 @@ class PiChatService(private val project: Project) : Disposable {
         ).await()
     }
 
+    /** Returns project-relative regular files used by the composer @ reference picker. */
+    fun projectFiles(): List<String> {
+        val base = projectWorkDir() ?: return emptyList()
+        val excluded = setOf(
+            ".git", ".idea", ".gradle", ".intellijPlatform", "node_modules", "build", "dist", "out", "target",
+        )
+        return runCatching {
+            Files.walk(base).use { paths ->
+                paths
+                    .filter { path ->
+                        path != base && Files.isRegularFile(path) &&
+                            base.relativize(path).none { it.fileName.toString() in excluded }
+                    }
+                    .map { base.relativize(it).toString().replace('\\', '/') }
+                    .sorted()
+                    .limit(MAX_PROJECT_FILES.toLong())
+                    .toList()
+            }
+        }.getOrDefault(emptyList())
+    }
+
     /** Updates the automatically attached editor selection context. */
     fun setEditorContext(context: String?) {
         editorContext = context?.takeIf { it.isNotBlank() }
@@ -649,5 +670,6 @@ class PiChatService(private val project: Project) : Disposable {
         private const val RECOVERY_DELAY_MS = 500L
         private const val RECOVERY_START_WAIT_MS = 250L
         private const val RECOVERY_START_WAIT_ATTEMPTS = 40
+        private const val MAX_PROJECT_FILES = 5000
     }
 }

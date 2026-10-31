@@ -91,6 +91,7 @@ export function App(): JSX.Element {
   useEffect(() => {
     if (phase !== "running") return;
     post({ type: "get_commands" });
+    post({ type: "list_files" });
     post({ type: "get_models" });
     post({ type: "get_thinking_levels" });
   }, [phase]);
@@ -235,6 +236,7 @@ export function App(): JSX.Element {
         disabled={!ready || state.sending}
         busy={busy || Boolean(state.status.isStreaming || state.status.isCompacting)}
         commands={state.commands}
+        files={state.files}
         onCompact={() => post({ type: "compact" })}
         pendingContext={state.status.pendingContext}
         onClearContext={() => post({ type: "clear_context" })}

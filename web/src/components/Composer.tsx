@@ -10,6 +10,8 @@ interface Props {
   busy: boolean;
   /** Discoverable commands from `get_commands` (plan M3.8). */
   commands: SlashCommand[];
+  /** Project-relative files available for @ references. */
+  files: string[];
   onCompact: () => void;
   pendingContext?: string | null;
   onClearContext: () => void;
@@ -33,6 +35,7 @@ export function Composer({
   disabled,
   busy,
   commands,
+  files,
   onCompact,
   pendingContext,
   onClearContext,
@@ -44,7 +47,24 @@ export function Composer({
   const [highlight, setHighlight] = useState(0);
   const [dismissed, setDismissed] = useState(false);
   const rows = useRef<Array<HTMLButtonElement | null>>([]);
+  const fileRows = useRef<Array<HTMLButtonElement | null>>([]);
   const textarea = useRef<HTMLTextAreaElement>(null);
+
+  const fileQuery = useMemo(() => {
+    const match = /(^|\s)@([^\s]*)$/.exec(value);
+    if (!match || match[2] === undefined || match.index === undefined) return null;
+    const queryText = match[2];
+    return {
+      text: queryText.toLowerCase(),
+      start: match.index + (match[1]?.length ?? 0),
+      end: value.length,
+    };
+  }, [value]);
+
+  const fileMatches = useMemo(() => {
+    if (fileQuery === null) return [];
+    return files.filter((file) => file.toLowerCase().includes(fileQuery.text));
+  }, [fileQuery, files]);
 
   const query = useMemo(() => {
     const match = /^\/([^\s]*)$/.exec(value);
@@ -65,15 +85,16 @@ export function Composer({
   }, [availableCommands, query]);
 
   const open = query !== null && matches.length > 0 && !dismissed;
+  const filesOpen = fileQuery !== null && fileMatches.length > 0 && !dismissed;
 
   useEffect(() => {
     setHighlight(0);
-  }, [query]);
+  }, [query, fileQuery?.text]);
 
   useEffect(() => {
-    if (!open) return;
-    rows.current[highlight]?.scrollIntoView?.({ block: "nearest" });
-  }, [highlight, open]);
+    if (filesOpen) fileRows.current[highlight]?.scrollIntoView?.({ block: "nearest" });
+    else if (open) rows.current[highlight]?.scrollIntoView?.({ block: "nearest" });
+  }, [highlight, open, filesOpen]);
 
   useEffect(() => {
     const element = textarea.current;
@@ -109,12 +130,41 @@ export function Composer({
     setDismissed(true);
   };
 
+  const acceptFile = (file: string): void => {
+    if (!fileQuery) return;
+    onChange(`${value.slice(0, fileQuery.start)}@${file} ${value.slice(fileQuery.end)}`);
+    setDismissed(true);
+  };
+
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
     if (event.key === "Enter" && !event.shiftKey && !disabled && !busy && /^\/compact$/.test(value.trim())) {
       event.preventDefault();
       onChange("");
       onCompact();
       return;
+    }
+    if (filesOpen) {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setHighlight((current) => (current + 1) % fileMatches.length);
+        return;
+      }
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setHighlight((current) => (current - 1 + fileMatches.length) % fileMatches.length);
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setDismissed(true);
+        return;
+      }
+      if (event.key === "Tab" || event.key === "Enter") {
+        event.preventDefault();
+        const chosen = fileMatches[highlight];
+        if (chosen) acceptFile(chosen);
+        return;
+      }
     }
     if (open) {
       if (event.key === "ArrowDown") {
@@ -170,7 +220,28 @@ export function Composer({
           ))}
         </div>
       )}
-      {open && (
+      {filesOpen && (
+        <div className="slash-menu file-menu" role="listbox" aria-label="Referenced files">
+          {fileMatches.map((file, index) => (
+            <button
+              key={file}
+              ref={(element) => {
+                fileRows.current[index] = element;
+              }}
+              type="button"
+              role="option"
+              aria-selected={index === highlight}
+              className={`slash-row ${index === highlight ? "slash-row-selected" : ""}`}
+              onMouseMove={() => setHighlight(index)}
+              onClick={() => acceptFile(file)}
+            >
+              <span className="file-reference-at">@</span>
+              <span className="slash-name">{file}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {open && !filesOpen && (
         <div className="slash-menu" role="listbox" aria-label="Slash commands">
           {matches.map((command, index) => (
             <button

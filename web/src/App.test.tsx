@@ -271,6 +271,29 @@ describe("App", () => {
     );
   });
 
+  it("completes @ file references and sends them with the prompt", async () => {
+    render(<App />);
+    await waitFor(() => expect(window.__piDeliver).toBeDefined());
+
+    deliver(
+      { type: "status", status: { phase: "running", message: "ready", model: "m" } },
+      { type: "files", files: ["src/main.kt", "src/main.test.kt", "docs/JETBRAINS_GUI_PLAN.md"] },
+    );
+
+    const input = (await screen.findByPlaceholderText(/Send a message to pi/)) as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "Please inspect @plan" } });
+    expect(await screen.findByRole("listbox", { name: "Referenced files" })).toBeDefined();
+    fireEvent.click(screen.getByRole("option", { name: /docs\/JETBRAINS_GUI_PLAN\.md/ }));
+    expect(input.value).toBe("Please inspect @docs/JETBRAINS_GUI_PLAN.md ");
+
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() =>
+      expect(window.__piSent?.filter((message) => message.type === "prompt")).toEqual([
+        { type: "prompt", message: "Please inspect @docs/JETBRAINS_GUI_PLAN.md" },
+      ]),
+    );
+  });
+
   it("completes slash commands in the composer", async () => {
     render(<App />);
     await waitFor(() => expect(window.__piDeliver).toBeDefined());

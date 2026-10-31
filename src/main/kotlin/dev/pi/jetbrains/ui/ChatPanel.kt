@@ -270,6 +270,7 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
                 if (response?.success == true) request { service.requestState() }
             }
             "get_commands" -> scope.launch { sendCommands() }
+            "list_files" -> scope.launch { bridge?.send(HostMessages.files(service.projectFiles())) }
             "clear_context" -> service.clearEditorContext()
 
             else -> LOG.debug("unknown webview message: ${message.type}")
