@@ -498,10 +498,16 @@ body {
   right: 0;
   bottom: 8px;
   align-self: flex-end;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
   z-index: 2;
   border: 1px solid var(--accent);
-  border-radius: 999px;
-  padding: 5px 12px;
+  border-radius: 50%;
+  padding: 0;
   background: var(--bg);
   color: var(--accent);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
@@ -511,6 +517,11 @@ body {
 
 .latest-button:hover {
   background: var(--bg-raised);
+}
+
+.latest-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .load-earlier {
