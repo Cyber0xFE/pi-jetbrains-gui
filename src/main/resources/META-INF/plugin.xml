@@ -23,7 +23,7 @@
     <depends>com.intellij.modules.platform</depends>
 
     <actions>
-        <action id="dev.pi.jetbrains.SendConsoleSelectionToPi" class="dev.pi.jetbrains.editor.SendConsoleSelectionToPiAction">
+        <action id="dev.pi.jetbrains.SendConsoleSelectionToPi" class="dev.pi.jetbrains.editor.SendConsoleSelectionToPiAction" icon="/icons/toolWindowPi.png">
             <add-to-group group-id="ConsoleView.PopupMenu" anchor="last"/>
         </action>
     </actions>
