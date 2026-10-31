@@ -1,23 +1,23 @@
 <idea-plugin>
     <id>dev.pi.jetbrains</id>
-    <name>Pi Jetbrains GUI</name>
+    <name>Pi Coding Agent GUI</name>
     <vendor url="https://github.com/Cyber0xFE/pi-jetbrains-gui">Cyber0xFE</vendor>
     <description><![CDATA[
-        JetBrains IDE 内 pi coding agent（<a href="https://github.com/badlogic/pi-mono">pi</a>）的图形化前端。<br><br>
+        Pi Coding Agent brings the pi coding agent to JetBrains IDEs with a focused chat tool window, session persistence, protected tool output, editor context sharing, and configurable Node.js and pi CLI paths.<br><br>
 
-        <b>功能特性</b>
+        <b>Features</b>
         <ul>
-            <li>内置 Pi 工具窗口，直接在 IDE 内与 pi coding agent 对话</li>
-            <li>会话持久化与进程恢复，重启 IDE 后可继续历史会话</li>
-            <li>受保护的工具输出展示（读文件、终端、补丁等）</li>
-            <li>IDE 主题集成，界面跟随编辑器明暗主题自动切换</li>
-            <li>自动识别编辑器选中的区域，作为上下文附到对话中</li>
-            <li>可配置 pi CLI 路径与工作目录</li>
+            <li>Chat with pi directly inside the IDE.</li>
+            <li>Persist and restore pi sessions across IDE restarts.</li>
+            <li>Display protected tool output, including files, terminals, and patches.</li>
+            <li>Follow the IDE light and dark themes automatically.</li>
+            <li>Attach the selected editor text as context for a conversation.</li>
+            <li>Configure the pi CLI path, Node.js runtime, and working directory.</li>
         </ul>
 
-        <b>使用前提</b>：本机已安装 pi CLI（<code>npm install -g @mariozechner/pi</code>）。<br><br>
+        <p><b>Requirement:</b> Install the pi CLI before use, for example with <code>npm install -g @earendil-works/pi-coding-agent</code>.</p>
 
-        源码与问题反馈：<a href="https://github.com/Cyber0xFE/pi-jetbrains-gui">https://github.com/Cyber0xFE/pi-jetbrains-gui</a>
+        <p>Source code and issue tracker: <a href="https://github.com/Cyber0xFE/pi-jetbrains-gui">https://github.com/Cyber0xFE/pi-jetbrains-gui</a></p>
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
