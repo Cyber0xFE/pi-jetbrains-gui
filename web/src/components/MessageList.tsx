@@ -4,6 +4,9 @@ import { Markdown } from "./Markdown";
 import { ToolCard } from "./tools/ToolCard";
 import { recordPerf } from "../perfLog";
 
+/** Older messages stay out of the DOM until asked for, keeping long sessions cheap to render. */
+const VISIBLE_BATCH = 60;
+
 interface Props {
   messages: ChatMessage[];
   tools: Record<string, ToolState>;
@@ -18,7 +21,18 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
   const scroller = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const [showLatestButton, setShowLatestButton] = useState(false);
-  const toolStatesByMessage = useMessageToolStates(messages, tools);
+  const [visibleCount, setVisibleCount] = useState(VISIBLE_BATCH);
+  const visible = useMemo(
+    () => (messages.length <= visibleCount ? messages : messages.slice(messages.length - visibleCount)),
+    [messages, visibleCount],
+  );
+  const hiddenCount = messages.length - visible.length;
+  const toolStatesByMessage = useMessageToolStates(visible, tools);
+
+  // A session switch rebuilds the transcript from scratch; drop the old window size.
+  useEffect(() => {
+    if (messages.length === 0) setVisibleCount(VISIBLE_BATCH);
+  }, [messages.length]);
 
   useEffect(() => {
     const element = scroller.current;
@@ -41,6 +55,17 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
     element.scrollTo({ top: element.scrollHeight, behavior: "smooth" });
   };
 
+  const loadEarlier = (): void => {
+    const element = scroller.current;
+    const previousHeight = element?.scrollHeight ?? 0;
+    setVisibleCount((current) => current + VISIBLE_BATCH);
+    // Prepend changes the content height; keep the viewport on the same messages.
+    requestAnimationFrame(() => {
+      const updated = scroller.current;
+      if (updated) updated.scrollTop += updated.scrollHeight - previousHeight;
+    });
+  };
+
   return (
     <div
       className="messages"
@@ -53,13 +78,18 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
       {messages.length === 0 && !connecting && (
         <div className="empty">{loadingHistory ? "loading transcript…" : emptyHint}</div>
       )}
-      {messages.map((message, messageIndex) => (
+      {hiddenCount > 0 && (
+        <button type="button" className="load-earlier" onClick={loadEarlier}>
+          ↑ 加载更早的消息（剩余 {hiddenCount} 条）
+        </button>
+      )}
+      {visible.map((message, index) => (
         <MemoMessageView
           key={message.id}
           message={message}
           previousAssistantModel={
-            messageIndex > 0 && messages[messageIndex - 1]?.role === "assistant"
-              ? messages[messageIndex - 1]?.model
+            index + hiddenCount > 0 && messages[index + hiddenCount - 1]?.role === "assistant"
+              ? messages[index + hiddenCount - 1]?.model
               : null
           }
           tools={tools}

@@ -434,6 +434,23 @@ body {
   background: var(--bg-raised);
 }
 
+.load-earlier {
+  display: block;
+  margin: 8px auto;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 14px;
+  background: var(--bg-raised);
+  color: var(--fg-dim);
+  font: inherit;
+  cursor: pointer;
+}
+
+.load-earlier:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 .message-error {
   color: var(--error);
   white-space: pre-wrap;
