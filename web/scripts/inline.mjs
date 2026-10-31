@@ -30,7 +30,11 @@ if (bundle === null) {
 	throw new Error("no bundle script found in dist/index.html");
 }
 
-html = html.replace("</body>", `    <script>${bundle}</script>\n  </body>`);
+const bodyClose = html.lastIndexOf("</body>");
+if (bodyClose < 0) {
+	throw new Error("no closing body tag found in dist/index.html");
+}
+html = `${html.slice(0, bodyClose)}    <script>${bundle}</script>\n  </body>${html.slice(bodyClose + "</body>".length)}`;
 
 if (/\bsrc="|\bhref="\/(assets|src)\//.test(html)) {
 	throw new Error("webview bundle still references external assets; check the inlining step");

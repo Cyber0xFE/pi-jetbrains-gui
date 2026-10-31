@@ -13,6 +13,7 @@ interface Props {
   /** Project-relative files available for @ references. */
   files: string[];
   onCompact: () => void;
+  onOpenTree: () => void;
   pendingContext?: string | null;
   onClearContext: () => void;
   images: PromptImage[];
@@ -25,6 +26,7 @@ interface Props {
 const MAX_SUGGESTIONS = 8;
 const BUILTIN_COMMANDS: SlashCommand[] = [
   { name: "compact", description: "Compact the session context", source: "built-in" },
+  { name: "tree", description: "Open the current session tree", source: "built-in" },
 ];
 
 /** The textarea, its corner send/stop button and the `/` command menu; sending is triggered by Enter or the corner button. */
@@ -37,6 +39,7 @@ export function Composer({
   commands,
   files,
   onCompact,
+  onOpenTree,
   pendingContext,
   onClearContext,
   images,
@@ -137,11 +140,20 @@ export function Composer({
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
-    if (event.key === "Enter" && !event.shiftKey && !disabled && !busy && /^\/compact$/.test(value.trim())) {
-      event.preventDefault();
-      onChange("");
-      onCompact();
-      return;
+    if (event.key === "Enter" && !event.shiftKey && !disabled && !busy) {
+      const command = value.trim();
+      if (command === "/compact") {
+        event.preventDefault();
+        onChange("");
+        onCompact();
+        return;
+      }
+      if (command === "/tree") {
+        event.preventDefault();
+        onChange("");
+        onOpenTree();
+        return;
+      }
     }
     if (filesOpen) {
       if (event.key === "ArrowDown") {

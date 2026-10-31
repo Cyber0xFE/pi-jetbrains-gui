@@ -13,12 +13,14 @@ import { ChatStore } from "./store";
 import type { Block } from "./state/sessionReducer";
 
 type Dialog = "sessions" | "models" | "thinking" | null;
+type SessionDialogTab = "sessions" | "tree";
 
 export function App(): JSX.Element {
   const store = useMemo(() => new ChatStore(), []);
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const [draft, setDraft] = useState("");
   const [dialog, setDialog] = useState<Dialog>(null);
+  const [sessionDialogTab, setSessionDialogTab] = useState<SessionDialogTab>("sessions");
   const [images, setImages] = useState<PromptImage[]>([]);
   const [pendingPrompt, setPendingPrompt] = useState(false);
   const pendingPromptStartedAt = useRef<number | null>(null);
@@ -127,11 +129,15 @@ export function App(): JSX.Element {
 
   const abort = useCallback(() => post({ type: "abort" }), []);
 
-  const openSessions = useCallback(() => {
+  const openSessionDialog = useCallback((tab: SessionDialogTab) => {
     post({ type: "list_sessions" });
     post({ type: "get_tree" });
+    setSessionDialogTab(tab);
     setDialog("sessions");
   }, []);
+
+  const openSessions = useCallback(() => openSessionDialog("sessions"), [openSessionDialog]);
+  const openTree = useCallback(() => openSessionDialog("tree"), [openSessionDialog]);
 
   const closeDialog = useCallback(() => setDialog(null), []);
 
@@ -244,6 +250,7 @@ export function App(): JSX.Element {
         commands={state.commands}
         files={state.files}
         onCompact={() => post({ type: "compact" })}
+        onOpenTree={openTree}
         pendingContext={state.status.pendingContext}
         onClearContext={() => post({ type: "clear_context" })}
         images={images}
@@ -280,6 +287,7 @@ export function App(): JSX.Element {
           tree={state.tree}
           leafId={state.treeLeafId}
           loading={state.sessionsLoading}
+          initialTab={sessionDialogTab}
           onClose={closeDialog}
           onNewSession={() => {
             post({ type: "new_session" });

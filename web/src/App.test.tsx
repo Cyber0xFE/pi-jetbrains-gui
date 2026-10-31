@@ -294,6 +294,30 @@ describe("App", () => {
     );
   });
 
+  it("opens the current session tree with /tree", async () => {
+    render(<App />);
+    await waitFor(() => expect(window.__piDeliver).toBeDefined());
+
+    deliver(
+      { type: "status", status: { phase: "running", message: "ready", model: "m" } },
+      {
+        type: "session_tree",
+        entries: [{ id: "entry-1", type: "message", role: "user", text: "hello", depth: 0, forkable: true, active: true }],
+        leafId: "entry-1",
+        sessionId: "session-1",
+      },
+    );
+
+    const input = (await screen.findByPlaceholderText(/Send a message to pi/)) as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "/tree" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(await screen.findByRole("dialog", { name: "Session tree" })).toBeDefined();
+    expect(screen.getByText("hello")).toBeDefined();
+    expect(input.value).toBe("");
+    expect(window.__piSent?.filter((message) => message.type === "prompt")).toEqual([]);
+  });
+
   it("completes slash commands in the composer", async () => {
     render(<App />);
     await waitFor(() => expect(window.__piDeliver).toBeDefined());

@@ -649,8 +649,8 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
         val raised = blend(background, foreground, if (EditorColorsManager.getInstance().isDarkEditor) 0.12f else 0.06f)
         // Some headless/startup LAFs expose these UI colors as null. Theme delivery must never
         // prevent the tool window from being created, so use stable IDE-like fallbacks.
-        val accent = UIUtil.getActiveTextColor() ?: Color(0x2563EB)
-        val error = UIUtil.getErrorForeground() ?: Color(0xB42318)
+        val accent = runCatching { UIUtil.getActiveTextColor() }.getOrNull() ?: Color(0x2563EB)
+        val error = runCatching { UIUtil.getErrorForeground() }.getOrNull() ?: Color(0xB42318)
         return HostMessages.theme(
             HostTheme(
                 background = cssColor(background),

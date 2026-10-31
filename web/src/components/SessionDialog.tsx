@@ -8,6 +8,7 @@ interface Props {
   tree: TreeEntry[];
   leafId: string | null;
   loading: boolean;
+  initialTab?: Tab;
   onClose: () => void;
   onNewSession: () => void;
   onRename: (name: string) => void;
@@ -28,6 +29,7 @@ export function SessionDialog({
   tree,
   leafId,
   loading,
+  initialTab = "sessions",
   onClose,
   onNewSession,
   onRename,
@@ -36,7 +38,7 @@ export function SessionDialog({
   onDelete,
   onFork,
 }: Props): JSX.Element {
-  const [tab, setTab] = useState<Tab>("sessions");
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState("");
 

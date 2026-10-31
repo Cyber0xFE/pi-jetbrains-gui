@@ -25,6 +25,10 @@ class WebviewBundleTest {
             markerIndex in 0 until bundleIndex,
             "the bridge marker must be defined before the bundle runs",
         )
+        assertTrue(
+            document.endsWith("</script>\n  </body>\n</html>"),
+            "the inlined bundle must be the final script before the document closes",
+        )
     }
 
     @Test
