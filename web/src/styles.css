@@ -157,6 +157,7 @@ body {
   gap: 9px;
   flex-wrap: wrap;
   min-width: 0;
+  font-size: 1.12em;
   font-variant-numeric: tabular-nums;
   align-items: center;
 }
@@ -212,17 +213,67 @@ body {
   color: var(--accent);
 }
 
+.status-auto-control {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.status-auto-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  z-index: 100;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--fg);
+  box-shadow: var(--shadow-sm);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .status-auto {
-  border: none;
-  background: transparent;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
   padding: 0;
   font: inherit;
   color: var(--fg-dim);
   cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, transform 80ms ease;
+}
+
+.status-auto svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .status-auto:hover:not(:disabled) {
   color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.status-auto:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.status-auto:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .status-auto:disabled {
@@ -232,6 +283,7 @@ body {
 
 .status-auto-on {
   color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .status-context-warning {

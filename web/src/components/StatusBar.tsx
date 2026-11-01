@@ -1,3 +1,4 @@
+import { useId, useState } from "react";
 import { formatCost, formatTokens } from "../format";
 import type { WireStatus } from "../types";
 
@@ -13,7 +14,7 @@ interface Props {
   onOpenModels: () => void;
   /** Footer thinking-level entry, opening the thinking picker. */
   onOpenThinking: () => void;
-  /** Footer `(auto)` entry, toggling automatic context compaction. */
+  /** Footer icon, toggling automatic context compaction. */
   onToggleAutoCompaction: () => void;
 }
 
@@ -37,10 +38,15 @@ export function StatusBar({
   onOpenThinking,
   onToggleAutoCompaction,
 }: Props): JSX.Element {
+  const autoCompactionTooltipId = useId();
+  const [autoCompactionHovered, setAutoCompactionHovered] = useState(false);
+  const [autoCompactionFocused, setAutoCompactionFocused] = useState(false);
+  const showAutoCompactionTooltip = autoCompactionHovered || autoCompactionFocused;
   const usage = status.usage ?? null;
   const contextWindow = status.context?.contextWindow ?? status.contextWindow ?? null;
   const percent = status.context?.percent ?? null;
   const autoCompaction = status.autoCompaction !== false;
+  const autoCompactionLabel = autoCompaction ? "自动压缩开启" : "自动压缩关闭";
 
   const contextDisplay =
     percent === null
@@ -92,16 +98,32 @@ export function StatusBar({
           >
             {contextDisplay}
           </span>
-          <button
-            type="button"
-            className={`status-auto ${autoCompaction ? "status-auto-on" : ""}`}
-            onClick={onToggleAutoCompaction}
-            disabled={disabled}
-            title="Automatic compaction when the context window fills up"
-            aria-pressed={autoCompaction}
+          <span
+            className="status-auto-control"
+            onMouseEnter={() => setAutoCompactionHovered(true)}
+            onMouseLeave={() => setAutoCompactionHovered(false)}
+            onFocus={() => setAutoCompactionFocused(true)}
+            onBlur={() => setAutoCompactionFocused(false)}
           >
-            {autoCompaction ? "(auto-compact)" : "(compact off)"}
-          </button>
+            <button
+              type="button"
+              className={`status-auto ${autoCompaction ? "status-auto-on" : ""}`}
+              onClick={onToggleAutoCompaction}
+              disabled={disabled}
+              aria-label={autoCompactionLabel}
+              aria-pressed={autoCompaction}
+              aria-describedby={showAutoCompactionTooltip ? autoCompactionTooltipId : undefined}
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                <path d="M12 3v6m-4-4 4 4 4-4M12 21v-6m-4 4 4-4 4 4M4 12h16" />
+              </svg>
+            </button>
+            {showAutoCompactionTooltip && (
+              <span id={autoCompactionTooltipId} role="tooltip" className="status-auto-tooltip">
+                {autoCompactionLabel}
+              </span>
+            )}
+          </span>
           {status.isCompacting && <span className="status-streaming">compacting…</span>}
           {(busy || status.isStreaming) && <span className="status-streaming">running…</span>}
         </div>
