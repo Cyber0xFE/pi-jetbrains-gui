@@ -242,6 +242,8 @@ data class HostModelsMessage(
     val models: List<HostModel>,
     val currentProvider: String? = null,
     val currentModel: String? = null,
+    val defaultProvider: String? = null,
+    val defaultModel: String? = null,
 )
 
 @Serializable
@@ -364,13 +366,21 @@ object HostMessages {
             ),
         )
 
-    fun models(models: List<RpcModelInfo>, currentProvider: String?, currentModel: String?): JsonElement =
+    fun models(
+        models: List<RpcModelInfo>,
+        currentProvider: String?,
+        currentModel: String?,
+        defaultProvider: String? = null,
+        defaultModel: String? = null,
+    ): JsonElement =
         PiJson.encodeToJsonElement(
             HostModelsMessage.serializer(),
             HostModelsMessage(
                 models = models.map { HostModel.from(it) },
                 currentProvider = currentProvider,
                 currentModel = currentModel,
+                defaultProvider = defaultProvider,
+                defaultModel = defaultModel,
             ),
         )
 

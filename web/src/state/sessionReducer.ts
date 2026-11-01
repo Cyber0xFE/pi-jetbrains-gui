@@ -104,6 +104,8 @@ export interface ChatState {
   tree: TreeEntry[];
   treeLeafId: string | null;
   models: ModelInfo[];
+  defaultModelProvider: string | null;
+  defaultModel: string | null;
   thinkingLevels: string[];
   commands: SlashCommand[];
   files: string[];
@@ -129,6 +131,8 @@ export const initialState: ChatState = {
   tree: [],
   treeLeafId: null,
   models: [],
+  defaultModelProvider: null,
+  defaultModel: null,
   thinkingLevels: [],
   commands: [],
   files: [],
@@ -174,7 +178,12 @@ function applyInbound(state: ChatState, message: Inbound): ChatState {
     case "session_tree":
       return { ...state, tree: message.entries, treeLeafId: message.leafId };
     case "models":
-      return { ...state, models: message.models };
+      return {
+        ...state,
+        models: message.models,
+        defaultModelProvider: message.defaultProvider ?? null,
+        defaultModel: message.defaultModel ?? null,
+      };
     case "thinking_levels":
       return { ...state, thinkingLevels: message.levels };
     case "commands":

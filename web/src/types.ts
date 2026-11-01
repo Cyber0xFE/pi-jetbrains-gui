@@ -219,7 +219,14 @@ export type Inbound =
   | { type: "notice"; level: NoticeLevel; message: string }
   | { type: "sessions"; sessions: SessionSummary[] }
   | { type: "session_tree"; entries: TreeEntry[]; leafId: string | null; sessionId: string | null }
-  | { type: "models"; models: ModelInfo[]; currentProvider: string | null; currentModel: string | null }
+  | {
+      type: "models";
+      models: ModelInfo[];
+      currentProvider: string | null;
+      currentModel: string | null;
+      defaultProvider?: string | null;
+      defaultModel?: string | null;
+    }
   | { type: "thinking_levels"; levels: string[]; current: string | null }
   | { type: "commands"; commands: SlashCommand[] }
   | { type: "files"; files: string[] }
@@ -250,6 +257,7 @@ export type Outbound =
   // M3: model / thinking
   | { type: "get_models" }
   | { type: "set_model"; provider: string; modelId: string }
+  | { type: "set_default_model"; provider: string; modelId: string }
   | { type: "get_thinking_levels" }
   | { type: "set_thinking_level"; level: string }
   // M3: compaction / retry / slash commands

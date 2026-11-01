@@ -239,6 +239,36 @@ describe("App", () => {
     );
   });
 
+  it("marks the default model and offers a hover action for other models", async () => {
+    render(<App />);
+    await waitFor(() => expect(window.__piDeliver).toBeDefined());
+
+    deliver(
+      { type: "status", status: { phase: "running", message: "ready", provider: "openai", model: "gpt-5" } },
+      {
+        type: "models",
+        currentProvider: "openai",
+        currentModel: "gpt-5",
+        defaultProvider: "openai",
+        defaultModel: "gpt-5",
+        models: [
+          { id: "gpt-5", name: "GPT-5", provider: "openai" },
+          { id: "claude", name: "Claude", provider: "anthropic" },
+        ],
+      },
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /openai\/gpt-5/ }));
+    expect(await screen.findByText("default")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Set as default" }));
+
+    await waitFor(() =>
+      expect(window.__piSent?.filter((message) => message.type === "set_default_model")).toEqual([
+        { type: "set_default_model", provider: "anthropic", modelId: "claude" },
+      ]),
+    );
+  });
+
   it("changes the thinking level and shows retry controls", async () => {
     render(<App />);
     await waitFor(() => expect(window.__piDeliver).toBeDefined());

@@ -1819,6 +1819,7 @@ body {
 
 .picker-row {
   display: flex;
+  position: relative;
   gap: 8px;
   align-items: center;
   width: 100%;
@@ -1883,6 +1884,47 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.picker-action {
+  display: inline-flex;
+  position: absolute;
+  right: 10px;
+  align-items: center;
+  justify-content: center;
+  min-width: 76px;
+  height: 24px;
+  margin-left: 0;
+  padding: 0 7px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--accent);
+  background: var(--bg-raised);
+  font-size: 0.78em;
+  opacity: 0;
+  pointer-events: none;
+  cursor: pointer;
+  transition: opacity 120ms ease, color 120ms ease, background 120ms ease;
+}
+
+.picker-row:hover .picker-action,
+.picker-row:focus-within .picker-action,
+.picker-action:focus {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.picker-action:hover,
+.picker-action:focus-visible {
+  background: var(--accent-soft);
+  outline: none;
+}
+
+.picker-default {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-size: 0.76em;
+  font-weight: 600;
 }
 
 .picker-delete {

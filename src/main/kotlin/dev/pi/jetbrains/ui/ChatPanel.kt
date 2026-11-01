@@ -349,6 +349,22 @@ class ChatPanel(
                     }
                 }
             }
+            "set_default_model" -> {
+                val provider = message.provider ?: return
+                val modelId = message.modelId ?: return
+                scope.launch {
+                    if (PiSettings.get().syncDefaultModel(provider, modelId)) {
+                        sendModels()
+                    } else {
+                        bridge?.send(
+                            HostMessages.notice(
+                                "failed to update ~/.pi/agent/settings.json",
+                                level = "error",
+                            ),
+                        )
+                    }
+                }
+            }
             "get_thinking_levels" -> scope.launch { sendThinkingLevels() }
             "set_thinking_level" -> {
                 val level = message.level ?: return
@@ -466,8 +482,13 @@ class ChatPanel(
         val response = request { service.availableModels() } ?: return
         if (!response.success) return
         val models = response.decodeDataAs<RpcModelsData>()?.models ?: return
+        val currentProvider = service.status.value.provider
+        val currentModel = service.status.value.model
+        val settings = PiSettings.get().getState()
+        val defaultProvider = settings.defaultModelProvider.trim().takeIf { it.isNotEmpty() } ?: currentProvider
+        val defaultModel = settings.defaultModelId.trim().takeIf { it.isNotEmpty() } ?: currentModel
         activeBridge.send(
-            HostMessages.models(models, service.status.value.provider, service.status.value.model),
+            HostMessages.models(models, currentProvider, currentModel, defaultProvider, defaultModel),
         )
     }
 

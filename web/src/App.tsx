@@ -148,20 +148,39 @@ export function App(): JSX.Element {
   const closeDialog = useCallback(() => setDialog(null), []);
 
   const modelItems = useMemo<PickerItem[]>(
-    () =>
-      state.models.map((model) => ({
-        key: `${model.provider ?? ""}/${model.id}`,
-        label: model.name?.trim() || model.id,
-        detail: [
-          model.provider ? `${model.provider}/${model.id}` : model.id,
-          model.contextWindow ? `${formatTokens(model.contextWindow)} ctx` : null,
-        ]
-          .filter(Boolean)
-          .join(" · "),
-        badge: model.reasoning ? "thinking" : undefined,
-        active: model.provider === state.status.provider && model.id === state.status.model,
-      })),
-    [state.models, state.status.provider, state.status.model],
+    () => {
+      // Older hosts did not include defaultModel fields. During that transition the active
+      // model is the only useful fallback, so it remains visibly marked as the default.
+      const defaultProvider = state.defaultModelProvider ?? state.status.provider;
+      const defaultModel = state.defaultModel ?? state.status.model;
+      return state.models.map((model) => {
+        const isDefault = model.provider === defaultProvider && model.id === defaultModel;
+        return {
+          key: `${model.provider ?? ""}/${model.id}`,
+          label: model.name?.trim() || model.id,
+          detail: [
+            model.provider ? `${model.provider}/${model.id}` : model.id,
+            model.contextWindow ? `${formatTokens(model.contextWindow)} ctx` : null,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+          badge: model.reasoning ? "thinking" : undefined,
+          active: model.provider === state.status.provider && model.id === state.status.model,
+          default: isDefault,
+          onAction: isDefault
+            ? undefined
+            : () => post({ type: "set_default_model", provider: model.provider ?? "", modelId: model.id }),
+          actionLabel: "Set as default",
+        };
+      });
+    },
+    [
+      state.models,
+      state.status.provider,
+      state.status.model,
+      state.defaultModelProvider,
+      state.defaultModel,
+    ],
   );
 
   const thinkingItems = useMemo<PickerItem[]>(

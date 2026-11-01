@@ -7,6 +7,7 @@ export interface PickerItem {
   detail?: string;
   badge?: string;
   active?: boolean;
+  default?: boolean;
   disabled?: boolean;
   /** Tree rows are flattened with a depth; the picker indents them instead of nesting. */
   depth?: number;
@@ -14,6 +15,9 @@ export interface PickerItem {
   onRename?: () => void;
   /** Optional trailing delete affordance (session list); stop propagation so the row is not selected. */
   onDelete?: () => void;
+  /** Optional trailing action shown when the row is hovered; stop propagation so the row is not selected. */
+  onAction?: () => void;
+  actionLabel?: string;
 }
 
 interface Props {
@@ -163,7 +167,30 @@ export function Picker({ title, items, placeholder, emptyText, actions, onSelect
                 <span className="picker-marker">{item.active ? "●" : ""}</span>
                 <span className="picker-label">{item.label}</span>
                 {item.badge && <span className="picker-badge">{item.badge}</span>}
+                {item.default && <span className="picker-default">default</span>}
                 {item.detail && <span className="picker-detail">{item.detail}</span>}
+                {item.onAction && (
+                  <span
+                    className="picker-action"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={item.actionLabel ?? "Set as default"}
+                    title={item.actionLabel ?? "Set as default"}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      item.onAction?.();
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        item.onAction?.();
+                      }
+                    }}
+                  >
+                    {item.actionLabel ?? "Set as default"}
+                  </span>
+                )}
                 {item.onRename && (
                   <span
                     className="picker-rename"
