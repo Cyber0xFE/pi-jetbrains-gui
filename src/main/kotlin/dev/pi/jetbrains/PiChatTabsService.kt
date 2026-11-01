@@ -12,6 +12,7 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.ui.AnimatedIcon
+import com.intellij.util.ui.UIUtil
 import com.intellij.ui.content.Content
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.content.ContentManagerEvent
@@ -61,7 +62,7 @@ class PiChatTabsService(private val project: Project) : Disposable {
         }
         val createdContent = ContentFactory.getInstance().createContent(panel, "Chat $number", false)
         createdContent.putUserData(ToolWindow.SHOW_CONTENT_ICON, true)
-        createdContent.icon = AllIcons.Actions.Checked
+        createdContent.icon = CompletedTabIcon
         content = createdContent
         createdContent.isCloseable = true
         createdContent.setDisposer(panel)
@@ -75,7 +76,24 @@ class PiChatTabsService(private val project: Project) : Disposable {
 
     private fun setTabIcon(content: Content, running: Boolean) {
         ApplicationManager.getApplication().invokeLater {
-            if (content.isValid) content.icon = if (running) AnimatedIcon.Default.INSTANCE else AllIcons.Actions.Checked
+            if (content.isValid) content.icon = if (running) AnimatedIcon.Default.INSTANCE else CompletedTabIcon
+        }
+    }
+
+    private object CompletedTabIcon : javax.swing.Icon {
+        override fun getIconWidth(): Int = 16
+
+        override fun getIconHeight(): Int = 16
+
+        override fun paintIcon(component: java.awt.Component?, graphics: java.awt.Graphics, x: Int, y: Int) {
+            val copy = graphics.create() as java.awt.Graphics2D
+            try {
+                copy.color = UIUtil.getLabelForeground()
+                copy.stroke = java.awt.BasicStroke(1.5f)
+                copy.drawOval(x + 3, y + 3, 10, 10)
+            } finally {
+                copy.dispose()
+            }
         }
     }
 
