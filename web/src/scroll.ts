@@ -2,6 +2,8 @@ import { useEffect, useRef, type RefObject } from "react";
 
 const WHEEL_MULTIPLIER = 2.5;
 const RESPONSE_MS = 80;
+// scrollTop can be fractional while scrollHeight/clientHeight are rounded to whole pixels.
+const SCROLL_EDGE_TOLERANCE = 1;
 
 /**
  * One animation owns each wheel gesture; never mix scrollTop jumps with native scrolling.
@@ -52,19 +54,18 @@ export function installSmoothWheelScroll(root: HTMLElement, onIntent?: (delta: n
       return;
     }
 
-    // Code blocks and tool output keep their own scrolling, including containment at the edges.
+    // Scroll the innermost surface that still has room in this direction. Once a card reaches
+    // an edge, let further wheel input move its parent even if the card contains native scrolling.
     let next: HTMLElement | null = event.target instanceof HTMLElement ? event.target :
       event.target instanceof Element ? event.target.parentElement : root;
     while (next && next !== root) {
       if (next.scrollHeight > next.clientHeight) {
         const style = window.getComputedStyle(next);
         if (/^(auto|scroll)$/.test(style.overflowY)) {
-          const canScroll = event.deltaY < 0 ? next.scrollTop > 0 : next.scrollTop + next.clientHeight < next.scrollHeight;
+          const canScroll = event.deltaY < 0
+            ? next.scrollTop > SCROLL_EDGE_TOLERANCE
+            : next.scrollHeight - next.clientHeight - next.scrollTop > SCROLL_EDGE_TOLERANCE;
           if (canScroll) break;
-          if (/^(contain|none)$/.test(style.overscrollBehaviorY)) {
-            stop();
-            return;
-          }
         }
       }
       next = next.parentElement;

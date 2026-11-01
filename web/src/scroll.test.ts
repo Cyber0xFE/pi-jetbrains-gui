@@ -153,6 +153,64 @@ describe("smooth wheel scrolling", () => {
     expect(root.scrollTop).toBe(250);
   });
 
+  it.each([
+    { edge: "bottom", cardTop: 699.5, delta: 100, expectedTop: 750 },
+    { edge: "top", cardTop: 0.5, delta: -100, expectedTop: 250 },
+  ])("scrolls the transcript at a card's fractional $edge edge", ({ cardTop, delta, expectedTop }) => {
+    root.scrollTop = 500;
+    const card = surface(900, 200);
+    card.style.overflowY = "auto";
+    card.scrollTop = cardTop;
+    const code = document.createElement("code");
+    card.append(code);
+    root.append(card);
+
+    expect(wheel(delta, {}, code).defaultPrevented).toBe(true);
+    finish();
+    expect(root.scrollTop).toBe(expectedTop);
+    expect(card.scrollTop).toBe(cardTop);
+
+    wheel(-delta, {}, code);
+    finish();
+    expect(card.scrollTop).toBeCloseTo(cardTop - delta * 2.5);
+    expect(root.scrollTop).toBe(expectedTop);
+  });
+
+  it.each(["contain", "none"])("continues scrolling outside a card with %s at its edge", (behavior) => {
+    const card = surface(900, 200);
+    card.style.overflowY = "auto";
+    card.style.overscrollBehaviorY = behavior;
+    card.scrollTop = 700;
+    root.append(card);
+
+    wheel(100, {}, card);
+    finish();
+    expect(root.scrollTop).toBe(250);
+    expect(card.scrollTop).toBe(700);
+  });
+
+  it("hands off from a finishing card animation and notifies transcript scroll intent", () => {
+    dispose();
+    const onIntent = vi.fn();
+    dispose = installSmoothWheelScroll(root, onIntent);
+    const card = surface(900, 200);
+    card.style.overflowY = "auto";
+    card.scrollTop = 690;
+    root.append(card);
+
+    wheel(100, {}, card);
+    for (let count = 0; card.scrollTop < 699; count += 1) {
+      expect(count).toBeLessThan(30);
+      tick();
+    }
+    expect(frames.size).toBe(1);
+    expect(onIntent).not.toHaveBeenCalled();
+    wheel(100, {}, card);
+    finish();
+    expect(root.scrollTop).toBe(250);
+    expect(onIntent).toHaveBeenCalledWith(100);
+  });
+
   it.each([{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { deltaX: 150 }, { cancelable: false }])(
     "preserves native zoom, horizontal gestures and non-cancelable events: %j",
     (options) => {
