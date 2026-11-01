@@ -976,8 +976,8 @@ body {
 
 .thinking-icon {
   flex: 0 0 auto;
-  width: 25px;
-  height: 25px;
+  width: 16px;
+  height: 16px;
   color: var(--accent);
   fill: none;
   stroke: currentColor;
@@ -1006,7 +1006,7 @@ body {
 .thinking pre {
   white-space: pre-wrap;
   word-break: break-word;
-  margin: 8px 0 0 34px;
+  margin: 8px 0 0 25px;
   font-size: 0.88em;
 }
 
