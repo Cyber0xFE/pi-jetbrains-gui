@@ -562,6 +562,8 @@ body {
   border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
   align-self: flex-end;
   max-width: min(85%, 760px);
+  /* The assistant's content starts inside the message's horizontal padding. */
+  margin-right: 12px;
   box-shadow: var(--shadow-sm);
 }
 
