@@ -3,16 +3,24 @@
     <name>Pi Coding Agent GUI</name>
     <vendor url="https://github.com/Cyber0xFE/pi-jetbrains-gui">Cyber0xFE</vendor>
     <description><![CDATA[
-        Pi Coding Agent brings the pi coding agent to JetBrains IDEs with a focused chat tool window, session persistence, protected tool output, editor context sharing, and configurable Node.js and pi CLI paths.<br><br>
+        Pi Coding Agent brings the pi coding agent to JetBrains IDEs with a focused, streaming chat tool window, session persistence, protected tool output, editor and console context sharing, and configurable runtime settings.<br><br>
 
         <b>Features</b>
         <ul>
-            <li>Chat with pi directly inside the IDE.</li>
+            <li>Chat with pi directly inside the IDE and receive streamed responses.</li>
             <li>Persist and restore pi sessions across IDE restarts.</li>
-            <li>Display protected tool output, including files, terminals, and patches.</li>
+            <li>Create, switch, rename, delete, fork, and inspect sessions in a session tree.</li>
+            <li>Choose the active model and thinking level, and view token usage and context information.</li>
+            <li>Display protected tool output, including files, terminals, patches, and large-result summaries.</li>
+            <li>Open referenced files, URLs, and diff lines directly in the IDE.</li>
+            <li>Browse slash commands and reference project files with <code>/</code> and <code>@</code> completion.</li>
+            <li>Compact context manually, configure automatic compaction, and abort automatic retries.</li>
+            <li>Attach selected editor text or selected console output as conversation context.</li>
+            <li>Paste images into the composer and send them with a prompt.</li>
+            <li>Support pi extension dialogs, notifications, status text, and widgets.</li>
             <li>Follow the IDE light and dark themes automatically.</li>
-            <li>Attach the selected editor text as context for a conversation.</li>
-            <li>Configure the pi CLI path, Node.js runtime, and working directory.</li>
+            <li>Configure the pi CLI path, Node.js runtime, diagnostic log directory, and panel shortcut.</li>
+            <li>Optionally play a sound when a task is completed.</li>
         </ul>
 
         <p><b>Requirement:</b> Install the pi CLI before use, for example with <code>npm install -g @earendil-works/pi-coding-agent</code>.</p>
