@@ -12,7 +12,6 @@ import {
 } from "../../tools/result";
 import { DiffView } from "./DiffView";
 import { PathLink } from "./PathLink";
-import { CopyButton } from "../CopyButton";
 
 const MAX_NESTING = 4;
 
@@ -44,7 +43,6 @@ export function ToolCard({ callId, name, tool, tools, depth = 0 }: Props): JSX.E
         <StatusBadge status={state.status} durationMs={state.durationMs} />
       </header>
       {view.body}
-      <CopyButton className="tool-card-copy" text={toolCopyText(state)} title="复制卡片" iconOnly />
       {children.length > 0 && depth < MAX_NESTING && (
         <div className="tool-children">
           <div className="tool-children-label">{children.length} nested call(s)</div>
@@ -62,15 +60,6 @@ export function ToolCard({ callId, name, tool, tools, depth = 0 }: Props): JSX.E
       )}
     </section>
   );
-}
-
-function toolCopyText(tool: ToolState): string {
-  const sections = [tool.name];
-  if (tool.args !== undefined) sections.push(formatJson(tool.args));
-  if (tool.output) sections.push(tool.output);
-  const diff = typeof tool.details?.diff === "string" ? tool.details.diff : undefined;
-  if (diff) sections.push(diff);
-  return sections.join("\n\n");
 }
 
 interface ToolView {

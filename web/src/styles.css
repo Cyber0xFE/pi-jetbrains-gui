@@ -1134,11 +1134,6 @@ body {
   outline: none;
 }
 
-.tool-card-copy {
-  align-self: flex-end;
-}
-
-.tool-card-copy,
 .markdown-card-copy {
   display: inline-flex;
   align-items: center;
@@ -1167,7 +1162,6 @@ body {
   bottom: 4px;
 }
 
-.tool-card:hover > .tool-card-copy,
 .markdown-card:hover > .markdown-card-copy,
 .message-user:hover .message-user-copy,
 .card-copy:focus-visible {
