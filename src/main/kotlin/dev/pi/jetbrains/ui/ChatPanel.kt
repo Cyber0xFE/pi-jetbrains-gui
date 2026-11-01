@@ -697,12 +697,7 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
     private fun toRecord(event: PiEvent): JsonElement? = when (event) {
         is PiEvent.Session -> capJsonDepth(protectLargeToolRecord(event.payload))
         is PiEvent.ExtensionUiRequest -> capJsonDepth(event.payload)
-        is PiEvent.Response -> {
-            val cappedData = event.response.data?.let(::capJsonDepth)
-            val response = if (cappedData === event.response.data) event.response
-            else event.response.copy(data = cappedData)
-            PiJson.encodeToJsonElement(RpcResponse.serializer(), response)
-        }
+        is PiEvent.Response -> HostMessages.response(event.response)
         is PiEvent.Unknown -> null
     }
 
@@ -866,6 +861,7 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
     override fun dispose() {
         soundExecutor.shutdownNow()
         scope.cancel()
+        bridge?.let { Disposer.dispose(it) }
         browser?.let { Disposer.dispose(it) }
         browser = null
         bridge = null

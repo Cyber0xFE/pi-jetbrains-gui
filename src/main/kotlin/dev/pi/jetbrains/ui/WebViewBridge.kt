@@ -2,6 +2,7 @@ package dev.pi.jetbrains.ui
 
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.util.Disposer
 import com.intellij.ui.jcef.JBCefBrowser
 import com.intellij.ui.jcef.JBCefBrowserBase
@@ -38,6 +39,8 @@ class WebViewBridge(
     private val pending = ArrayDeque<JsonElement>()
     @Volatile
     private var ready = false
+    @Volatile
+    private var disposed = false
 
     /** Number of JCEF delivery callbacks currently queued on the IntelliJ EDT. */
     private val queuedDeliveries = AtomicInteger()
@@ -59,7 +62,9 @@ class WebViewBridge(
             if (message == null) {
                 log("ignoring unparseable webview message: ${payload.take(200)}")
             } else {
-                ApplicationManager.getApplication().invokeLater { onClientMessage(message) }
+                ApplicationManager.getApplication().invokeLater {
+                    if (!disposed && !browser.isDisposed) onClientMessage(message)
+                }
             }
             null
         }
@@ -78,6 +83,7 @@ class WebViewBridge(
     fun markReady() {
         val queued: List<JsonElement>
         synchronized(lock) {
+            if (disposed) return
             ready = true
             queued = pending.toList()
             pending.clear()
@@ -87,6 +93,7 @@ class WebViewBridge(
 
     fun send(message: JsonElement) {
         val executeNow = synchronized(lock) {
+            if (disposed) return
             if (!ready) {
                 if (pending.size >= MAX_PENDING) {
                     log("dropping webview message: ${pending.size} already queued before the page was ready")
@@ -108,6 +115,7 @@ class WebViewBridge(
         val serializationQueuedAt = System.nanoTime()
         try {
             serializationExecutor.execute {
+                if (disposed) return@execute
                 val serializationStartedAt = System.nanoTime()
                 val serializationQueueMs = (serializationStartedAt - serializationQueuedAt) / 1_000_000.0
                 // U+2028/U+2029 are legal inside JSON strings but are JS line terminators in source.
@@ -128,10 +136,13 @@ class WebViewBridge(
                     log("[webview-bridge] edt_queue pending=$queued message=${messageType(message)}")
                 }
 
-                ApplicationManager.getApplication().invokeLater {
+                // This only updates the webview, not IDE models. Deliver even while a settings
+                // dialog is open; default modality would defer delivery until the dialog closes.
+                ApplicationManager.getApplication().invokeLater({
                     val callbackStartedAt = System.nanoTime()
                     val edtQueueMs = (callbackStartedAt - edtQueuedAt) / 1_000_000.0
                     val outstanding = queuedDeliveries.decrementAndGet()
+                    if (disposed || browser.isDisposed) return@invokeLater
                     val frame = browser.cefBrowser.mainFrame
                     if (frame == null) {
                         recordDelivery(
@@ -160,7 +171,7 @@ class WebViewBridge(
                         payloadBytes,
                         recordCount,
                     )
-                }
+                }, ModalityState.any())
             }
         } catch (_: RejectedExecutionException) {
             // The bridge is being disposed; no further delivery is needed.
@@ -221,6 +232,10 @@ class WebViewBridge(
     private fun Double.rounded(): String = "%.1f".format(this)
 
     override fun dispose() {
+        synchronized(lock) {
+            disposed = true
+            pending.clear()
+        }
         serializationExecutor.shutdownNow()
         Disposer.dispose(query)
     }

@@ -3,6 +3,7 @@ package dev.pi.jetbrains.ui
 import dev.pi.jetbrains.PiChatService
 import dev.pi.jetbrains.rpc.PiJson
 import dev.pi.jetbrains.rpc.RpcModelInfo
+import dev.pi.jetbrains.rpc.RpcResponse
 import dev.pi.jetbrains.rpc.RpcSlashCommand
 import dev.pi.jetbrains.session.FlatTreeEntry
 import dev.pi.jetbrains.session.SessionSummary
@@ -315,6 +316,10 @@ object HostMessages {
 
     fun status(status: PiChatService.Status): JsonElement =
         PiJson.encodeToJsonElement(HostStatusMessage.serializer(), HostStatusMessage(status = HostStatus.from(status)))
+
+    /** The reducer only reads response metadata; data travels via dedicated host messages. */
+    fun response(response: RpcResponse): JsonElement =
+        PiJson.encodeToJsonElement(RpcResponse.serializer(), response.copy(data = null))
 
     fun records(records: List<JsonElement>): JsonElement =
         PiJson.encodeToJsonElement(HostRecordsMessage.serializer(), HostRecordsMessage(records = records))

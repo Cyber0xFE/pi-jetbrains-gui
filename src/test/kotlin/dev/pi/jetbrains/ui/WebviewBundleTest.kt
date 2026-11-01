@@ -2,6 +2,11 @@ package dev.pi.jetbrains.ui
 
 import dev.pi.jetbrains.PiChatService
 import dev.pi.jetbrains.rpc.PiJson
+import dev.pi.jetbrains.rpc.RpcResponse
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -66,6 +71,30 @@ class WebviewBundleTest {
         assertTrue(json.contains("\"cacheRead\":13000000"), json)
         assertTrue(json.contains("\"cost\":0.043"), json)
         assertTrue(json.contains("\"percent\":35.9"), json)
+    }
+
+    @Test
+    fun `response records omit large deeply nested data without changing the original`() {
+        var data: JsonElement = JsonPrimitive("x".repeat(2 * 1024 * 1024))
+        repeat(1000) { data = JsonArray(listOf(data)) }
+        val response = RpcResponse(id = "history-1", command = "get_messages", success = true, data = data)
+
+        val record = HostMessages.response(response) as JsonObject
+        val expected = PiJson.parseToJsonElement(
+            """{"id":"history-1","type":"response","command":"get_messages","success":true}""",
+        )
+
+        assertEquals(expected, record)
+        assertFalse(record.containsKey("data"))
+        assertTrue(response.data === data, "native RPC consumers must retain access to the original data")
+    }
+
+    @Test
+    fun `response records preserve failure metadata`() {
+        val response = RpcResponse(id = "prompt-1", command = "prompt", success = false, error = "failed")
+        val record = HostMessages.response(response)
+
+        assertEquals(PiJson.encodeToJsonElement(RpcResponse.serializer(), response), record)
     }
 
     @Test
