@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { normalizeTaggedBlocks, type Block, type ChatMessage, type ToolState } from "../state/sessionReducer";
 import { Markdown } from "./Markdown";
 import { CopyButton } from "./CopyButton";
@@ -325,13 +325,46 @@ interface MessageViewProps {
   thinkingLabel: string | null;
 }
 
+interface ParsedSkillBlock {
+  name: string;
+  location: string;
+  content: string;
+  userMessage?: string;
+}
+
+/** Pi persists an explicit `/skill:name` invocation as an XML-wrapped skill document. */
+export function parseSkillBlock(text: string): ParsedSkillBlock | null {
+  const match = /^<skill name="([^"]+)" location="([^"]+)">\r?\n([\s\S]*?)\r?\n<\/skill>(?:\r?\n\r?\n([\s\S]+))?$/.exec(text);
+  if (!match) return null;
+  return {
+    name: match[1] ?? "",
+    location: match[2] ?? "",
+    content: match[3] ?? "",
+    userMessage: match[4]?.trim() || undefined,
+  };
+}
+
+function findSkillInvocation(blocks: Block[]): {
+  block: Extract<Block, { kind: "text" }>;
+  skill: ParsedSkillBlock;
+} | null {
+  const block = blocks.find((candidate): candidate is Extract<Block, { kind: "text" }> => candidate.kind === "text");
+  if (!block) return null;
+  const skill = parseSkillBlock(block.text);
+  return skill ? { block, skill } : null;
+}
+
 function MessageView({ message, fileReferences, previousAssistantModel, tools, thinkingLabel }: MessageViewProps): JSX.Element {
   const showModel = message.role === "assistant" && message.model && message.model !== previousAssistantModel;
-  const contextualText = message.role === "user" ? findEditorContext(message.blocks) : null;
+  const skillInvocation = message.role === "user" ? findSkillInvocation(message.blocks) : null;
+  const contextualText = message.role === "user" && !skillInvocation ? findEditorContext(message.blocks) : null;
   const userText = message.role === "user"
     ? message.blocks
       .filter((block): block is Extract<Block, { kind: "text" }> => block.kind === "text")
-      .map((block) => contextualText && block === contextualText.block ? contextualText.prompt : block.text)
+      .map((block) => {
+        if (skillInvocation && block === skillInvocation.block) return skillInvocation.skill.userMessage ?? "";
+        return contextualText && block === contextualText.block ? contextualText.prompt : block.text;
+      })
       .join("\n\n")
     : "";
 
@@ -340,18 +373,36 @@ function MessageView({ message, fileReferences, previousAssistantModel, tools, t
       {contextualText && <EditorContextView context={contextualText.context} />}
       <div className={message.role === "user"
         ? `message-user-content${contextualText ? " message-user-body" : ""}` : undefined}>
-        {message.blocks.map((block, index) => (
-          <BlockView
-            key={index}
-            block={contextualText && block === contextualText.block
-              ? { ...block, text: contextualText.prompt }
-              : block}
-            fileReferences={fileReferences}
-            tools={tools}
-            streaming={message.streaming}
-            thinkingLabel={thinkingLabel}
-          />
-        ))}
+        {message.blocks.map((block, index) => {
+          if (skillInvocation && block === skillInvocation.block) {
+            return (
+              <Fragment key={index}>
+                <SkillInvocationView skill={skillInvocation.skill} fileReferences={fileReferences} />
+                {skillInvocation.skill.userMessage && (
+                  <BlockView
+                    block={{ kind: "text", text: skillInvocation.skill.userMessage }}
+                    fileReferences={fileReferences}
+                    tools={tools}
+                    streaming={message.streaming}
+                    thinkingLabel={thinkingLabel}
+                  />
+                )}
+              </Fragment>
+            );
+          }
+          return (
+            <BlockView
+              key={index}
+              block={contextualText && block === contextualText.block
+                ? { ...block, text: contextualText.prompt }
+                : block}
+              fileReferences={fileReferences}
+              tools={tools}
+              streaming={message.streaming}
+              thinkingLabel={thinkingLabel}
+            />
+          );
+        })}
         {userText && <CopyButton className="message-user-copy" text={userText} title="复制用户消息" iconOnly />}
       </div>
       {message.streaming && message.blocks.length === 0 && <div className="typing">...</div>}
@@ -364,6 +415,35 @@ function MessageView({ message, fileReferences, previousAssistantModel, tools, t
         </footer>
       )}
     </article>
+  );
+}
+
+function SkillInvocationView({ skill, fileReferences }: { skill: ParsedSkillBlock; fileReferences: readonly string[] }): JSX.Element {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <details
+      className="skill-invocation"
+      open={expanded}
+    >
+      <summary
+        aria-label={`Skill ${skill.name}`}
+        onClick={(event) => {
+          // React flushes this state update before the browser's native <details> toggle. Stop
+          // that default action so it cannot immediately toggle the controlled state back.
+          event.preventDefault();
+          setExpanded((current) => !current);
+        }}
+      >
+        <span className="skill-invocation-label">[skill]</span>
+        <span className="skill-invocation-name">{skill.name}</span>
+        <span className="skill-invocation-hint">({expanded ? "click to collapse" : "click to expand"})</span>
+      </summary>
+      {expanded && (
+        <div className="skill-invocation-content">
+          <Markdown text={skill.content} streaming={false} fileReferences={fileReferences} />
+        </div>
+      )}
+    </details>
   );
 }
 
@@ -431,7 +511,10 @@ function EditorContextView({ context }: { context: EditorContext }): JSX.Element
 function messagePreview(message: ChatMessage): string {
   const text = message.blocks
     .filter((block): block is Extract<Block, { kind: "text" }> => block.kind === "text")
-    .map((block) => block.text)
+    .map((block) => {
+      const skill = parseSkillBlock(block.text);
+      return skill ? `[skill] ${skill.name}${skill.userMessage ? ` ${skill.userMessage}` : ""}` : block.text;
+    })
     .join(" ")
     .replace(/\s+/g, " ")
     .trim();

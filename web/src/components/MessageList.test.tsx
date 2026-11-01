@@ -30,6 +30,42 @@ it.each([
   expect(view.getByRole("button", { name: "已复制" })).toBeDefined();
 });
 
+it("collapses expanded skill instructions and keeps the user request visible", () => {
+  const text = [
+    '<skill name="drawio-skill" location="C:\\Users\\Bebop\\.pi\\skills\\drawio-skill\\SKILL.md">',
+    "References are relative to C:\\Users\\Bebop\\.pi\\skills\\drawio-skill.",
+    "",
+    "# Draw.io Diagrams",
+    "\nDetailed skill instructions.",
+    "</skill>",
+    "",
+    "画一下系统架构图",
+  ].join("\n");
+  const view = render(
+    <MessageList
+      messages={[{ id: "skill-1", role: "user", blocks: [{ kind: "text", text }], timestamp: 1, streaming: false }]}
+      tools={{}}
+      loadingHistory={false}
+      emptyHint=""
+      thinkingLabel={null}
+      connecting={false}
+    />,
+  );
+
+  const details = view.container.querySelector<HTMLDetailsElement>("details.skill-invocation");
+  expect(details).not.toBeNull();
+  expect(details?.open).toBe(false);
+  expect(view.getByText("[skill]")).toBeDefined();
+  expect(view.getByText("drawio-skill")).toBeDefined();
+  expect(view.getByText("画一下系统架构图")).toBeDefined();
+  expect(view.queryByText("Draw.io Diagrams")).toBeNull();
+
+  fireEvent.click(view.getByText("(click to expand)"));
+  expect(details?.open).toBe(true);
+  expect(view.container.querySelector("h1")?.textContent).toContain("Draw.io Diagrams");
+  expect(view.getByText("(click to collapse)")).toBeDefined();
+});
+
 it("shows scroll hints only in directions with more user messages", () => {
   const messages: ChatMessage[] = Array.from({ length: 20 }, (_, index) => ({
     id: `user-${index}`, role: "user", blocks: [{ kind: "text", text: `Message ${index}` }],

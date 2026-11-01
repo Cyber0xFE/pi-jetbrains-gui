@@ -967,6 +967,51 @@ body {
   font-size: 0.88em;
 }
 
+/* Skill invocations --------------------------------------------------------------------------- */
+
+.skill-invocation {
+  border-left: 3px solid var(--accent);
+  padding: 5px 0 5px 11px;
+  color: var(--fg-dim);
+  background: linear-gradient(90deg, var(--bg-soft), transparent 70%);
+}
+
+.skill-invocation summary {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  cursor: pointer;
+  color: var(--fg);
+  font-size: 0.9em;
+}
+
+.skill-invocation summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.skill-invocation-label {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.skill-invocation-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-invocation-hint {
+  color: var(--fg-dim);
+  font-size: 0.88em;
+}
+
+.skill-invocation-content {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
 /* Tool cards -------------------------------------------------------------------------------- */
 
 .tool-card {
