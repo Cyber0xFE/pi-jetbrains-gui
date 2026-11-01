@@ -4,9 +4,8 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
-import dev.pi.jetbrains.PiChatService
+import dev.pi.jetbrains.PiChatTabsService
 
 /** Places the selected console output in the pi chat composer. */
 class SendConsoleSelectionToPiAction : AnAction("发送到 Pi", "将选中的控制台输出发送到 Pi 输入框", null) {
@@ -16,10 +15,7 @@ class SendConsoleSelectionToPiAction : AnAction("发送到 Pi", "将选中的控
         val project = event.project ?: return
         val editor = event.getData(CommonDataKeys.EDITOR) ?: return
         val text = editor.selectionModel.selectedText?.takeIf { it.isNotBlank() } ?: return
-        project.service<PiChatService>().prefillComposer(text)
-        ApplicationManager.getApplication().invokeLater {
-            project.service<PiChatService>().showToolWindow()
-        }
+        project.service<PiChatTabsService>().showToolWindow(prefill = text)
     }
 
     override fun update(event: AnActionEvent) {

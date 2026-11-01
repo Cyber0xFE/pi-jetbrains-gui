@@ -6,6 +6,28 @@ import type { ChatMessage } from "../state/sessionReducer";
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+it.each([
+  { text: "再来一个200字左右的", expected: "再来一个200字左右的" },
+  { text: "--- src/main.ts:1-2 (buffer) ---\nconst x = 1;\nconst y = 2;\n\n解释这段代码", expected: "解释这段代码" },
+])("copies user message text with feedback: $expected", async ({ text, expected }) => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  vi.stubGlobal("navigator", Object.create(navigator, { clipboard: { value: { writeText } } }));
+  const messages: ChatMessage[] = [{
+    id: "user-1", role: "user", blocks: [{ kind: "text", text }], timestamp: 1, streaming: false,
+  }];
+  const view = render(<MessageList messages={messages} tools={{}} loadingHistory={false}
+    emptyHint="" thinkingLabel={null} connecting={false} />);
+  const button = view.getByRole("button", { name: "复制用户消息" });
+  expect(button.title).toBe("复制用户消息");
+  expect(button.textContent).toBe("");
+  expect(button.querySelector("svg")).not.toBeNull();
+  expect(button.parentElement?.classList.contains("message-user-content")).toBe(true);
+  await act(async () => { fireEvent.click(button); });
+  expect(writeText).toHaveBeenCalledWith(expected);
+  expect(view.getByRole("button", { name: "已复制" })).toBeDefined();
 });
 
 it("shows scroll hints only in directions with more user messages", () => {

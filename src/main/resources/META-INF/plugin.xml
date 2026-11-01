@@ -40,11 +40,12 @@
     </actions>
 
     <extensions defaultExtensionNs="com.intellij">
-        <projectService serviceImplementation="dev.pi.jetbrains.PiChatService"/>
+        <projectService serviceImplementation="dev.pi.jetbrains.PiChatTabsService"/>
         <applicationConfigurable instance="dev.pi.jetbrains.ui.PiSettingsConfigurable"/>
         <toolWindow
                 id="Pi"
                 anchor="right"
+                canCloseContents="true"
                 icon="/icons/toolWindowPi.png"
                 factoryClass="dev.pi.jetbrains.ui.ChatToolWindowFactory"/>
     </extensions>

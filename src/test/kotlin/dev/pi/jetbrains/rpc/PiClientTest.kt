@@ -29,7 +29,7 @@ class PiClientTest {
     @TempDir
     lateinit var tempDir: Path
 
-    private var client: PiClient? = null
+    private val clients = mutableListOf<PiClient>()
 
     @BeforeEach
     fun requireNode() {
@@ -38,8 +38,8 @@ class PiClientTest {
 
     @AfterEach
     fun tearDown() {
-        client?.close()
-        client = null
+        clients.forEach { it.close() }
+        clients.clear()
     }
 
     @Test
@@ -134,6 +134,33 @@ class PiClientTest {
     }
 
     @Test
+    fun `parallel task clients isolate events and closing one leaves the other running`() = runBlocking {
+        val first = startClient()
+        val second = startClient()
+        val firstMessage = async(start = CoroutineStart.UNDISPATCHED) {
+            first.events.filterIsInstance<PiEvent.Session>().first { it.type == "message_start" }
+        }
+        val secondMessage = async(start = CoroutineStart.UNDISPATCHED) {
+            second.events.filterIsInstance<PiEvent.Session>().first { it.type == "message_start" }
+        }
+
+        val firstRequest = first.send(RpcCommand(type = "echo", message = "task one"))
+        val secondRequest = second.send(RpcCommand(type = "echo", message = "task two"))
+        withTimeout(TIMEOUT_MS) {
+            assertTrue(firstRequest.await().success)
+            assertTrue(secondRequest.await().success)
+            assertEquals("task one", firstMessage.await().payload.message()?.string("content"))
+            assertEquals("task two", secondMessage.await().payload.message()?.string("content"))
+        }
+
+        val pending = first.send(RpcCommand(type = "hang"), timeout = Duration.ofMinutes(5))
+        first.close()
+        assertFailsWith<PiProcessExitedException> { withTimeout(TIMEOUT_MS) { pending.await() } }
+        assertTrue(second.running.value)
+        assertTrue(withTimeout(TIMEOUT_MS) { second.send(RpcCommand(type = "get_state")).await().success })
+    }
+
+    @Test
     fun `decodes M3 model, thinking, command and tree payloads`() = runBlocking {
         val client = startClient()
 
@@ -190,15 +217,16 @@ class PiClientTest {
             onExit = onExit,
         )
         assertTrue(created.start(), "failed to start the fake pi process")
-        client = created
+        clients.add(created)
         return created
     }
 
     private fun copyScript(): Path {
+        val target = tempDir.resolve("fake-pi.mjs")
+        if (Files.exists(target)) return target
         val resource = checkNotNull(javaClass.getResourceAsStream("/fake-pi/fake-pi.mjs")) {
             "fake-pi.mjs test resource is missing"
         }
-        val target = tempDir.resolve("fake-pi.mjs")
         resource.use { Files.copy(it, target) }
         return target
     }

@@ -4,7 +4,6 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.openapi.ui.Messages
-import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.colors.EditorColorsListener
 import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.diagnostic.Logger
@@ -72,8 +71,16 @@ import javax.swing.JOptionPane
  * M3 adds the session/model/thinking/command surfaces. Anything that changes the active session
  * (switch, new, fork) resets the webview transcript and re-hydrates it from `get_messages`.
  */
-class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposable {
-    private val service = project.service<PiChatService>()
+class ChatPanel(
+    private val project: Project,
+    private val service: PiChatService,
+    private val activateSession: (String) -> Boolean,
+) : JPanel(BorderLayout()), Disposable {
+    val sessionFile: String? get() = service.status.value.sessionFile
+
+    fun isTaskRunning(): Boolean = service.status.value.let { it.isStreaming || it.isCompacting }
+
+    fun prefillComposer(text: String) = service.prefillComposer(text)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val pending = LinkedBlockingQueue<JsonElement>()
@@ -298,7 +305,9 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
             }
             "switch_session" -> {
                 val path = message.path ?: return
-                scope.launch { changeSession("switch") { service.switchSession(path) } }
+                if (!activateSession(path)) {
+                    scope.launch { changeSession("switch") { service.switchSession(path) } }
+                }
             }
             "fork" -> {
                 val entryId = message.entryId ?: return

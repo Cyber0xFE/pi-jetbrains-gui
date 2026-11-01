@@ -651,6 +651,10 @@ body {
   overflow-wrap: anywhere;
 }
 
+.message-user-content {
+  position: relative;
+}
+
 .message-user-body {
   display: flex;
   flex-direction: column;
@@ -1036,6 +1040,34 @@ body {
 
 .tool-card-copy {
   align-self: flex-end;
+}
+
+.message-user-copy {
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease, color 120ms ease;
+}
+
+.message-user-body .message-user-copy {
+  right: 4px;
+  bottom: 4px;
+}
+
+.message-user:hover .message-user-copy,
+.message-user:focus-within .message-user-copy {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .tool-info {

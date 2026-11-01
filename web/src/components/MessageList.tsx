@@ -1,6 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { normalizeTaggedBlocks, type Block, type ChatMessage, type ToolState } from "../state/sessionReducer";
 import { Markdown } from "./Markdown";
+import { CopyButton } from "./CopyButton";
 import { ToolCard } from "./tools/ToolCard";
 import { recordPerf } from "../perfLog";
 import { useSmoothWheelScroll } from "../scroll";
@@ -327,11 +328,18 @@ interface MessageViewProps {
 function MessageView({ message, fileReferences, previousAssistantModel, tools, thinkingLabel }: MessageViewProps): JSX.Element {
   const showModel = message.role === "assistant" && message.model && message.model !== previousAssistantModel;
   const contextualText = message.role === "user" ? findEditorContext(message.blocks) : null;
+  const userText = message.role === "user"
+    ? message.blocks
+      .filter((block): block is Extract<Block, { kind: "text" }> => block.kind === "text")
+      .map((block) => contextualText && block === contextualText.block ? contextualText.prompt : block.text)
+      .join("\n\n")
+    : "";
 
   return (
     <article className={`message message-${message.role}${contextualText ? " message-user-with-context" : ""}`} data-message-id={message.id}>
       {contextualText && <EditorContextView context={contextualText.context} />}
-      <div className={contextualText ? "message-user-body" : undefined}>
+      <div className={message.role === "user"
+        ? `message-user-content${contextualText ? " message-user-body" : ""}` : undefined}>
         {message.blocks.map((block, index) => (
           <BlockView
             key={index}
@@ -344,6 +352,7 @@ function MessageView({ message, fileReferences, previousAssistantModel, tools, t
             thinkingLabel={thinkingLabel}
           />
         ))}
+        {userText && <CopyButton className="message-user-copy" text={userText} title="复制用户消息" iconOnly />}
       </div>
       {message.streaming && message.blocks.length === 0 && <div className="typing">...</div>}
       {message.stopReason === "error" && (

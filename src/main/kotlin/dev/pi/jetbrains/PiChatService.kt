@@ -2,7 +2,6 @@ package dev.pi.jetbrains
 
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.Project
@@ -12,11 +11,9 @@ import com.intellij.openapi.editor.event.SelectionEvent
 import com.intellij.openapi.editor.event.SelectionListener
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditorManager
-import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.PathManager
 import dev.pi.jetbrains.editor.ToolFileRefresher
-import dev.pi.jetbrains.ui.ChatPanel
 import dev.pi.jetbrains.rpc.PiClient
 import dev.pi.jetbrains.rpc.PiEvent
 import dev.pi.jetbrains.rpc.PiJson
@@ -62,11 +59,7 @@ import java.nio.file.StandardOpenOption
 import java.time.Duration
 import kotlin.concurrent.thread
 
-/**
- * Project-level owner of the pi child process (plan 7.2). One process per project, so the agent's
- * working directory is always the project root.
- */
-@Service(Service.Level.PROJECT)
+/** Owns one tab's pi child process. All tabs use the project root as their working directory. */
 class PiChatService(private val project: Project) : Disposable {
     enum class Phase { STOPPED, STARTING, RUNNING, FAILED }
 
@@ -389,15 +382,6 @@ class PiChatService(private val project: Project) : Disposable {
 
     fun respondToExtensionUi(response: RpcExtensionUiResponse): Boolean =
         requireClient().respondToExtensionUi(response)
-
-    fun showToolWindow() {
-        ApplicationManager.getApplication().invokeLater {
-            val toolWindow = ToolWindowManager.getInstance(project).getToolWindow("Pi") ?: return@invokeLater
-            toolWindow.activate {
-                (toolWindow.contentManager.contents.firstOrNull()?.component as? ChatPanel)?.requestComposerFocus()
-            }
-        }
-    }
 
     suspend fun abort(): RpcResponse =
         requireClient().send(RpcCommand(type = "abort")).await()
