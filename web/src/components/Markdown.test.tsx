@@ -4,6 +4,7 @@ import { closeOpenFence, Markdown } from "./Markdown";
 
 afterEach(() => {
   cleanup();
+  window.__piNativePost = undefined;
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
@@ -63,5 +64,27 @@ describe("Markdown", () => {
   it("never lets raw HTML through", () => {
     const { container } = render(<Markdown text={'<img src=x onerror="alert(1)">'} streaming={false} />);
     expect(container.querySelector("img")).toBeNull();
+  });
+
+  it("opens relative Markdown file links in the IDE", () => {
+    const sent: unknown[] = [];
+    window.__piNativePost = (message) => sent.push(message);
+    const view = render(
+      <Markdown text={'[agent-graph.drawio](agent-graph.drawio)'} streaming={false} />,
+    );
+
+    fireEvent.click(view.getByRole("link", { name: "agent-graph.drawio" }));
+
+    expect(sent).toEqual([{ type: "open_path", path: "agent-graph.drawio" }]);
+  });
+
+  it("keeps web links opening in the external browser", () => {
+    const sent: unknown[] = [];
+    window.__piNativePost = (message) => sent.push(message);
+    const view = render(<Markdown text={'[draw.io](https://draw.io)'} streaming={false} />);
+
+    fireEvent.click(view.getByRole("link", { name: "draw.io" }));
+
+    expect(sent).toEqual([{ type: "open_url", url: "https://draw.io" }]);
   });
 });

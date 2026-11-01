@@ -126,10 +126,10 @@ export function Markdown({
   const handleClick = (event: MouseEvent<HTMLDivElement>): void => {
     const target = event.target as HTMLElement | null;
     const fileReference = target?.closest<HTMLButtonElement>(".md-file-reference");
-    const filePath = fileReference?.dataset.filePath;
-    if (filePath) {
+    const buttonPath = fileReference?.dataset.filePath;
+    if (buttonPath) {
       event.preventDefault();
-      post({ type: "open_path", path: filePath });
+      post({ type: "open_path", path: buttonPath });
       return;
     }
     const copyButton = target?.closest<HTMLButtonElement>("[data-copy-code]");
@@ -152,13 +152,55 @@ export function Markdown({
     const anchor = target?.closest("a");
     const href = anchor?.getAttribute("href");
     if (!href) return;
-    // `#anchor`-style links have no target in a single-document webview.
-    if (!/^[a-z]+:/i.test(href)) return;
-    event.preventDefault();
-    if (/^https?:/i.test(href)) post({ type: "open_url", url: href });
+    if (/^https?:/i.test(href)) {
+      event.preventDefault();
+      post({ type: "open_url", url: href });
+      return;
+    }
+    const filePath = filePathFromLink(href);
+    if (filePath) {
+      event.preventDefault();
+      post({ type: "open_path", path: filePath });
+      return;
+    }
+    // `#anchor`-style links have no target in a single-document webview. Keep other schemes
+    // from navigating the JCEF page away from the chat as well.
+    if (/^[a-z][a-z\d+.-]*:/i.test(href)) event.preventDefault();
   };
 
   return <div className="markdown" onClick={handleClick} dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+/** Returns a project/absolute file path for a Markdown link, or null for non-file links. */
+function filePathFromLink(href: string): string | null {
+  const raw = href.trim();
+  if (!raw || raw.startsWith("#") || raw.startsWith("//")) return null;
+
+  if (/^file:/i.test(raw)) {
+    try {
+      const url = new URL(raw);
+      if (url.protocol !== "file:") return null;
+      const pathname = decodeURIComponent(url.pathname);
+      if (!pathname) return null;
+      if (url.hostname && url.hostname !== "localhost") return `//${url.hostname}${pathname}`;
+      return /^[A-Za-z]:\//.test(pathname) ? pathname.slice(1) : pathname;
+    } catch {
+      return null;
+    }
+  }
+
+  // Strip a fragment/query before decoding so links such as `src/main.kt#L12` still open the
+  // file. A Windows drive letter is accepted as an absolute path even though it looks like a URI
+  // scheme to the generic protocol check.
+  const pathPart = raw.split(/[?#]/, 1)[0] ?? "";
+  let path: string;
+  try {
+    path = decodeURIComponent(pathPart);
+  } catch {
+    path = pathPart;
+  }
+  if (!path || (/^[a-z][a-z\d+.-]*:/i.test(raw) && !/^[A-Za-z]:[\\/]/.test(path))) return null;
+  return path;
 }
 
 function codeCopyIcon(copied = false): string {
