@@ -158,6 +158,10 @@ export function MessageList({ messages, files = EMPTY_FILE_REFERENCES, tools, lo
   const scrollToLatest = (): void => {
     const element = scroller.current;
     if (!element) return;
+    const latestUserMessage = userMessages[userMessages.length - 1]?.message;
+    if (latestUserMessage) setActiveMessageId(latestUserMessage.id);
+    const outline = outlineScroller.current;
+    if (outline) outline.scrollTo({ top: outline.scrollHeight, behavior: "smooth" });
     stickToBottom.current = true;
     latestButtonVisible.current = false;
     setShowLatestButton(false);
