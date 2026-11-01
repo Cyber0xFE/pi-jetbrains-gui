@@ -272,7 +272,7 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
                 request { service.requestStats() }
             }
             "open_path" -> message.path?.let { path ->
-                EditorNavigator.open(project, path, message.line) { error ->
+                EditorNavigator.open(project, path, message.line, message.endLine) { error ->
                     bridge?.send(HostMessages.notice(error))
                 }
             }

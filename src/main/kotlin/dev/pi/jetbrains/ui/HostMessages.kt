@@ -285,6 +285,7 @@ data class ClientMessage(
     /** `open_path` / `open_url` payloads (M2 editor navigation). */
     val path: String? = null,
     val line: Int? = null,
+    val endLine: Int? = null,
     val url: String? = null,
     /** M3 model / thinking / session selectors. */
     val provider: String? = null,

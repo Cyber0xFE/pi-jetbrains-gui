@@ -3,10 +3,12 @@ package dev.pi.jetbrains.editor
 import com.intellij.ide.BrowserUtil
 import com.intellij.ide.projectView.ProjectView
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.editor.ScrollType
 import java.nio.file.Paths
 
 /**
@@ -17,8 +19,8 @@ import java.nio.file.Paths
  * touches the editor UI.
  */
 object EditorNavigator {
-    /** Opens [rawPath] at [line] (1-based), reporting failures instead of throwing. */
-    fun open(project: Project, rawPath: String, line: Int?, onError: (String) -> Unit) {
+    /** Opens [rawPath] at [line] (1-based), selecting through [endLine] when present. */
+    fun open(project: Project, rawPath: String, line: Int?, endLine: Int? = null, onError: (String) -> Unit) {
         ApplicationManager.getApplication().invokeLater {
             if (project.isDisposed) return@invokeLater
             val path = ToolFileRefresher.resolve(projectBasePath(project), rawPath)
@@ -36,12 +38,24 @@ object EditorNavigator {
                 ProjectView.getInstance(project).select(null, file, true)
                 return@invokeLater
             }
-            val descriptor = if (line != null && line > 0) {
-                OpenFileDescriptor(project, file, line - 1, 0)
+            val startLine = line?.takeIf { it > 0 }
+            val descriptor = if (startLine != null) {
+                OpenFileDescriptor(project, file, startLine - 1, 0)
             } else {
                 OpenFileDescriptor(project, file)
             }
-            descriptor.navigate(true)
+            if (startLine == null || endLine == null || endLine < startLine) {
+                descriptor.navigate(true)
+                return@invokeLater
+            }
+            val editor = FileEditorManager.getInstance(project).openTextEditor(descriptor, true) ?: return@invokeLater
+            val document = editor.document
+            val lastLine = (endLine - 1).coerceAtMost(document.lineCount - 1)
+            val startOffset = document.getLineStartOffset((startLine - 1).coerceAtMost(document.lineCount - 1))
+            val endOffset = document.getLineEndOffset(lastLine)
+            editor.selectionModel.setSelection(startOffset, endOffset)
+            editor.caretModel.moveToOffset(startOffset)
+            editor.scrollingModel.scrollToCaret(ScrollType.CENTER)
         }
     }
 

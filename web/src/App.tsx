@@ -237,6 +237,7 @@ export function App(): JSX.Element {
       ))}
       <MessageList
         messages={state.messages}
+        files={state.files}
         tools={state.tools}
         loadingHistory={state.historyLoading}
         emptyHint={ready ? "Ask pi about this project…" : state.status.message}

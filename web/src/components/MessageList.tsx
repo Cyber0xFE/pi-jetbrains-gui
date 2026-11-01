@@ -4,14 +4,17 @@ import { Markdown } from "./Markdown";
 import { ToolCard } from "./tools/ToolCard";
 import { recordPerf } from "../perfLog";
 import { useSmoothWheelScroll } from "../scroll";
+import { post } from "../bridge";
 
 /** Older messages stay out of the DOM until asked for, keeping long sessions cheap to render. */
 const VISIBLE_BATCH = 60;
 /** Keep the outline readable; larger histories scroll inside the outline itself. */
 const OUTLINE_MAX_VISIBLE = 15;
+const EMPTY_FILE_REFERENCES: string[] = [];
 
 interface Props {
   messages: ChatMessage[];
+  files?: string[];
   tools: Record<string, ToolState>;
   loadingHistory: boolean;
   emptyHint: string;
@@ -19,7 +22,7 @@ interface Props {
   connecting: boolean;
 }
 
-export function MessageList({ messages, tools, loadingHistory, emptyHint, thinkingLabel, connecting }: Props): JSX.Element {
+export function MessageList({ messages, files = EMPTY_FILE_REFERENCES, tools, loadingHistory, emptyHint, thinkingLabel, connecting }: Props): JSX.Element {
   recordPerf("message_list_render", 0, { messages: messages.length, tools: Object.keys(tools).length });
   const scroller = useRef<HTMLDivElement>(null);
   const outlineScroller = useRef<HTMLDivElement>(null);
@@ -272,6 +275,7 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
           <MemoMessageView
             key={message.id}
             message={message}
+            fileReferences={files}
             previousAssistantModel={
               index + hiddenCount > 0 && messages[index + hiddenCount - 1]?.role === "assistant"
                 ? messages[index + hiddenCount - 1]?.model
@@ -308,6 +312,7 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
 
 interface MessageViewProps {
   message: ChatMessage;
+  fileReferences: readonly string[];
   previousAssistantModel: string | null | undefined;
   tools: Record<string, ToolState>;
   /** Stable references for the tool calls owned by this message. */
@@ -315,20 +320,27 @@ interface MessageViewProps {
   thinkingLabel: string | null;
 }
 
-function MessageView({ message, previousAssistantModel, tools, thinkingLabel }: MessageViewProps): JSX.Element {
+function MessageView({ message, fileReferences, previousAssistantModel, tools, thinkingLabel }: MessageViewProps): JSX.Element {
   const showModel = message.role === "assistant" && message.model && message.model !== previousAssistantModel;
+  const contextualText = message.role === "user" ? findEditorContext(message.blocks) : null;
 
   return (
-    <article className={`message message-${message.role}`} data-message-id={message.id}>
-      {message.blocks.map((block, index) => (
-        <BlockView
-          key={index}
-          block={block}
-          tools={tools}
-          streaming={message.streaming}
-          thinkingLabel={thinkingLabel}
-        />
-      ))}
+    <article className={`message message-${message.role}${contextualText ? " message-user-with-context" : ""}`} data-message-id={message.id}>
+      {contextualText && <EditorContextView context={contextualText.context} />}
+      <div className={contextualText ? "message-user-body" : undefined}>
+        {message.blocks.map((block, index) => (
+          <BlockView
+            key={index}
+            block={contextualText && block === contextualText.block
+              ? { ...block, text: contextualText.prompt }
+              : block}
+            fileReferences={fileReferences}
+            tools={tools}
+            streaming={message.streaming}
+            thinkingLabel={thinkingLabel}
+          />
+        ))}
+      </div>
       {message.streaming && message.blocks.length === 0 && <div className="typing">...</div>}
       {message.stopReason === "error" && (
         <div className="message-error">{message.errorMessage ?? "the request failed"}</div>
@@ -339,6 +351,67 @@ function MessageView({ message, previousAssistantModel, tools, thinkingLabel }: 
         </footer>
       )}
     </article>
+  );
+}
+
+interface EditorContext {
+  path: string;
+  startLine: number;
+  endLine: number | null;
+  buffer: boolean;
+  selection: string;
+}
+
+function findEditorContext(blocks: Block[]): { block: Extract<Block, { kind: "text" }>; context: EditorContext; prompt: string } | null {
+  const block = blocks.find((candidate): candidate is Extract<Block, { kind: "text" }> => candidate.kind === "text");
+  if (!block) return null;
+  const header = /^--- (.+):(\d+)(?:-(\d+))?( \(buffer\))? ---\r?\n/.exec(block.text);
+  if (!header) return null;
+
+  const remainder = block.text.slice(header[0].length);
+  const separator = /\r?\n\r?\n/.exec(remainder);
+  if (!separator || separator.index === undefined) return null;
+  return {
+    block,
+    context: {
+      path: header[1] ?? "",
+      startLine: Number(header[2]),
+      endLine: header[3] ? Number(header[3]) : null,
+      buffer: Boolean(header[4]),
+      selection: remainder.slice(0, separator.index).trim(),
+    },
+    prompt: remainder.slice(separator.index + separator[0].length),
+  };
+}
+
+function EditorContextView({ context }: { context: EditorContext }): JSX.Element {
+  const line = context.endLine && context.endLine !== context.startLine
+    ? `${context.startLine}-${context.endLine}`
+    : String(context.startLine);
+  const rangeLabel = context.endLine && context.endLine !== context.startLine
+    ? `lines ${context.startLine}-${context.endLine}`
+    : `line ${context.startLine}`;
+  return (
+    <button
+      type="button"
+      className="message-editor-context"
+      aria-label={`Open ${context.path} and select ${rangeLabel}`}
+      title={`Open ${context.path}:${line} and select ${rangeLabel}`}
+      onClick={() => post({
+        type: "open_path",
+        path: context.path,
+        line: context.startLine,
+        endLine: context.endLine ?? context.startLine,
+      })}
+    >
+      <div className="message-editor-context-heading">
+        <span className="message-editor-context-icon" aria-hidden="true">⌁</span>
+        <span className="message-editor-context-path" title={context.path}>{context.path}</span>
+        <span className="message-editor-context-line">:{line}</span>
+        {context.buffer && <span className="message-editor-context-buffer">buffer</span>}
+      </div>
+      {context.selection && <pre className="message-editor-context-selection">{context.selection}</pre>}
+    </button>
   );
 }
 
@@ -363,6 +436,7 @@ const MemoMessageView = memo(MessageView, areMessageViewPropsEqual);
 function areMessageViewPropsEqual(previous: MessageViewProps, next: MessageViewProps): boolean {
   if (
     previous.message !== next.message ||
+    previous.fileReferences !== next.fileReferences ||
     previous.previousAssistantModel !== next.previousAssistantModel ||
     previous.thinkingLabel !== next.thinkingLabel ||
     previous.toolStates !== next.toolStates
@@ -462,16 +536,17 @@ function AnimatedEllipsis({ className }: { className: string }): JSX.Element {
 
 interface BlockProps {
   block: Block;
+  fileReferences: readonly string[];
   tools: Record<string, ToolState>;
   streaming: boolean;
   thinkingLabel: string | null;
 }
 
-function BlockView({ block, tools, streaming, thinkingLabel }: BlockProps): JSX.Element | null {
+function BlockView({ block, fileReferences, tools, streaming, thinkingLabel }: BlockProps): JSX.Element | null {
   switch (block.kind) {
     case "text": {
       if (!/<\/?thinking\b/i.test(block.text)) {
-        return <Markdown text={block.text} streaming={streaming} />;
+        return <Markdown text={block.text} streaming={streaming} fileReferences={fileReferences} />;
       }
       return (
         <>
@@ -479,6 +554,7 @@ function BlockView({ block, tools, streaming, thinkingLabel }: BlockProps): JSX.
             <BlockView
               key={index}
               block={nestedBlock}
+              fileReferences={fileReferences}
               tools={tools}
               streaming={streaming}
               thinkingLabel={thinkingLabel}

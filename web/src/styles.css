@@ -565,6 +565,104 @@ body {
   box-shadow: var(--shadow-sm);
 }
 
+.message-user-with-context {
+  align-items: flex-end;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.message-editor-context {
+  align-self: flex-end;
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
+  color: var(--fg-dim);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.message-editor-context:hover {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--border));
+  background: var(--bg-raised);
+}
+
+.message-editor-context:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.message-editor-context-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  padding: 5px 8px;
+  font-size: 0.82em;
+}
+
+.message-editor-context-icon {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-size: 1.15em;
+}
+
+.message-editor-context-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+}
+
+.message-editor-context-line {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+}
+
+.message-editor-context-buffer {
+  flex: 0 0 auto;
+  margin-left: 4px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--bg-raised);
+  font-size: 0.88em;
+}
+
+.message-editor-context-selection {
+  max-height: 180px;
+  margin: 0;
+  padding: 0 8px 6px 14px;
+  overflow: auto;
+  border-top: 1px solid var(--border);
+  color: var(--fg-dim);
+  font: 0.82em/1.45 var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.message-user-body {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-width: 100%;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  box-shadow: var(--shadow-sm);
+}
+
 .message-assistant {
   align-self: stretch;
   background: transparent;
@@ -733,6 +831,22 @@ body {
 .markdown a,
 .md-link {
   color: var(--accent);
+}
+
+.md-file-reference {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 42%, transparent);
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.md-file-reference:hover {
+  text-decoration-color: currentColor;
 }
 
 /* highlight.js token colours, keyed to the IDE-like palette above. */

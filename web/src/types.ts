@@ -235,7 +235,7 @@ export type Outbound =
   | { type: "prompt"; message: string; images?: PromptImage[] }
   | { type: "abort" }
   | { type: "request_state" }
-  | { type: "open_path"; path: string; line?: number }
+  | { type: "open_path"; path: string; line?: number; endLine?: number }
   | { type: "open_url"; url: string }
   | { type: "log"; message: string }
   // M3: sessions

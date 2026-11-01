@@ -54,7 +54,7 @@ function highlight(code: string, language: string): string {
   }
 }
 
-function createRenderer(withHighlight: boolean): MarkdownIt {
+function createRenderer(withHighlight: boolean, fileReferences: readonly string[]): MarkdownIt {
   const renderer = new MarkdownIt({
     // Model output is untrusted HTML: never let raw tags through.
     html: false,
@@ -62,6 +62,28 @@ function createRenderer(withHighlight: boolean): MarkdownIt {
     breaks: true,
     ...(withHighlight ? { highlight } : {}),
   });
+  const references = [...fileReferences].sort((left, right) => right.length - left.length);
+  renderer.inline.ruler.before("text", "file_reference", (state, silent) => {
+    const preceding = state.src[state.pos - 1] ?? " ";
+    if (!/[\s([{*_]/.test(preceding)) return false;
+    for (const path of references) {
+      if (!state.src.startsWith(`@${path}`, state.pos)) continue;
+      const next = state.src[state.pos + path.length + 1] ?? "";
+      if (next && /[A-Za-z0-9_./\\-]/.test(next)) continue;
+      if (!silent) {
+        const token = state.push("file_reference", "", 0);
+        token.content = path;
+      }
+      state.pos += path.length + 1;
+      return true;
+    }
+    return false;
+  });
+  renderer.renderer.rules.file_reference = (tokens, index) => {
+    const path = tokens[index]?.content ?? "";
+    const escaped = renderer.utils.escapeHtml(path);
+    return `<button type="button" class="md-file-reference" data-file-path="${escaped}" title="Open ${escaped}">@${escaped}</button>`;
+  };
   // Links must not navigate the JCEF page away from the chat; open them in the IDE instead.
   renderer.renderer.rules.link_open = (tokens, index, options, _env, self) => {
     const token = tokens[index];
@@ -74,8 +96,7 @@ function createRenderer(withHighlight: boolean): MarkdownIt {
   return renderer;
 }
 
-const streamingRenderer = createRenderer(false);
-const finalRenderer = createRenderer(true);
+const EMPTY_FILE_REFERENCES: readonly string[] = [];
 
 /**
  * Markdown for assistant text.
@@ -84,21 +105,33 @@ const finalRenderer = createRenderer(true);
  * skipped (plan M2.5). A code fence that is still open is closed for display so the partial answer
  * renders as a code block instead of swallowing the rest of the message.
  */
-export function Markdown({ text, streaming }: { text: string; streaming: boolean }): JSX.Element {
+export function Markdown({
+  text,
+  streaming,
+  fileReferences = EMPTY_FILE_REFERENCES,
+}: { text: string; streaming: boolean; fileReferences?: readonly string[] }): JSX.Element {
   const shown = useThrottled(text, STREAM_THROTTLE_MS, streaming);
+  const renderer = useMemo(() => createRenderer(!streaming, fileReferences), [fileReferences, streaming]);
   const html = useMemo(() => {
     const startedAt = performance.now();
     const source = streaming ? closeOpenFence(shown) : text;
-    const rendered = addCodeCopyButtons(streaming ? streamingRenderer.render(source) : finalRenderer.render(source));
+    const rendered = addCodeCopyButtons(renderer.render(source));
     recordPerf("markdown_render", performance.now() - startedAt, {
       chars: source.length,
       streaming: streaming ? 1 : 0,
     });
     return rendered;
-  }, [shown, streaming, text]);
+  }, [renderer, shown, streaming, text]);
 
   const handleClick = (event: MouseEvent<HTMLDivElement>): void => {
     const target = event.target as HTMLElement | null;
+    const fileReference = target?.closest<HTMLButtonElement>(".md-file-reference");
+    const filePath = fileReference?.dataset.filePath;
+    if (filePath) {
+      event.preventDefault();
+      post({ type: "open_path", path: filePath });
+      return;
+    }
     const copyButton = target?.closest<HTMLButtonElement>("[data-copy-code]");
     if (copyButton) {
       const code = copyButton.parentElement?.querySelector("pre")?.textContent ?? "";
