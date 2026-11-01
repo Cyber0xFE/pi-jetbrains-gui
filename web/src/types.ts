@@ -225,6 +225,7 @@ export type Inbound =
   | { type: "files"; files: string[] }
   | { type: "reset"; reason: string }
   | { type: "prefill"; text: string }
+  | { type: "focus_composer" }
   | { type: "widget"; key: string; lines: string[]; placement: "aboveEditor" | "belowEditor" }
   | { type: "extension_status"; key: string; text: string | null };
 

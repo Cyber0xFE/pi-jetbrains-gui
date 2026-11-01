@@ -23,6 +23,9 @@
     <depends>com.intellij.modules.platform</depends>
 
     <actions>
+        <action id="dev.pi.jetbrains.ShowPiToolWindow" class="dev.pi.jetbrains.ui.ShowPiToolWindowAction">
+            <keyboard-shortcut keymap="$default" first-keystroke="control alt K"/>
+        </action>
         <action id="dev.pi.jetbrains.SendConsoleSelectionToPi" class="dev.pi.jetbrains.editor.SendConsoleSelectionToPiAction" icon="/icons/toolWindowPi.png">
             <add-to-group group-id="ConsoleView.PopupMenu" anchor="last"/>
         </action>

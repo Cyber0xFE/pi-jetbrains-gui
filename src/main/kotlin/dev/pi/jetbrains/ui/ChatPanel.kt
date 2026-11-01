@@ -2,6 +2,7 @@ package dev.pi.jetbrains.ui
 
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.colors.EditorColorsListener
@@ -198,6 +199,13 @@ class ChatPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
         }
         scope.launch { flushRecords() }
         scope.launch { flushHeldUpdates() }
+    }
+
+    fun requestComposerFocus() {
+        val browser = browser ?: return
+        IdeFocusManager.getInstance(project).requestFocus(browser.component, true)
+        browser.cefBrowser.setFocus(true)
+        bridge?.send(HostMessages.focusComposer())
     }
 
     /** Queues a record for the webview, or parks it while the transcript is still hydrating. */

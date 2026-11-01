@@ -277,6 +277,9 @@ data class HostResetMessage(val type: String = "reset", val reason: String = "se
 @Serializable
 data class HostPrefillMessage(val type: String = "prefill", val text: String)
 
+@Serializable
+data class HostFocusComposerMessage(val type: String = "focus_composer")
+
 /** One message from the webview to Kotlin; see `web/src/types.ts` (`Outbound`). */
 @Serializable
 data class ClientMessage(
@@ -386,4 +389,7 @@ object HostMessages {
 
     fun prefill(text: String): JsonElement =
         PiJson.encodeToJsonElement(HostPrefillMessage.serializer(), HostPrefillMessage(text = text))
+
+    fun focusComposer(): JsonElement =
+        PiJson.encodeToJsonElement(HostFocusComposerMessage.serializer(), HostFocusComposerMessage())
 }

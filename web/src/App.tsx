@@ -67,6 +67,10 @@ export function App(): JSX.Element {
         setFocusDraftRequest((current) => current + 1);
         return;
       }
+      if (message.type === "focus_composer") {
+        setFocusDraftRequest((current) => current + 1);
+        return;
+      }
       store.dispatch({ kind: "inbound", message });
     });
     post({ type: "ready" });

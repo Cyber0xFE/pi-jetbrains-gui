@@ -186,6 +186,8 @@ function applyInbound(state: ChatState, message: Inbound): ChatState {
     case "prefill":
       // The composer lives in App state, not the transcript reducer.
       return state;
+    case "focus_composer":
+      return state;
     case "extension_status": {
       const extensionStatuses = { ...state.extensionStatuses };
       if (message.text == null || message.text.trim().length === 0) delete extensionStatuses[message.key];

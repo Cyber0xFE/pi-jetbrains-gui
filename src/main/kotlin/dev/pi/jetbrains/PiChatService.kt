@@ -16,6 +16,7 @@ import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.PathManager
 import dev.pi.jetbrains.editor.ToolFileRefresher
+import dev.pi.jetbrains.ui.ChatPanel
 import dev.pi.jetbrains.rpc.PiClient
 import dev.pi.jetbrains.rpc.PiEvent
 import dev.pi.jetbrains.rpc.PiJson
@@ -391,7 +392,10 @@ class PiChatService(private val project: Project) : Disposable {
 
     fun showToolWindow() {
         ApplicationManager.getApplication().invokeLater {
-            ToolWindowManager.getInstance(project).getToolWindow("Pi")?.show()
+            val toolWindow = ToolWindowManager.getInstance(project).getToolWindow("Pi") ?: return@invokeLater
+            toolWindow.activate {
+                (toolWindow.contentManager.contents.firstOrNull()?.component as? ChatPanel)?.requestComposerFocus()
+            }
         }
     }
 
