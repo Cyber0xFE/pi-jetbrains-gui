@@ -137,10 +137,13 @@ export function Markdown({
       const code = copyButton.parentElement?.querySelector("pre")?.textContent ?? "";
       void copyText(code).then((success) => {
         if (!success) return;
-        const original = copyButton.textContent;
-        copyButton.textContent = "已复制";
+        copyButton.innerHTML = codeCopyIcon(true);
+        copyButton.title = "已复制";
+        copyButton.setAttribute("aria-label", "已复制");
         window.setTimeout(() => {
-          copyButton.textContent = original ?? "复制";
+          copyButton.innerHTML = codeCopyIcon();
+          copyButton.title = "复制代码块";
+          copyButton.setAttribute("aria-label", "复制代码块");
         }, 1200);
       });
       return;
@@ -158,11 +161,18 @@ export function Markdown({
   return <div className="markdown" onClick={handleClick} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
+function codeCopyIcon(copied = false): string {
+  const shape = copied
+    ? '<path d="m5 12 4 4L19 6" />'
+    : '<rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" />';
+  return `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${shape}</svg>`;
+}
+
 function addCodeCopyButtons(html: string): string {
   return html.replace(
     /<pre(\b[^>]*)>([\s\S]*?)<\/pre>/g,
     (_match, attributes: string, body: string) =>
-      `<div class="markdown-card"><button type="button" class="card-copy markdown-card-copy" data-copy-code="true" title="Copy code block">复制</button><pre${attributes}>${body}</pre></div>`,
+      `<div class="markdown-card"><button type="button" class="card-copy markdown-card-copy" data-copy-code="true" title="复制代码块" aria-label="复制代码块">${codeCopyIcon()}</button><pre${attributes}>${body}</pre></div>`,
   );
 }
 

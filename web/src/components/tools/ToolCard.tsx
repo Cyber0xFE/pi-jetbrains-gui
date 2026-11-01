@@ -44,7 +44,7 @@ export function ToolCard({ callId, name, tool, tools, depth = 0 }: Props): JSX.E
         <StatusBadge status={state.status} durationMs={state.durationMs} />
       </header>
       {view.body}
-      <CopyButton className="tool-card-copy" text={toolCopyText(state)} title="Copy tool card" />
+      <CopyButton className="tool-card-copy" text={toolCopyText(state)} title="复制卡片" iconOnly />
       {children.length > 0 && depth < MAX_NESTING && (
         <div className="tool-children">
           <div className="tool-children-label">{children.length} nested call(s)</div>

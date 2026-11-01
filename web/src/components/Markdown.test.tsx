@@ -1,8 +1,12 @@
-import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { act, cleanup, fireEvent, render } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { closeOpenFence, Markdown } from "./Markdown";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 describe("closeOpenFence", () => {
   it("leaves balanced fences untouched", () => {
@@ -33,6 +37,27 @@ describe("Markdown", () => {
   it("keeps a still-open fence inside the code block while streaming", () => {
     const { container } = render(<Markdown text={"before\n```ts\nconst a = 1;"} streaming={true} />);
     expect(container.querySelector("pre code")?.textContent).toContain("const a = 1;");
+  });
+
+  it("copies code when clicking the icon and restores it after success feedback", async () => {
+    vi.useFakeTimers();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", Object.create(navigator, { clipboard: { value: { writeText } } }));
+    const view = render(<Markdown text={"```\nMySQL 业务库\n```"} streaming={false} />);
+    const button = view.getByRole("button", { name: "复制代码块" });
+    expect(button.textContent).toBe("");
+    const icon = button.querySelector("svg")!;
+    const original = icon.outerHTML;
+
+    await act(async () => { fireEvent.click(icon.querySelector("path")!); });
+    expect(writeText).toHaveBeenCalledWith("MySQL 业务库\n");
+    expect(view.getByRole("button", { name: "已复制" }).title).toBe("已复制");
+    expect(button.textContent).toBe("");
+    expect(button.querySelector("svg")?.outerHTML).not.toBe(original);
+
+    act(() => { vi.advanceTimersByTime(1200); });
+    expect(view.getByRole("button", { name: "复制代码块" }).title).toBe("复制代码块");
+    expect(button.querySelector("svg")?.outerHTML).toBe(original);
   });
 
   it("never lets raw HTML through", () => {
