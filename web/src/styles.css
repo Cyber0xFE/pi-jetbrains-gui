@@ -673,6 +673,12 @@ body {
   padding-left: 2px;
 }
 
+.message-assistant > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .message-system {
   color: var(--fg-dim);
 }
