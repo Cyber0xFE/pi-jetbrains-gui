@@ -157,7 +157,7 @@ body {
   gap: 9px;
   flex-wrap: wrap;
   min-width: 0;
-  font-size: 1.12em;
+  font-size: 1.05em;
   font-variant-numeric: tabular-nums;
   align-items: center;
 }
