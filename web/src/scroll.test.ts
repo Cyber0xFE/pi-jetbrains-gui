@@ -62,12 +62,12 @@ describe("smooth wheel scrolling", () => {
     expect(root.scrollTop).toBe(0);
     tick();
     expect(root.scrollTop).toBeGreaterThan(0);
-    expect(root.scrollTop).toBeLessThan(175);
+    expect(root.scrollTop).toBeLessThan(250);
     const firstTop = root.scrollTop;
     tick();
     expect(root.scrollTop).toBeGreaterThan(firstTop);
     finish();
-    expect(root.scrollTop).toBe(175);
+    expect(root.scrollTop).toBe(250);
   });
 
   it("accumulates fast notches without creating multiple animation loops", () => {
@@ -77,7 +77,7 @@ describe("smooth wheel scrolling", () => {
     wheel(100);
     expect(frames.size).toBe(1);
     finish();
-    expect(root.scrollTop).toBe(525);
+    expect(root.scrollTop).toBe(750);
   });
 
   it("reverses immediately instead of finishing the old direction", () => {
@@ -89,10 +89,10 @@ describe("smooth wheel scrolling", () => {
     tick();
     expect(root.scrollTop).toBeLessThan(beforeReverse);
     finish();
-    expect(root.scrollTop).toBeCloseTo(beforeReverse - 175);
+    expect(root.scrollTop).toBeCloseTo(beforeReverse - 250);
   });
 
-  it.each([{ deltaMode: 1, delta: 3, distance: 84 }, { deltaMode: 2, delta: 1, distance: 700 }])(
+  it.each([{ deltaMode: 1, delta: 3, distance: 120 }, { deltaMode: 2, delta: 1, distance: 1000 }])(
     "normalizes wheel units in mode $deltaMode",
     ({ deltaMode, delta, distance }) => {
       wheel(delta, { deltaMode });
@@ -108,7 +108,7 @@ describe("smooth wheel scrolling", () => {
     expect(root.scrollTop).toBe(1600);
     wheel(-10);
     finish();
-    expect(root.scrollTop).toBe(1582.5);
+    expect(root.scrollTop).toBe(1575);
     wheel(-10000);
     finish();
     expect(root.scrollTop).toBe(0);
@@ -123,10 +123,10 @@ describe("smooth wheel scrolling", () => {
     });
     wheel(100);
     finish();
-    expect(root.scrollTop).toBe(175);
+    expect(root.scrollTop).toBe(250);
     wheel(10);
     finish();
-    expect(root.scrollTop).toBe(193);
+    expect(root.scrollTop).toBe(275);
   });
 
   it.each([30, 60, 120, 144])("keeps motion consistent at %i frames per second", (fps) => {
@@ -134,9 +134,9 @@ describe("smooth wheel scrolling", () => {
     const fullFrames = Math.floor(fps / 10);
     for (let step = 0; step < fullFrames; step += 1) tick(1000 / fps);
     if (now < 100) tick(100 - now);
-    expect(root.scrollTop).toBeCloseTo(175 * (1 - Math.exp(-100 / 80)));
+    expect(root.scrollTop).toBeCloseTo(250 * (1 - Math.exp(-100 / 80)));
     finish();
-    expect(root.scrollTop).toBe(175);
+    expect(root.scrollTop).toBe(250);
   });
 
   it("scrolls nested tool output without moving the transcript", () => {
@@ -145,12 +145,12 @@ describe("smooth wheel scrolling", () => {
     root.append(output);
     wheel(100, {}, output);
     finish();
-    expect(output.scrollTop).toBe(175);
+    expect(output.scrollTop).toBe(250);
     expect(root.scrollTop).toBe(0);
     output.scrollTop = 700;
     wheel(100, {}, output);
     finish();
-    expect(root.scrollTop).toBe(175);
+    expect(root.scrollTop).toBe(250);
   });
 
   it.each([{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { deltaX: 150 }, { cancelable: false }])(
@@ -168,9 +168,9 @@ describe("smooth wheel scrolling", () => {
     expect(wheel(100).defaultPrevented).toBe(true);
     tick();
     expect(root.scrollTop).toBeGreaterThan(0);
-    expect(root.scrollTop).toBeLessThan(175);
+    expect(root.scrollTop).toBeLessThan(250);
     finish();
-    expect(root.scrollTop).toBe(175);
+    expect(root.scrollTop).toBe(250);
   });
 
   it.each(["pointerdown", "keydown"])("yields to %s and cleans up on unmount", (type) => {

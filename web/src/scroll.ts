@@ -1,6 +1,6 @@
 import { useEffect, useRef, type RefObject } from "react";
 
-const WHEEL_MULTIPLIER = 1.75;
+const WHEEL_MULTIPLIER = 2.5;
 const RESPONSE_MS = 80;
 
 /**
