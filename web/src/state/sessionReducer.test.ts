@@ -209,7 +209,7 @@ describe("sessionReducer", () => {
     );
 
     expect(state.messages[0]?.blocks).toEqual([
-      { kind: "thinking", text: "pondering" },
+      { kind: "thinking", text: "pondering", completed: true },
       { kind: "text", text: "answer" },
     ]);
   });
@@ -244,7 +244,7 @@ describe("sessionReducer", () => {
     });
 
     expect(state.messages[0]?.blocks).toEqual([
-      { kind: "thinking", text: "Building plugin" },
+      { kind: "thinking", text: "Building plugin", completed: true },
       { kind: "text", text: "\n\nDone" },
     ]);
   });

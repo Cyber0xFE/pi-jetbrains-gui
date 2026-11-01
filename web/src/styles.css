@@ -941,20 +941,63 @@ body {
 }
 
 .thinking {
-  border-left: 3px solid var(--accent);
-  padding: 3px 0 3px 11px;
+  padding: 4px 0;
   color: var(--fg-dim);
-  background: linear-gradient(90deg, var(--bg-soft), transparent 70%);
 }
 
 .thinking summary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
   cursor: pointer;
-  font-size: 0.88em;
+  font-size: 1em;
+  line-height: 1.5;
+  list-style: none;
+}
+
+.thinking summary::-webkit-details-marker {
+  display: none;
+}
+
+.thinking summary::after {
+  width: 8px;
+  height: 8px;
+  margin-left: auto;
+  border-right: 2px solid var(--fg-dim);
+  border-bottom: 2px solid var(--fg-dim);
+  content: "";
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 120ms ease;
+}
+
+.thinking[open] summary::after {
+  transform: rotate(225deg) translate(-1px, -1px);
+}
+
+.thinking-icon {
+  flex: 0 0 auto;
+  width: 25px;
+  height: 25px;
+  color: var(--accent);
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
+.thinking-label {
+  display: inline-flex;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.thinking-duration {
+  margin-left: 2px;
 }
 
 .thinking-ellipsis {
   display: inline-block;
-  width: 1.1em;
+  width: 1.15em;
   overflow: hidden;
   white-space: nowrap;
   vertical-align: baseline;
@@ -963,7 +1006,7 @@ body {
 .thinking pre {
   white-space: pre-wrap;
   word-break: break-word;
-  margin: 4px 0 0;
+  margin: 8px 0 0 34px;
   font-size: 0.88em;
 }
 
@@ -1384,20 +1427,12 @@ body {
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
-  gap: 4px;
-  padding: 4px 8px;
-  font-size: 0.84em;
-  border-left: 3px solid var(--accent);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  background: linear-gradient(90deg, var(--bg-soft), transparent 85%);
+  gap: 9px;
+  margin-left: 2px;
+  padding: 4px 0;
+  font-size: 1em;
+  line-height: 1.5;
   color: var(--fg-dim);
-}
-
-.connecting-ellipsis {
-  display: inline-block;
-  width: 1.1em;
-  overflow: hidden;
-  white-space: nowrap;
 }
 
 .extension-widget {

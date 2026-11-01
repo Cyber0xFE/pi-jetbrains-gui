@@ -27,6 +27,8 @@ export interface ThinkingBlock {
   kind: "thinking";
   text: string;
   redacted?: boolean;
+  /** Set when the provider has finished emitting this reasoning block. */
+  completed?: boolean;
 }
 
 export interface ToolBlock {
@@ -52,6 +54,9 @@ export interface ChatMessage {
   stopReason?: string;
   errorMessage?: string;
   model?: string;
+  durationMs?: number;
+  /** Local start time used when the provider does not include a response duration. */
+  startedAtMs?: number;
 }
 
 export type ToolStatus = "running" | "done" | "error";
@@ -233,7 +238,7 @@ function applyRecord(state: ChatState, record: WireRecord): ChatState {
     case "message_update":
       return onMessageUpdate(state, record.assistantMessageEvent);
     case "message_end":
-      return onMessageEnd(state, record.message);
+      return onMessageEnd(state, record.message, record.durationMs);
     case "tool_execution_start":
       return onToolStart(state, record);
     case "tool_execution_update":
@@ -274,6 +279,8 @@ function onMessageStart(state: ChatState, message: WireMessage | undefined): Cha
     stopReason: message.stopReason,
     errorMessage: message.errorMessage,
     model: message.model,
+    durationMs: message.durationMs,
+    startedAtMs: Date.now(),
   };
   return {
     ...state,
@@ -293,7 +300,14 @@ function onMessageUpdate(state: ChatState, delta: AssistantDelta | undefined): C
       ...base,
       messages: [
         ...base.messages,
-        { id: syntheticId, role: "assistant", blocks: [], timestamp: Date.now(), streaming: true },
+        {
+          id: syntheticId,
+          role: "assistant",
+          blocks: [],
+          timestamp: Date.now(),
+          streaming: true,
+          startedAtMs: Date.now(),
+        },
       ],
       streamingMessageId: syntheticId,
     };
@@ -325,6 +339,16 @@ function patchBlocks(message: ChatMessage, delta: AssistantDelta): ChatMessage {
   const index = delta.contentIndex ?? message.blocks.length;
   const blocks = message.blocks.slice();
 
+  // Some providers switch straight to answer/tool output without a thinking_end event.
+  if (delta.type.startsWith("text_") || delta.type.startsWith("toolcall_")) {
+    for (let previous = 0; previous < index; previous += 1) {
+      const block = blocks[previous];
+      if (block?.kind === "thinking" && !block.completed) {
+        blocks[previous] = { ...block, completed: true };
+      }
+    }
+  }
+
   const ensure = (kind: "text" | "thinking"): void => {
     const current = blocks[index];
     if (!current || current.kind !== kind) {
@@ -355,7 +379,11 @@ function patchBlocks(message: ChatMessage, delta: AssistantDelta): ChatMessage {
       break;
     }
     case "thinking_end":
-      if (delta.content !== undefined) blocks[index] = { kind: "thinking", text: stripThinkingTags(delta.content) };
+      if (delta.content !== undefined) {
+        blocks[index] = { kind: "thinking", text: stripThinkingTags(delta.content), completed: true };
+      } else if (blocks[index]?.kind === "thinking") {
+        blocks[index] = { ...blocks[index], completed: true };
+      }
       break;
     case "toolcall_start":
       blocks[index] = { kind: "tool", callId: delta.id ?? "", name: delta.toolName ?? "tool" };
@@ -373,7 +401,7 @@ function patchBlocks(message: ChatMessage, delta: AssistantDelta): ChatMessage {
   return { ...message, blocks };
 }
 
-function onMessageEnd(state: ChatState, message: WireMessage | undefined): ChatState {
+function onMessageEnd(state: ChatState, message: WireMessage | undefined, recordDurationMs?: number): ChatState {
   if (!message) return state;
   if (message.role === "toolResult") return attachToolResult(state, message);
 
@@ -389,6 +417,11 @@ function onMessageEnd(state: ChatState, message: WireMessage | undefined): ChatS
     stopReason: message.stopReason,
     errorMessage: message.errorMessage,
     model: message.model,
+    durationMs: message.durationMs
+      ?? (typeof recordDurationMs === "number" ? recordDurationMs : undefined)
+      ?? existing?.durationMs
+      ?? (existing?.startedAtMs === undefined ? undefined : Math.max(0, Date.now() - existing.startedAtMs)),
+    startedAtMs: existing?.startedAtMs,
   };
 
   const messages = existing
@@ -645,6 +678,7 @@ function applyHistory(state: ChatState, messages: WireMessage[], final: boolean)
           stopReason: message.stopReason,
           errorMessage: message.errorMessage,
           model: message.model,
+          durationMs: message.durationMs,
         },
       ],
     };
@@ -700,7 +734,7 @@ function splitTaggedText(text: string): Block[] {
   while ((match = tagPattern.exec(text)) !== null) {
     const segment = text.slice(cursor, match.index);
     if (segment.length > 0) {
-      blocks.push(thinking ? { kind: "thinking", text: segment } : { kind: "text", text: segment });
+      blocks.push(thinking ? { kind: "thinking", text: segment, completed: true } : { kind: "text", text: segment });
     }
     thinking = !thinking;
     cursor = match.index + match[0].length;

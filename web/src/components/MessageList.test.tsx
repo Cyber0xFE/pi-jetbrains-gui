@@ -2,6 +2,8 @@ import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { MessageList } from "./MessageList";
 import type { ChatMessage } from "../state/sessionReducer";
+import { initialState, reduce } from "../state/sessionReducer";
+import type { AssistantDelta } from "../types";
 
 afterEach(() => {
   cleanup();
@@ -64,6 +66,112 @@ it("collapses expanded skill instructions and keeps the user request visible", (
   expect(details?.open).toBe(true);
   expect(view.container.querySelector("h1")?.textContent).toContain("Draw.io Diagrams");
   expect(view.getByText("(click to collapse)")).toBeDefined();
+});
+
+it("shows the thinking status icon, streaming ellipsis and completed duration", () => {
+  const view = render(
+    <MessageList
+      messages={[
+        {
+          id: "thinking-stream",
+          role: "assistant",
+          blocks: [{ kind: "thinking", text: "still working" }],
+          timestamp: 1,
+          streaming: true,
+        },
+        {
+          id: "thinking-done",
+          role: "assistant",
+          blocks: [{ kind: "thinking", text: "finished", completed: true }],
+          timestamp: 2,
+          streaming: false,
+          durationMs: 21_000,
+        },
+      ]}
+      tools={{}}
+      loadingHistory={false}
+      emptyHint=""
+      thinkingLabel={null}
+      connecting={false}
+    />,
+  );
+
+  expect(view.getByText("正在思考")).toBeDefined();
+  expect(view.getByText("已思考")).toBeDefined();
+  expect(view.getByText("（用时 21 秒）")).toBeDefined();
+  expect(view.container.querySelectorAll(".thinking-icon")).toHaveLength(2);
+  expect(view.container.querySelectorAll(".thinking-ellipsis")).toHaveLength(1);
+});
+
+it.each([
+  {
+    name: "tagged thinking with a closing tag split across chunks",
+    start: { type: "text_delta", contentIndex: 0, delta: "<thinking>reasoning" },
+    finish: [
+      { type: "text_delta", contentIndex: 0, delta: "</think" },
+      { type: "text_delta", contentIndex: 0, delta: "ing>" },
+    ],
+    answer: { type: "text_delta", contentIndex: 0, delta: "answer" },
+  },
+  {
+    name: "native thinking with an explicit end",
+    start: { type: "thinking_delta", contentIndex: 0, delta: "reasoning" },
+    finish: [{ type: "thinking_end", contentIndex: 0 }],
+    answer: { type: "text_delta", contentIndex: 1, delta: "answer" },
+  },
+  {
+    name: "native thinking followed by text_start without thinking_end",
+    start: { type: "thinking_delta", contentIndex: 0, delta: "reasoning" },
+    finish: [{ type: "text_start", contentIndex: 1 }],
+    answer: { type: "text_delta", contentIndex: 1, delta: "answer" },
+  },
+  {
+    name: "native thinking followed directly by answer text",
+    start: { type: "thinking_delta", contentIndex: 0, delta: "reasoning" },
+    finish: [{ type: "text_delta", contentIndex: 1, delta: "answer" }],
+    answer: { type: "text_delta", contentIndex: 1, delta: " continues" },
+  },
+  {
+    name: "native thinking followed by a tool call",
+    start: { type: "thinking_delta", contentIndex: 0, delta: "reasoning" },
+    finish: [{ type: "toolcall_start", contentIndex: 1, id: "read-1", toolName: "read" }],
+    answer: { type: "text_delta", contentIndex: 2, delta: "answer" },
+  },
+])("finishes $name while the assistant keeps streaming", ({ start, finish, answer }) => {
+  let state = reduce(initialState, {
+    kind: "inbound",
+    message: {
+      type: "records",
+      records: [{ type: "message_start", message: { role: "assistant", timestamp: 1, content: [] } }],
+    },
+  });
+  const update = (delta: AssistantDelta): void => {
+    state = reduce(state, {
+      kind: "inbound",
+      message: { type: "records", records: [{ type: "message_update", assistantMessageEvent: delta }] },
+    });
+  };
+  const transcript = (): JSX.Element => (
+    <MessageList messages={state.messages} tools={state.tools} loadingHistory={false}
+      emptyHint="" thinkingLabel={null} connecting={false} />
+  );
+  update(start);
+  const view = render(transcript());
+  expect(view.getByText("正在思考")).toBeDefined();
+  expect(view.container.querySelector(".thinking-ellipsis")).not.toBeNull();
+
+  finish.forEach(update);
+  view.rerender(transcript());
+  expect(state.messages[0]?.streaming).toBe(true);
+  expect(view.getByText("已思考")).toBeDefined();
+  expect(view.queryByText("正在思考")).toBeNull();
+  expect(view.container.querySelector(".thinking-ellipsis")).toBeNull();
+
+  update(answer);
+  view.rerender(transcript());
+  expect(state.messages[0]?.streaming).toBe(true);
+  expect(view.getByText("已思考")).toBeDefined();
+  expect(view.container.querySelector(".thinking-ellipsis")).toBeNull();
 });
 
 it("shows scroll hints only in directions with more user messages", () => {

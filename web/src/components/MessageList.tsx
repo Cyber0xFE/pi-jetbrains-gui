@@ -293,8 +293,10 @@ export function MessageList({ messages, files = EMPTY_FILE_REFERENCES, tools, lo
         ))}
         {connecting && (
           <div className="connecting-status" role="status" aria-label="正在连接服务">
-            <span>正在连接服务</span>
-            <AnimatedEllipsis className="connecting-ellipsis" />
+            <ThinkingIcon />
+            <span className="thinking-label">
+              正在连接服务<AnimatedEllipsis className="thinking-ellipsis" />
+            </span>
           </div>
         )}
       </div>
@@ -385,6 +387,7 @@ function MessageView({ message, fileReferences, previousAssistantModel, tools, t
                     tools={tools}
                     streaming={message.streaming}
                     thinkingLabel={thinkingLabel}
+                    durationMs={message.durationMs}
                   />
                 )}
               </Fragment>
@@ -400,6 +403,7 @@ function MessageView({ message, fileReferences, previousAssistantModel, tools, t
               tools={tools}
               streaming={message.streaming}
               thinkingLabel={thinkingLabel}
+              durationMs={message.durationMs}
             />
           );
         })}
@@ -636,9 +640,10 @@ interface BlockProps {
   tools: Record<string, ToolState>;
   streaming: boolean;
   thinkingLabel: string | null;
+  durationMs?: number;
 }
 
-function BlockView({ block, fileReferences, tools, streaming, thinkingLabel }: BlockProps): JSX.Element | null {
+function BlockView({ block, fileReferences, tools, streaming, thinkingLabel, durationMs }: BlockProps): JSX.Element | null {
   switch (block.kind) {
     case "text": {
       if (!/<\/?thinking\b/i.test(block.text)) {
@@ -654,21 +659,31 @@ function BlockView({ block, fileReferences, tools, streaming, thinkingLabel }: B
               tools={tools}
               streaming={streaming}
               thinkingLabel={thinkingLabel}
+              durationMs={durationMs}
             />
           ))}
         </>
       );
     }
-    case "thinking":
+    case "thinking": {
+      const thinkingActive = streaming && block.completed !== true;
+      const defaultLabel = block.redacted ? "思考内容已隐藏" : (thinkingActive ? "正在思考" : "已思考");
       return (
         <details className="thinking">
           <summary>
-            <span>{thinkingLabel ?? (block.redacted ? "thinking (redacted)" : "thinking")}</span>
-            {streaming && <AnimatedEllipsis className="thinking-ellipsis" />}
+            <ThinkingIcon />
+            <span className="thinking-label">
+              {thinkingLabel ?? defaultLabel}
+              {thinkingActive && <AnimatedEllipsis className="thinking-ellipsis" />}
+              {!thinkingActive && !thinkingLabel && !block.redacted && durationMs !== undefined && (
+                <span className="thinking-duration">（用时 {formatThinkingDuration(durationMs)}）</span>
+              )}
+            </span>
           </summary>
           <pre>{block.text}</pre>
         </details>
       );
+    }
     case "tool":
       return <ToolCard name={block.name} callId={block.callId} tool={tools[block.callId]} tools={tools} />;
     case "image":
@@ -676,4 +691,18 @@ function BlockView({ block, fileReferences, tools, streaming, thinkingLabel }: B
     default:
       return null;
   }
+}
+
+function ThinkingIcon(): JSX.Element {
+  return (
+    <svg className="thinking-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <ellipse cx="12" cy="12" rx="4.25" ry="10" transform="rotate(45 12 12)" />
+      <ellipse cx="12" cy="12" rx="4.25" ry="10" transform="rotate(-45 12 12)" />
+      <ellipse cx="12" cy="12" rx="4.25" ry="10" />
+    </svg>
+  );
+}
+
+function formatThinkingDuration(durationMs: number): string {
+  return `${Math.max(0, Math.round(durationMs / 1000))} 秒`;
 }
