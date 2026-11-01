@@ -14,6 +14,7 @@ import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.PathManager
 import dev.pi.jetbrains.editor.ToolFileRefresher
+import dev.pi.jetbrains.editor.ProjectFileCollector
 import dev.pi.jetbrains.rpc.PiClient
 import dev.pi.jetbrains.rpc.PiEvent
 import dev.pi.jetbrains.rpc.PiJson
@@ -305,22 +306,7 @@ class PiChatService(private val project: Project) : Disposable {
     /** Returns project-relative regular files used by the composer @ reference picker. */
     fun projectFiles(): List<String> {
         val base = projectWorkDir() ?: return emptyList()
-        val excluded = setOf(
-            ".git", ".idea", ".gradle", ".intellijPlatform", "node_modules", "build", "dist", "out", "target",
-        )
-        return runCatching {
-            Files.walk(base).use { paths ->
-                paths
-                    .filter { path ->
-                        path != base && Files.isRegularFile(path) &&
-                            base.relativize(path).none { it.fileName.toString() in excluded }
-                    }
-                    .map { base.relativize(it).toString().replace('\\', '/') }
-                    .sorted()
-                    .limit(MAX_PROJECT_FILES.toLong())
-                    .toList()
-            }
-        }.getOrDefault(emptyList())
+        return ProjectFileCollector.collect(base)
     }
 
     fun setEditorContext(context: String?) {
@@ -702,6 +688,5 @@ class PiChatService(private val project: Project) : Disposable {
         private const val RECOVERY_DELAY_MS = 500L
         private const val RECOVERY_START_WAIT_MS = 250L
         private const val RECOVERY_START_WAIT_ATTEMPTS = 40
-        private const val MAX_PROJECT_FILES = 5000
     }
 }

@@ -326,6 +326,28 @@ describe("App", () => {
     );
   });
 
+  it("completes a visuals HTML reference after a skill command", async () => {
+    render(<App />);
+    await waitFor(() => expect(window.__piDeliver).toBeDefined());
+
+    deliver(
+      { type: "status", status: { phase: "running", message: "ready", model: "m" } },
+      { type: "files", files: ["api/agent.py", "visuals/agent-flow.html"] },
+    );
+
+    const input = (await screen.findByPlaceholderText(/Send a message to pi/)) as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "/skill:drawio-skill 画一下 @agent" } });
+    fireEvent.click(await screen.findByRole("option", { name: /visuals\/agent-flow\.html/ }));
+    expect(input.value).toBe("/skill:drawio-skill 画一下 @visuals/agent-flow.html ");
+
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() =>
+      expect(window.__piSent?.filter((message) => message.type === "prompt")).toEqual([
+        { type: "prompt", message: "/skill:drawio-skill 画一下 @visuals/agent-flow.html" },
+      ]),
+    );
+  });
+
   it("opens the current session tree with /tree", async () => {
     render(<App />);
     await waitFor(() => expect(window.__piDeliver).toBeDefined());
