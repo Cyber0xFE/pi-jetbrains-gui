@@ -44,6 +44,25 @@ describe("ToolCard", () => {
     expect(window.__piSent).toEqual([{ type: "open_path", path: "src/index.ts" }]);
   });
 
+  it("collapses long read output by default", () => {
+    render(
+      card({
+        callId: "read-long",
+        name: "read",
+        status: "done",
+        args: { path: "SKILL.md" },
+        output: "line 1\nline 2\nline 3\nline 4",
+      }),
+    );
+
+    const summary = screen.getByText("content · 4 lines");
+    const details = summary.closest("details");
+    expect(details?.open).toBe(false);
+
+    fireEvent.click(summary);
+    expect(details?.open).toBe(true);
+  });
+
   it("shows the authoritative diff from tool details and jumps to a line", () => {
     render(
       card({

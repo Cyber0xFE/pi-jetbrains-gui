@@ -122,7 +122,12 @@ function readView(tool: ToolState): ToolView {
         {range !== undefined && <span className="chip">{range}</span>}
       </>
     ),
-    body: tool.output ? <pre className="tool-output">{truncateToolText(tool.output)}</pre> : null,
+    body: tool.output ? (
+      <details className="tool-section" open={tool.isError || tool.output.split("\n").length <= 3}>
+        <summary>{tool.isError ? "error" : `content · ${tool.output.split("\n").length} lines`}</summary>
+        <pre className={`tool-output${tool.isError ? " tool-output-error" : ""}`}>{truncateToolText(tool.output)}</pre>
+      </details>
+    ) : null,
   };
 }
 
@@ -287,14 +292,28 @@ function grepView(tool: ToolState): ToolView {
       tool.isError && tool.output ? (
         <pre className="tool-output tool-output-error">{truncateToolText(tool.output)}</pre>
       ) : hits.length > 0 ? (
-        <div className="hits">
-          {hits.map((hit, index) => (
-            <div key={index} className="hit">
-              <PathLink path={hit.path} line={hit.line} label={`${hit.path}:${hit.line}`} className="hit-path" />
-              <span className="hit-text">{hit.text}</span>
+        hits.length > 3 ? (
+          <details className="tool-section">
+            <summary>{hits.length} hit(s)</summary>
+            <div className="hits">
+              {hits.map((hit, index) => (
+                <div key={index} className="hit">
+                  <PathLink path={hit.path} line={hit.line} label={`${hit.path}:${hit.line}`} className="hit-path" />
+                  <span className="hit-text">{hit.text}</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </details>
+        ) : (
+          <div className="hits">
+            {hits.map((hit, index) => (
+              <div key={index} className="hit">
+                <PathLink path={hit.path} line={hit.line} label={`${hit.path}:${hit.line}`} className="hit-path" />
+                <span className="hit-text">{hit.text}</span>
+              </div>
+            ))}
+          </div>
+        )
       ) : tool.output ? (
         <pre className="tool-output">{truncateToolText(tool.output)}</pre>
       ) : null,
@@ -346,9 +365,15 @@ function findView(tool: ToolState): ToolView {
 
 function lsView(tool: ToolState): ToolView {
   const path = stringField(tool.args, "path");
+  const lines = tool.output?.split("\n").length ?? 0;
   return {
     title: <PathLink path={path ?? "."} label={path ?? "cwd"} />,
-    body: tool.output ? <pre className="tool-output">{truncateToolText(tool.output)}</pre> : null,
+    body: tool.output ? (
+      <details className="tool-section" open={tool.isError || lines <= 3}>
+        <summary>{tool.isError ? "error" : `content · ${lines} lines`}</summary>
+        <pre className={`tool-output${tool.isError ? " tool-output-error" : ""}`}>{truncateToolText(tool.output)}</pre>
+      </details>
+    ) : null,
   };
 }
 
