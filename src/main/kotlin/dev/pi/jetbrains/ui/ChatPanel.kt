@@ -75,6 +75,7 @@ class ChatPanel(
     private val project: Project,
     private val service: PiChatService,
     private val activateSession: (String) -> Boolean,
+    private val onStatusChanged: (PiChatService.Status) -> Unit = {},
 ) : JPanel(BorderLayout()), Disposable {
     val sessionFile: String? get() = service.status.value.sessionFile
 
@@ -173,6 +174,7 @@ class ChatPanel(
         }
         scope.launch {
             service.status.collect { status ->
+                onStatusChanged(status)
                 bridge?.send(HostMessages.status(status))
                 if (status.phase == PiChatService.Phase.RUNNING) maybeHydrate()
             }
