@@ -1,3 +1,8 @@
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardCopyOption
+import java.net.URLClassLoader
+
 plugins {
     kotlin("jvm") version "2.0.21"
     kotlin("plugin.serialization") version "2.0.21"
@@ -170,4 +175,72 @@ val dumpRpcSchema by tasks.registering(Exec::class) {
 
 tasks.named("check") {
     dependsOn(dumpRpcSchema)
+}
+
+// Local development: deploy only after the ZIP was built successfully (including UP-TO-DATE builds).
+tasks.named<Zip>("buildPlugin") {
+    doLast {
+        if (providers.gradleProperty("installLocalPlugin").orElse("true").get() != "false") {
+            val configuredDirs = providers.gradleProperty("localIdePluginDirs").orNull
+            val jetBrainsDir = System.getenv("APPDATA")?.let { file("$it/JetBrains") }
+            val pluginDirs = if (configuredDirs != null) {
+                configuredDirs.split(';').filter { it.isNotBlank() }.map { file(it.trim()) }
+            } else {
+                jetBrainsDir?.listFiles().orEmpty()
+                    .filter { it.isDirectory && it.name.matches(Regex("(IntelliJIdea|IdeaIC|PyCharm|PyCharmCE)\\d{4}\\.\\d+")) }
+                    .filter {
+                        val (year, release) = Regex("(\\d{4})\\.(\\d+)$").find(it.name)!!.destructured
+                        year.toInt() > 2024 || (year.toInt() == 2024 && release.toInt() >= 2)
+                    }
+                    .map { it.resolve("plugins") }
+            }
+            if (pluginDirs.isEmpty()) {
+                logger.lifecycle("No local IDEA/PyCharm profiles found; skipping plugin installation.")
+            }
+            pluginDirs.distinctBy { it.canonicalPath }.forEach { pluginsDir ->
+                // Use the target IDE's own startup commands and class definitions. Loaded JARs
+                // stay untouched; IDEA applies the same commands it uses for Install from Disk.
+                val localAppData = System.getenv("LOCALAPPDATA")
+                    ?: throw GradleException("LOCALAPPDATA is required for local IDE installation.")
+                val systemDir = file("$localAppData/JetBrains/${pluginsDir.parentFile.name}")
+                val homeFile = systemDir.resolve(".home")
+                check(homeFile.isFile) { "Cannot locate IDE home: $homeFile. Launch this IDE once first." }
+                val ideLib = file(homeFile.readText().trim()).resolve("lib")
+                val jars = ideLib.listFiles().orEmpty().filter { it.extension == "jar" }
+                check(jars.isNotEmpty()) { "Cannot locate IDE libraries: $ideLib" }
+                URLClassLoader(jars.map { it.toURI().toURL() }.toTypedArray(), ClassLoader.getPlatformClassLoader()).use { loader ->
+                    val managerName = "com.intellij.ide.startup.StartupActionScriptManager"
+                    val manager = loader.loadClass(managerName)
+                    val pathType = Path::class.java
+                    val deleteCommand = loader.loadClass("$managerName\$DeleteCommand").getConstructor(pathType)
+                    val unzipCommand = loader.loadClass("$managerName\$UnzipCommand").getConstructor(pathType, pathType)
+                    val startupDir = systemDir.resolve("plugins").toPath()
+                    Files.createDirectories(startupDir)
+                    val script = startupDir.resolve("action.script")
+                    val previousBytes = if (Files.exists(script)) Files.readAllBytes(script) else null
+                    val commands = (manager.getMethod("loadActionScript", pathType).invoke(null, script) as List<*>).toMutableList()
+                    val stagedZip = Files.createTempFile(startupDir, "pi-local-update-", ".zip")
+                    val stagedScript = Files.createTempFile(startupDir, "pi-local-script-", ".tmp")
+                    try {
+                        Files.copy(archiveFile.get().asFile.toPath(), stagedZip, StandardCopyOption.REPLACE_EXISTING)
+                        commands.add(deleteCommand.newInstance(pluginsDir.resolve(project.name).toPath()))
+                        commands.add(unzipCommand.newInstance(stagedZip, pluginsDir.toPath()))
+                        commands.add(deleteCommand.newInstance(stagedZip))
+                        manager.getMethod("saveActionScript", List::class.java, pathType).invoke(null, commands, stagedScript)
+                        val currentBytes = if (Files.exists(script)) Files.readAllBytes(script) else null
+                        check(previousBytes.contentEquals(currentBytes)) { "IDE changed the update queue during installation. Run buildPlugin again." }
+                        Files.move(stagedScript, script, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+                    } catch (failure: Exception) {
+                        Files.deleteIfExists(stagedZip)
+                        throw GradleException("Could not queue plugin update for $pluginsDir", failure)
+                    } finally {
+                        Files.deleteIfExists(stagedScript)
+                    }
+                    logger.lifecycle("Queued plugin update for $pluginsDir. Restart this IDE to apply it.")
+                }
+            }
+        }
+    }
+    // Deployment must run even when the archive itself hasn't changed.
+    outputs.upToDateWhen { false }
 }

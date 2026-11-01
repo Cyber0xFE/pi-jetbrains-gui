@@ -50,6 +50,10 @@ Windows PowerShell：
 
 插件包会生成在 `build/distributions/`。Gradle 构建会自动安装 webview 依赖，并将 React/TypeScript 前端打包进插件资源。
 
+Windows 本机构建成功后，还会自动为 `%APPDATA%/JetBrains/` 下已有的 IntelliJ IDEA 和 PyCharm 配置目录（2024.2 及以上版本）安排插件更新。使用各 IDE 自带的启动更新队列，保留其他待安装插件，不覆盖运行中占用的 JAR。重启对应 IDE 时自动安装；构建不会自动关闭 IDE。构建日志中的 `Queued plugin update` 表示更新已排队，尚未在运行中的 IDE 生效。
+
+仅打包、不安装：`./gradlew buildPlugin -PinstallLocalPlugin=false`。指定本机配置目录可传 `-PlocalIdePluginDirs=目录1;目录2`（PowerShell 中请将整个参数加引号）；这里填写的是各 IDE 的 `plugins` 目录，须有对应的 `%LOCALAPPDATA%/JetBrains/<配置目录名>/.home` 记录。自定义缓存路径暂不支持。
+
 ## 使用
 
 1. 在 IDE 中安装构建生成的 ZIP 插件，或使用 `runIde` 启动开发 IDE。
