@@ -391,8 +391,11 @@ describe("App", () => {
     fireEvent.change(input, { target: { value: "/co" } });
     expect(await screen.findByRole("listbox", { name: "Slash commands" })).toBeDefined();
 
+    fireEvent.change(input, { target: { value: "/vie" } });
+    expect(await screen.findByText("/review")).toBeDefined();
+
     fireEvent.keyDown(input, { key: "Enter" });
-    await waitFor(() => expect(input.value).toBe("/compact "));
+    await waitFor(() => expect(input.value).toBe("/review "));
     expect(window.__piSent?.filter((message) => message.type === "prompt")).toEqual([]);
 
     fireEvent.change(input, { target: { value: "/compact" } });

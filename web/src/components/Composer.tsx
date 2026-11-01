@@ -86,7 +86,10 @@ export function Composer({
   const matches = useMemo(() => {
     if (query === null) return [];
     return availableCommands
-      .filter((command) => command.name.toLowerCase().startsWith(query))
+      .filter((command) => {
+        const searchable = `${command.name} ${command.description ?? ""}`.toLowerCase();
+        return searchable.includes(query);
+      })
       .slice(0, MAX_SUGGESTIONS);
   }, [availableCommands, query]);
 
