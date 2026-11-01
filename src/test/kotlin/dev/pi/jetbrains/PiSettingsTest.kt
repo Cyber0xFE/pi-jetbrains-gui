@@ -1,0 +1,37 @@
+package dev.pi.jetbrains
+
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
+
+class PiSettingsTest {
+    @Test
+    fun `default and blank proxy preserve inherited environment`() {
+        val settings = PiSettings()
+        assertTrue(settings.processEnvironment().isEmpty())
+
+        settings.getState().networkProxy = "   "
+        assertTrue(settings.processEnvironment().isEmpty())
+    }
+
+    @Test
+    fun `configured proxy sets both standard variables and trims whitespace`() {
+        val settings = PiSettings()
+        settings.getState().networkProxy = "  http://127.0.0.1:7890  "
+
+        assertEquals(
+            mapOf("HTTP_PROXY" to "http://127.0.0.1:7890", "HTTPS_PROXY" to "http://127.0.0.1:7890"),
+            settings.processEnvironment(),
+        )
+    }
+
+    @Test
+    fun `loaded settings restore proxy and clearing removes overrides`() {
+        val settings = PiSettings()
+        settings.loadState(PiSettings.State(networkProxy = "http://localhost:8080"))
+        assertEquals("http://localhost:8080", settings.processEnvironment()["HTTPS_PROXY"])
+
+        settings.getState().networkProxy = ""
+        assertTrue(settings.processEnvironment().isEmpty())
+    }
+}

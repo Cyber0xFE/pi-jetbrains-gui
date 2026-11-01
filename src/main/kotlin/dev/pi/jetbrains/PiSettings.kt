@@ -1,5 +1,7 @@
 package dev.pi.jetbrains
 
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.util.messages.Topic
 import com.intellij.openapi.actionSystem.KeyboardShortcut
 import com.intellij.openapi.keymap.ex.KeymapManagerEx
 import com.intellij.openapi.components.PersistentStateComponent
@@ -26,12 +28,17 @@ private val PrettyPiJson = Json(PiJson) {
     prettyPrintIndent = "  "
 }
 
+fun interface PiNetworkProxyListener {
+    fun networkProxyChanged()
+}
+
 /** User-level runtime and approval settings for the pi integration. */
 @Service(Service.Level.APP)
 @State(name = "PiJetBrainsSettings", storages = [Storage("pi-jetbrains.xml")])
 class PiSettings : PersistentStateComponent<PiSettings.State> {
     data class State(
         var nodePath: String = "",
+        var networkProxy: String = "",
         /** Retained for compatibility with existing settings files; no approval extension is loaded. */
         var approvalsEnabled: Boolean = false,
         var approveBash: Boolean = false,
@@ -50,6 +57,16 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
 
     override fun loadState(loadedState: State) {
         state = loadedState
+    }
+
+    /** Only overrides inherited proxy variables when a proxy is explicitly configured. */
+    fun processEnvironment(): Map<String, String> {
+        val proxy = state.networkProxy.trim()
+        return if (proxy.isEmpty()) emptyMap() else mapOf("HTTP_PROXY" to proxy, "HTTPS_PROXY" to proxy)
+    }
+
+    fun notifyNetworkProxyChanged() {
+        ApplicationManager.getApplication().messageBus.syncPublisher(NETWORK_PROXY_CHANGED).networkProxyChanged()
     }
 
     /**
@@ -118,6 +135,7 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
     }
 
     companion object {
+        val NETWORK_PROXY_CHANGED = Topic.create("Pi network proxy changed", PiNetworkProxyListener::class.java)
         const val SHOW_PI_TOOL_WINDOW_ACTION_ID = "dev.pi.jetbrains.ShowPiToolWindow"
 
         private fun piAgentSettingsPath(): Path = Paths.get(

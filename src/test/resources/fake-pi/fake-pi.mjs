@@ -21,6 +21,15 @@ function handle(line) {
 
 	const id = command.id;
 	switch (command.type) {
+		case "get_proxy_environment":
+			send({
+				id,
+				type: "response",
+				command: command.type,
+				success: true,
+				data: { HTTP_PROXY: process.env.HTTP_PROXY ?? null, HTTPS_PROXY: process.env.HTTPS_PROXY ?? null },
+			});
+			return;
 		case "get_state":
 			send({
 				id,

@@ -32,13 +32,19 @@ import dev.pi.jetbrains.runtime.PiPackageResolver
 import dev.pi.jetbrains.runtime.PiResolution
 import dev.pi.jetbrains.session.SessionIndex
 import dev.pi.jetbrains.session.SessionSummary
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -130,6 +136,7 @@ class PiChatService(private val project: Project) : Disposable {
     private var startJob: Job? = null
     private var heartbeatJob: Job? = null
     private var recoveryJob: Job? = null
+    private var proxyRestartJob: Job? = null
 
     @Volatile
     private var client: PiClient? = null
@@ -144,6 +151,10 @@ class PiChatService(private val project: Project) : Disposable {
     private var stopRequested = false
 
     init {
+        ApplicationManager.getApplication().messageBus.connect(this).subscribe(
+            PiSettings.NETWORK_PROXY_CHANGED,
+            PiNetworkProxyListener { restartForNetworkProxy() },
+        )
         EditorFactory.getInstance().eventMulticaster.addSelectionListener(selectionListener, this)
         ApplicationManager.getApplication().invokeLater { refreshEditorContext() }
     }
@@ -187,9 +198,11 @@ class PiChatService(private val project: Project) : Disposable {
                 installation.cliEntry.toString(),
                 "--mode", "rpc",
             )
+            currentCoroutineContext().ensureActive()
             val process = PiProcess(
                 command = command,
                 workDir = workDir,
+                environment = PiSettings.get().processEnvironment(),
                 log = { diagnosticLog("[${project.name}] $it") },
             )
             lateinit var startedClient: PiClient
@@ -202,16 +215,23 @@ class PiChatService(private val project: Project) : Disposable {
                 },
             )
             val newClient = startedClient
-            client = newClient
-            forwardJob = scope.launch {
-                newClient.events.collect { event ->
-                    updateStatusFromEvent(event)
-                    fileRefresher.onEvent(event)
-                    _events.emit(event)
+            val startContext = currentCoroutineContext()
+            val spawned = synchronized(this@PiChatService) {
+                // Cancellation and detachment must not race with registering/spawning a client.
+                startContext.ensureActive()
+                client = newClient
+                forwardJob = scope.launch {
+                    newClient.events.collect { event ->
+                        updateStatusFromEvent(event)
+                        fileRefresher.onEvent(event)
+                        _events.emit(event)
+                    }
                 }
+                newClient.start()
             }
+            startContext.ensureActive()
 
-            if (!newClient.start()) {
+            if (!spawned) {
                 client = null
                 forwardJob?.cancel()
                 return@launch fail("failed to start node process")
@@ -237,15 +257,52 @@ class PiChatService(private val project: Project) : Disposable {
                     pendingRecoverySession = null
                 }
                 if (_status.value.phase == Phase.RUNNING) startHeartbeat()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (t: Throwable) {
                 fail("get_state failed: ${t.message}")
             }
         }
     }
 
+    /** Restarts active tabs off the EDT, closing the old writer before restoring its session. */
+    private fun restartForNetworkProxy() {
+        if (_status.value.phase != Phase.STARTING && _status.value.phase != Phase.RUNNING) return
+        val sessionPath = pendingRecoverySession ?: _status.value.sessionFile
+        val previousStart = startJob
+        val previousRestart = proxyRestartJob
+        val active = detachClient()
+        pendingRecoverySession = sessionPath
+        _status.update { it.copy(phase = Phase.STARTING, message = "applying network proxy; restarting pi…") }
+        proxyRestartJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            // Even if stopped or reconfigured again, release the detached process off the EDT.
+            withContext(Dispatchers.IO + NonCancellable) {
+                previousRestart?.join()
+                previousStart?.join()
+                active?.close()
+            }
+            currentCoroutineContext().ensureActive()
+            _status.update { it.copy(phase = Phase.STOPPED, message = "restarting pi…") }
+            start()
+        }
+    }
+
     /** Stops the child process; safe to call from the EDT. */
     fun stop() {
+        val active = detachClient()
+        pendingRecoverySession = null
+        if (active != null) {
+            // Termination blocks until the process is gone, so keep it off the caller's thread.
+            thread(name = "pi-stop", isDaemon = true) { active.close() }
+        }
+        _status.update { it.copy(phase = Phase.STOPPED, message = "stopped", retry = null) }
+    }
+
+    @Synchronized
+    private fun detachClient(): PiClient? {
         stopRequested = true
+        proxyRestartJob?.cancel()
+        proxyRestartJob = null
         startJob?.cancel()
         startJob = null
         heartbeatJob?.cancel()
@@ -258,11 +315,7 @@ class PiChatService(private val project: Project) : Disposable {
 
         val active = client
         client = null
-        if (active != null) {
-            // Termination blocks until the process is gone, so keep it off the caller's thread.
-            thread(name = "pi-stop", isDaemon = true) { active.close() }
-        }
-        _status.update { it.copy(phase = Phase.STOPPED, message = "stopped", retry = null) }
+        return active
     }
 
     /** Sends `get_state` and refreshes the status line. */

@@ -1,5 +1,6 @@
 package dev.pi.jetbrains.rpc
 
+import dev.pi.jetbrains.PiSettings
 import dev.pi.jetbrains.runtime.CommandRunner
 import dev.pi.jetbrains.session.SessionTree
 import kotlinx.coroutines.CompletableDeferred
@@ -55,6 +56,23 @@ class PiClientTest {
         assertEquals("fake-session", state?.sessionId)
         assertEquals("fake-model", state?.model?.id)
         assertEquals("high", state?.thinkingLevel)
+    }
+
+    @Test
+    fun `injects proxy settings into the child and replacement processes`() = runBlocking {
+        val settings = PiSettings()
+        for (proxy in listOf("http://127.0.0.1:7890", "http://localhost:8080", "")) {
+            settings.getState().networkProxy = proxy
+            val client = startClient(environment = settings.processEnvironment())
+            val response = withTimeout(TIMEOUT_MS) {
+                client.send(RpcCommand(type = "get_proxy_environment")).await()
+            }
+            assertTrue(response.success)
+            val environment = response.data as JsonObject
+            assertEquals(proxy.ifEmpty { System.getenv("HTTP_PROXY") }, environment.string("HTTP_PROXY"))
+            assertEquals(proxy.ifEmpty { System.getenv("HTTPS_PROXY") }, environment.string("HTTPS_PROXY"))
+            client.close()
+        }
     }
 
     @Test
@@ -203,11 +221,13 @@ class PiClientTest {
     private fun startClient(
         onExit: (Int?) -> Unit = {},
         requestTimeout: Duration = Duration.ofSeconds(30),
+        environment: Map<String, String> = emptyMap(),
     ): PiClient {
         val script = copyScript()
         val process = PiProcess(
             command = listOf("node", script.toString()),
             workDir = tempDir,
+            environment = environment,
             log = { println("[fake-pi] $it") },
         )
         val created = PiClient(
