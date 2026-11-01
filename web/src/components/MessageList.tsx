@@ -27,6 +27,7 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
   const stickToBottom = useRef(true);
   const scrollFrame = useRef<number | null>(null);
   const previousScrollTop = useRef(0);
+  const messageOffsets = useRef<Array<{ id: string; top: number }> | null>(null);
   useSmoothWheelScroll(scroller, (delta) => {
     previousScrollTop.current = scroller.current?.scrollTop ?? 0;
     if (delta < 0) stickToBottom.current = false;
@@ -104,6 +105,19 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
     if (scrollFrame.current !== null) window.cancelAnimationFrame(scrollFrame.current);
   }, []);
 
+  // Cache message positions between layout changes. Reading every message's bounds on every
+  // animation frame forces layout work into the wheel animation, even in an idle conversation.
+  useEffect(() => { messageOffsets.current = null; }, [visible, tools]);
+  const firstVisibleId = visible[0]?.id;
+  useEffect(() => {
+    const element = scroller.current;
+    if (!element || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => { messageOffsets.current = null; });
+    observer.observe(element);
+    element.querySelectorAll(".message").forEach((message) => observer.observe(message));
+    return () => observer.disconnect();
+  }, [firstVisibleId, visible.length]);
+
   const updateScrollPosition = (): void => {
     const element = scroller.current;
     if (!element) return;
@@ -117,10 +131,15 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
       setShowLatestButton(nextLatestButtonVisible);
     }
 
-    const containerTop = element.getBoundingClientRect().top;
+    const offsets = messageOffsets.current ??= Array.from(
+      element.querySelectorAll<HTMLElement>(".message-user[data-message-id]"),
+      (message) => ({ id: message.dataset.messageId!, top: message.offsetTop }),
+    );
+    const threshold = element.scrollTop + 96;
     let current: string | null = null;
-    for (const message of Array.from(element.querySelectorAll<HTMLElement>(".message-user[data-message-id]"))) {
-      if (message.getBoundingClientRect().top <= containerTop + 96) current = message.dataset.messageId ?? current;
+    for (const message of offsets) {
+      if (message.top > threshold) break;
+      current = message.id;
     }
     if (current && current !== activeMessageId) setActiveMessageId(current);
   };
@@ -269,20 +288,20 @@ export function MessageList({ messages, tools, loadingHistory, emptyHint, thinki
             <AnimatedEllipsis className="connecting-ellipsis" />
           </div>
         )}
-        {showLatestButton && (
-          <button
-            type="button"
-            className="latest-button"
-            onClick={scrollToLatest}
-            title="Back to latest"
-            aria-label="Back to latest"
-          >
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-              <path d="M12 5v14m-6-6 6 6 6-6" />
-            </svg>
-          </button>
-        )}
       </div>
+      {showLatestButton && (
+        <button
+          type="button"
+          className="latest-button"
+          onClick={scrollToLatest}
+          title="Back to latest"
+          aria-label="Back to latest"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+            <path d="M12 5v14m-6-6 6 6 6-6" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }

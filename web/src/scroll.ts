@@ -1,17 +1,21 @@
 import { useEffect, useRef, type RefObject } from "react";
 
 const WHEEL_MULTIPLIER = 1.75;
-const RESPONSE_MS = 45;
+const RESPONSE_MS = 80;
 
-/** One animation owns each wheel gesture; never mix scrollTop jumps with native scrolling. */
+/**
+ * One animation owns each wheel gesture; never mix scrollTop jumps with native scrolling.
+ * Wheel input is direct viewport control. Keep it smooth when the OS disables decorative
+ * animation, which otherwise turns each physical mouse notch into a visible jump in JCEF.
+ */
 export function installSmoothWheelScroll(root: HTMLElement, onIntent?: (delta: number) => void): () => void {
   let frame: number | null = null;
   let scroller = root;
   let target = 0;
+  let position = 0;
   let lastTop = 0;
   let lastTime = 0;
   let direction = 0;
-  const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
   const clamp = (value: number): number => Math.max(0, Math.min(value, scroller.scrollHeight - scroller.clientHeight));
 
   const stop = (): void => {
@@ -25,15 +29,15 @@ export function installSmoothWheelScroll(root: HTMLElement, onIntent?: (delta: n
       stop();
       return;
     }
-    target = clamp(target);
-    const remaining = target - scroller.scrollTop;
+    const remaining = target - position;
     const elapsed = Math.max(0, now - lastTime);
     lastTime = now;
-    scroller.scrollTop = Math.abs(remaining) <= 1
-      ? target
-      : scroller.scrollTop + Math.sign(remaining) * Math.max(1, Math.abs(remaining) * (1 - Math.exp(-elapsed / RESPONSE_MS)));
+    // Integrate subpixel positions independently of the browser's integer pixel rounding.
+    // This keeps the tail consistent on high refresh rate displays as well as in JCEF.
+    position = Math.abs(remaining) <= 0.5 ? target : position + remaining * (1 - Math.exp(-elapsed / RESPONSE_MS));
+    scroller.scrollTop = position;
     lastTop = scroller.scrollTop;
-    if (Math.abs(target - lastTop) <= 1) {
+    if (Math.abs(target - position) <= 0.5) {
       scroller.scrollTop = target;
       frame = null;
     } else {
@@ -43,7 +47,7 @@ export function installSmoothWheelScroll(root: HTMLElement, onIntent?: (delta: n
 
   const wheel = (event: WheelEvent): void => {
     if (event.defaultPrevented || !event.cancelable || event.ctrlKey || event.metaKey || event.shiftKey ||
-        event.deltaY === 0 || Math.abs(event.deltaX) > Math.abs(event.deltaY) || reducedMotion?.matches) {
+        event.deltaY === 0 || Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
       stop();
       return;
     }
@@ -71,6 +75,7 @@ export function installSmoothWheelScroll(root: HTMLElement, onIntent?: (delta: n
       stop();
       scroller = next;
       target = scroller.scrollTop;
+      position = target;
     }
     direction = nextDirection;
     const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? scroller.clientHeight : 1;

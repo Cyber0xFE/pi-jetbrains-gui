@@ -129,6 +129,16 @@ describe("smooth wheel scrolling", () => {
     expect(root.scrollTop).toBe(193);
   });
 
+  it.each([30, 60, 120, 144])("keeps motion consistent at %i frames per second", (fps) => {
+    wheel(100);
+    const fullFrames = Math.floor(fps / 10);
+    for (let step = 0; step < fullFrames; step += 1) tick(1000 / fps);
+    if (now < 100) tick(100 - now);
+    expect(root.scrollTop).toBeCloseTo(175 * (1 - Math.exp(-100 / 80)));
+    finish();
+    expect(root.scrollTop).toBe(175);
+  });
+
   it("scrolls nested tool output without moving the transcript", () => {
     const output = surface(900, 200);
     output.style.overflowY = "auto";
@@ -151,12 +161,16 @@ describe("smooth wheel scrolling", () => {
     },
   );
 
-  it("respects reduced motion", () => {
+  it("smooths explicit wheel input even when the OS disables decorative animations", () => {
     dispose();
     vi.stubGlobal("matchMedia", () => ({ matches: true }));
     dispose = installSmoothWheelScroll(root);
-    expect(wheel(100).defaultPrevented).toBe(false);
-    expect(frames.size).toBe(0);
+    expect(wheel(100).defaultPrevented).toBe(true);
+    tick();
+    expect(root.scrollTop).toBeGreaterThan(0);
+    expect(root.scrollTop).toBeLessThan(175);
+    finish();
+    expect(root.scrollTop).toBe(175);
   });
 
   it.each(["pointerdown", "keydown"])("yields to %s and cleans up on unmount", (type) => {

@@ -84,3 +84,44 @@ it("keeps streaming updates from pulling an upward wheel gesture back to the bot
   view.rerender(<MessageList {...props} tools={{}} />);
   expect(log.scrollTop).toBe(readingPosition);
 });
+
+it("reuses navigation offsets while scrolling and keeps the latest button outside the transcript layout", () => {
+  let pending: FrameRequestCallback | null = null;
+  vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+    pending = callback;
+    return 1;
+  });
+  vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => { pending = null; });
+  const messages: ChatMessage[] = Array.from({ length: 3 }, (_, index) => ({
+    id: `user-${index}`, role: "user", blocks: [{ kind: "text", text: `Question ${index}` }],
+    timestamp: index, streaming: false,
+  }));
+  const props = { messages, tools: {}, loadingHistory: false, emptyHint: "", thinkingLabel: null, connecting: false };
+  const view = render(<MessageList {...props} />);
+  const log = view.getByRole("log");
+  Object.defineProperties(log, { scrollHeight: { value: 2000 }, clientHeight: { value: 400 } });
+  const positions = Array.from(log.querySelectorAll(".message-user"), (message, index) => {
+    const read = vi.fn(() => index * 600);
+    Object.defineProperty(message, "offsetTop", { get: read });
+    return read;
+  });
+  const scroll = (top: number): void => {
+    log.scrollTop = top;
+    fireEvent.scroll(log);
+    act(() => { pending?.(16); });
+  };
+  scroll(650);
+  positions.forEach((read) => expect(read).toHaveBeenCalledTimes(1));
+  scroll(700);
+  scroll(800);
+  positions.forEach((read) => expect(read).toHaveBeenCalledTimes(1));
+  const latest = view.getByRole("button", { name: "Back to latest" });
+  expect(log.contains(latest)).toBe(false);
+  expect(view.getByRole("button", { name: "Jump to user message 2: Question 1" }).getAttribute("aria-current")).toBe("location");
+
+  // A content update invalidates the positions for the next scroll.
+  view.rerender(<MessageList {...props} messages={[...messages]} />);
+  scroll(1250);
+  positions.forEach((read) => expect(read).toHaveBeenCalledTimes(2));
+  expect(view.getByRole("button", { name: "Jump to user message 3: Question 2" }).getAttribute("aria-current")).toBe("location");
+});

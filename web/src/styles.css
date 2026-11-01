@@ -365,6 +365,7 @@ body {
 }
 
 .conversation-shell {
+  position: relative;
   display: flex;
   flex: 1 1 auto;
   min-width: 0;
@@ -586,8 +587,8 @@ body {
 }
 
 .latest-button {
-  position: sticky;
-  right: 0;
+  position: absolute;
+  right: 16px;
   bottom: 8px;
   align-self: flex-end;
   display: flex;
