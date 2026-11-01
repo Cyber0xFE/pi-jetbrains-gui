@@ -96,6 +96,8 @@ export interface ChatState {
   notices: Notice[];
   noticeSeq: number;
   historyLoading: boolean;
+  /** Changes on reset even when reset and history arrive in the same render batch. */
+  transcriptGeneration: number;
   /** `extension_ui_request` / `setHiddenThinkingLabel`; null means the default label. */
   thinkingLabel: string | null;
   /** Cache-read share of the latest assistant prompt (`CH` in the TUI footer). */
@@ -127,6 +129,7 @@ export const initialState: ChatState = {
   notices: [],
   noticeSeq: 0,
   historyLoading: true,
+  transcriptGeneration: 0,
   thinkingLabel: null,
   cacheHitRate: null,
   extensionStatuses: {},
@@ -227,6 +230,7 @@ function resetTranscript(state: ChatState): ChatState {
     busy: false,
     sending: false,
     historyLoading: true,
+    transcriptGeneration: state.transcriptGeneration + 1,
     cacheHitRate: null,
   };
 }

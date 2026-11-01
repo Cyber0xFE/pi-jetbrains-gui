@@ -259,6 +259,7 @@ export function App(): JSX.Element {
         <div className="extension-widget" key={`above:${index}`}>{widget.lines.map((line, lineIndex) => <div key={lineIndex}>{line}</div>)}</div>
       ))}
       <MessageList
+        key={state.transcriptGeneration}
         messages={state.messages}
         files={state.files}
         tools={state.tools}

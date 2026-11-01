@@ -374,6 +374,9 @@ describe("sessionReducer", () => {
     expect(state.busy).toBe(false);
     expect(state.streamingMessageId).toBeNull();
     expect(state.historyLoading).toBe(true);
+    expect(state.transcriptGeneration).toBe(populated.transcriptGeneration + 1);
+    const resetAgain = apply(state, { kind: "inbound", message: { type: "reset", reason: "switch" } });
+    expect(resetAgain.transcriptGeneration).toBe(state.transcriptGeneration + 1);
   });
 
   it("stores sessions, tree, models, thinking levels and commands", () => {

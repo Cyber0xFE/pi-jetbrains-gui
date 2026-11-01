@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import type { Inbound, Outbound } from "./types";
 
@@ -17,6 +17,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   delete window.__piNativePost;
   delete window.__piDeliver;
   delete window.__piSent;
@@ -176,6 +177,43 @@ describe("App", () => {
         { type: "switch_session", path: "/p/s2.jsonl" },
       ]),
     );
+  });
+
+  it.each([false, true])("opens history at the bottom after reading upward (batched reset: %s)", async (batched) => {
+    // jsdom has no layout: emulate the browser clamping scrollTop to the bottom.
+    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(2000);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(400);
+    const positions = new WeakMap<HTMLElement, number>();
+    vi.spyOn(HTMLElement.prototype, "scrollTop", "get").mockImplementation(function (this: HTMLElement) {
+      return positions.get(this) ?? 0;
+    });
+    vi.spyOn(HTMLElement.prototype, "scrollTop", "set").mockImplementation(function (this: HTMLElement, top: number) {
+      positions.set(this, Math.max(0, Math.min(top, this.scrollHeight - this.clientHeight)));
+    });
+    render(<App />);
+    await waitFor(() => expect(window.__piDeliver).toBeDefined());
+    deliver({ type: "history", final: true, messages: [{ role: "user", content: "old question", timestamp: 1 }] });
+    await screen.findByRole("button", { name: /Jump to user message 1: old question/ });
+    const oldLog = screen.getByRole("log");
+    expect(oldLog.scrollTop).toBe(1600);
+    oldLog.scrollTop = 600;
+    fireEvent.scroll(oldLog);
+    await screen.findByRole("button", { name: "Back to latest" });
+
+    deliver({ type: "reset", reason: "switch" });
+    if (!batched) await screen.findByText("loading transcript");
+    deliver({ type: "history", final: false, messages: [{ role: "user", content: "historical question", timestamp: 2 }] });
+    await screen.findByRole("button", { name: /Jump to user message 1: historical question/ });
+    const log = screen.getByRole("log");
+    expect(log).not.toBe(oldLog);
+    expect(log.scrollTop).toBe(1600);
+    expect(screen.queryByRole("button", { name: "Back to latest" })).toBeNull();
+
+    // A later chunk must remain pinned to the new bottom.
+    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(3000);
+    deliver({ type: "history", final: true, messages: [{ role: "assistant", content: "latest historical answer", timestamp: 3 }] });
+    await screen.findByText("latest historical answer");
+    expect(log.scrollTop).toBe(2600);
   });
 
   it("renames the current session from the session picker", async () => {
