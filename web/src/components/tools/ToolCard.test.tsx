@@ -40,8 +40,8 @@ describe("ToolCard", () => {
     expect(screen.getByText("40–49")).toBeDefined();
     expect(screen.getByText(/const x = 1;/)).toBeDefined();
 
-    fireEvent.click(screen.getByTitle("Open src/index.ts"));
-    expect(window.__piSent).toEqual([{ type: "open_path", path: "src/index.ts" }]);
+    fireEvent.click(screen.getByTitle("Open src/index.ts:40-49"));
+    expect(window.__piSent).toEqual([{ type: "open_path", path: "src/index.ts", line: 40, endLine: 49 }]);
   });
 
   it("collapses long read output by default", () => {

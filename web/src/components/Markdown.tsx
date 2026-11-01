@@ -125,8 +125,8 @@ export function Markdown({
 
   const handleClick = (event: MouseEvent<HTMLDivElement>): void => {
     const target = event.target as HTMLElement | null;
-    const fileReference = target?.closest<HTMLButtonElement>(".md-file-reference");
-    const buttonPath = fileReference?.dataset.filePath;
+    const fileReferenceButton = target?.closest<HTMLButtonElement>(".md-file-reference");
+    const buttonPath = fileReferenceButton?.dataset.filePath;
     if (buttonPath) {
       event.preventDefault();
       post({ type: "open_path", path: buttonPath });
@@ -157,10 +157,10 @@ export function Markdown({
       post({ type: "open_url", url: href });
       return;
     }
-    const filePath = filePathFromLink(href);
-    if (filePath) {
+    const fileReference = fileReferenceFromLink(href, anchor?.textContent ?? "");
+    if (fileReference) {
       event.preventDefault();
-      post({ type: "open_path", path: filePath });
+      post({ type: "open_path", ...fileReference });
       return;
     }
     // `#anchor`-style links have no target in a single-document webview. Keep other schemes
@@ -171,8 +171,10 @@ export function Markdown({
   return <div className="markdown" onClick={handleClick} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
-/** Returns a project/absolute file path for a Markdown link, or null for non-file links. */
-function filePathFromLink(href: string): string | null {
+type FileReference = { path: string; line?: number; endLine?: number };
+
+/** Returns a project/absolute file reference, including an optional `:line[-endLine]` suffix. */
+export function fileReferenceFromLink(href: string, label = ""): FileReference | null {
   const raw = href.trim();
   if (!raw || raw.startsWith("#") || raw.startsWith("//")) return null;
 
@@ -182,8 +184,8 @@ function filePathFromLink(href: string): string | null {
       if (url.protocol !== "file:") return null;
       const pathname = decodeURIComponent(url.pathname);
       if (!pathname) return null;
-      if (url.hostname && url.hostname !== "localhost") return `//${url.hostname}${pathname}`;
-      return /^[A-Za-z]:\//.test(pathname) ? pathname.slice(1) : pathname;
+      const path = url.hostname && url.hostname !== "localhost" ? `//${url.hostname}${pathname}` : pathname;
+      return withLocation(path, url.hash, label);
     } catch {
       return null;
     }
@@ -200,7 +202,51 @@ function filePathFromLink(href: string): string | null {
     path = pathPart;
   }
   if (!path || (/^[a-z][a-z\d+.-]*:/i.test(raw) && !/^[A-Za-z]:[\\/]/.test(path))) return null;
-  return path;
+  return withLocation(path, raw.slice(pathPart.length), label);
+}
+
+function withLocation(path: string, suffix: string, label: string): FileReference | null {
+  const pathLocation = parseLocationSuffix(path);
+  const fragmentLocation = parseLocationFragment(suffix);
+  const labelLocation = parseLocationSuffix(label);
+  const location = pathLocation ?? fragmentLocation ?? labelLocation;
+  const filePath = pathLocation?.path ?? path;
+  if (!filePath) return null;
+  const normalizedPath = /^\/[A-Za-z]:\//.test(filePath) || /^[A-Za-z]:\//.test(filePath)
+    ? filePath.replace(/^\//, "")
+    : filePath;
+  // Some Markdown producers put only the start line in href and keep the complete range in
+  // the link label. Preserve that end line when both references agree on the start line.
+  const endLine = location?.endLine ?? (
+    labelLocation?.line !== undefined && labelLocation.line === location?.line
+      ? labelLocation.endLine
+      : undefined
+  );
+  return location?.line === undefined
+    ? { path: normalizedPath }
+    : { path: normalizedPath, line: location.line, ...(endLine === undefined ? {} : { endLine }) };
+}
+
+function parseLocationSuffix(value: string): { path: string; line: number; endLine?: number } | null {
+  const match = /^(.*?):(\d+)(?:-(\d+))?$/.exec(value.trim());
+  if (!match?.[1]) return null;
+  const line = Number(match[2]);
+  const endLine = match[3] === undefined ? undefined : Number(match[3]);
+  if (!Number.isSafeInteger(line) || line < 1 || (endLine !== undefined && (!Number.isSafeInteger(endLine) || endLine < line))) {
+    return null;
+  }
+  return { path: match[1], line, ...(endLine === undefined ? {} : { endLine }) };
+}
+
+function parseLocationFragment(value: string): { line: number; endLine?: number } | null {
+  const match = /^#L(\d+)(?:-L?(\d+))?$/i.exec(value.trim());
+  if (!match) return null;
+  const line = Number(match[1]);
+  const endLine = match[2] === undefined ? undefined : Number(match[2]);
+  if (!Number.isSafeInteger(line) || line < 1 || (endLine !== undefined && (!Number.isSafeInteger(endLine) || endLine < line))) {
+    return null;
+  }
+  return { line, ...(endLine === undefined ? {} : { endLine }) };
 }
 
 function codeCopyIcon(copied = false): string {

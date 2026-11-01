@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { closeOpenFence, Markdown } from "./Markdown";
+import { closeOpenFence, fileReferenceFromLink, Markdown } from "./Markdown";
 
 afterEach(() => {
   cleanup();
@@ -21,6 +21,25 @@ describe("closeOpenFence", () => {
 });
 
 describe("Markdown", () => {
+  it("parses line numbers from local file links", () => {
+    expect(fileReferenceFromLink("api/app/services/agent_runs.py:499")).toEqual({
+      path: "api/app/services/agent_runs.py",
+      line: 499,
+    });
+    expect(fileReferenceFromLink("src/main.kt:12-14")).toEqual({
+      path: "src/main.kt",
+      line: 12,
+      endLine: 14,
+    });
+    expect(fileReferenceFromLink("src/main.kt#L12")).toEqual({ path: "src/main.kt", line: 12 });
+    expect(fileReferenceFromLink("C:/src/main.kt:12")).toEqual({ path: "C:/src/main.kt", line: 12 });
+    expect(fileReferenceFromLink("src/main.kt:12", "src/main.kt:12-14")).toEqual({
+      path: "src/main.kt",
+      line: 12,
+      endLine: 14,
+    });
+  });
+
   it("renders paragraphs, code and lists", () => {
     const { container } = render(<Markdown text={"hello **world**\n\n- one\n- two"} streaming={false} />);
     expect(container.querySelector("strong")?.textContent).toBe("world");
@@ -76,6 +95,58 @@ describe("Markdown", () => {
     fireEvent.click(view.getByRole("link", { name: "agent-graph.drawio" }));
 
     expect(sent).toEqual([{ type: "open_path", path: "agent-graph.drawio" }]);
+  });
+
+  it("opens Markdown file links at their referenced line", () => {
+    const sent: unknown[] = [];
+    window.__piNativePost = (message) => sent.push(message);
+    const view = render(
+      <Markdown text={'[api/app/services/agent_runs.py:499](api/app/services/agent_runs.py:499)'} streaming={false} />,
+    );
+
+    fireEvent.click(view.getByRole("link", { name: "api/app/services/agent_runs.py:499" }));
+
+    expect(sent).toEqual([{ type: "open_path", path: "api/app/services/agent_runs.py", line: 499 }]);
+  });
+
+  it("selects a referenced line range from Markdown file links", () => {
+    const sent: unknown[] = [];
+    window.__piNativePost = (message) => sent.push(message);
+    const view = render(
+      <Markdown text={'[api/app/agents/contracts.py:20-31](api/app/agents/contracts.py:20-31)'} streaming={false} />,
+    );
+
+    fireEvent.click(view.getByRole("link", { name: "api/app/agents/contracts.py:20-31" }));
+
+    expect(sent).toEqual([{
+      type: "open_path",
+      path: "api/app/agents/contracts.py",
+      line: 20,
+      endLine: 31,
+    }]);
+  });
+
+  it.each([
+    { href: "api/app/agents/contracts.py:20", path: "api/app/agents/contracts.py" },
+    {
+      href: "D:/workspace/ecommerce_operation_assistant/api/app/agents/contracts.py#L20",
+      path: "D:/workspace/ecommerce_operation_assistant/api/app/agents/contracts.py",
+    },
+  ])("keeps the label range when href has only a start line: $href", ({ href, path }) => {
+    const sent: unknown[] = [];
+    window.__piNativePost = (message) => sent.push(message);
+    const view = render(
+      <Markdown text={`[api/app/agents/contracts.py:20-31](${href})`} streaming={false} />,
+    );
+
+    fireEvent.click(view.getByRole("link", { name: "api/app/agents/contracts.py:20-31" }));
+
+    expect(sent).toEqual([{
+      type: "open_path",
+      path,
+      line: 20,
+      endLine: 31,
+    }]);
   });
 
   it("keeps web links opening in the external browser", () => {

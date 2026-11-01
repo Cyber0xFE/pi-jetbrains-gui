@@ -108,6 +108,9 @@ function readView(tool: ToolState): ToolView {
   const path = stringField(tool.args, "path");
   const offset = numberField(tool.args, "offset");
   const limit = numberField(tool.args, "limit");
+  const selectedEndLine = offset !== undefined && limit !== undefined && limit > 0
+    ? offset + limit - 1
+    : offset;
   const range =
     offset !== undefined
       ? `${offset}${limit !== undefined ? `–${offset + limit - 1}` : "+"}`
@@ -118,7 +121,7 @@ function readView(tool: ToolState): ToolView {
   return {
     title: (
       <>
-        {path !== undefined && <PathLink path={path} />}
+        {path !== undefined && <PathLink path={path} line={offset} endLine={selectedEndLine} />}
         {range !== undefined && <span className="chip">{range}</span>}
       </>
     ),
