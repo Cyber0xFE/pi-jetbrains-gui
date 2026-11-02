@@ -295,6 +295,13 @@ data class HostScrollToLatestMessage(val type: String = "scroll_to_latest")
 @Serializable
 data class HostScrollToFirstMessage(val type: String = "scroll_to_first")
 
+/** Jumps to the previous or next user message relative to the current viewport. */
+@Serializable
+data class HostScrollToUserMessageMessage(
+    val type: String = "scroll_to_user_message",
+    val direction: String,
+)
+
 /** One message from the webview to Kotlin; see `web/src/types.ts` (`Outbound`). */
 @Serializable
 data class ClientMessage(
@@ -428,4 +435,10 @@ object HostMessages {
 
     fun scrollToFirst(): JsonElement =
         PiJson.encodeToJsonElement(HostScrollToFirstMessage.serializer(), HostScrollToFirstMessage())
+
+    fun scrollToUserMessage(direction: String): JsonElement =
+        PiJson.encodeToJsonElement(
+            HostScrollToUserMessageMessage.serializer(),
+            HostScrollToUserMessageMessage(direction = direction),
+        )
 }

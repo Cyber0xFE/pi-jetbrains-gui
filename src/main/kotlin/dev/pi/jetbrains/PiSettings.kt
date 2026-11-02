@@ -56,6 +56,8 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         var nextTabShortcut: String = DEFAULT_NEXT_TAB_SHORTCUT,
         var scrollToLatestShortcut: String = DEFAULT_SCROLL_TO_LATEST_SHORTCUT,
         var scrollToFirstShortcut: String = DEFAULT_SCROLL_TO_FIRST_SHORTCUT,
+        var previousUserMessageShortcut: String = DEFAULT_PREVIOUS_USER_MESSAGE_SHORTCUT,
+        var nextUserMessageShortcut: String = DEFAULT_NEXT_USER_MESSAGE_SHORTCUT,
         /** Preferred model shown as the default in the model picker. */
         var defaultModelProvider: String = "",
         var defaultModelId: String = "",
@@ -142,13 +144,17 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         val nextTabStroke = state.nextTabShortcut.toKeyStroke()
         val scrollToLatestStroke = state.scrollToLatestShortcut.toKeyStroke()
         val scrollToFirstStroke = state.scrollToFirstShortcut.toKeyStroke()
+        val previousUserMessageStroke = state.previousUserMessageShortcut.toKeyStroke()
+        val nextUserMessageStroke = state.nextUserMessageShortcut.toKeyStroke()
         val usesOnlyDefaults = panelStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_PANEL_SHORTCUT) &&
             newTabStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_NEW_TAB_SHORTCUT) &&
             closeTabStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_CLOSE_TAB_SHORTCUT) &&
             previousTabStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_PREVIOUS_TAB_SHORTCUT) &&
             nextTabStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_NEXT_TAB_SHORTCUT) &&
             scrollToLatestStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_SCROLL_TO_LATEST_SHORTCUT) &&
-            scrollToFirstStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_SCROLL_TO_FIRST_SHORTCUT)
+            scrollToFirstStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_SCROLL_TO_FIRST_SHORTCUT) &&
+            previousUserMessageStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_PREVIOUS_USER_MESSAGE_SHORTCUT) &&
+            nextUserMessageStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_NEXT_USER_MESSAGE_SHORTCUT)
         if (!keymap.canModify() && !usesOnlyDefaults) {
             keymap = manager.getKeymap("Pi JetBrains GUI") ?: keymap.deriveKeymap("Pi JetBrains GUI").also {
                 manager.schemeManager.addScheme(it)
@@ -164,6 +170,8 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
             NEXT_PI_TAB_ACTION_ID to nextTabStroke,
             SCROLL_PI_TO_LATEST_ACTION_ID to scrollToLatestStroke,
             SCROLL_PI_TO_FIRST_ACTION_ID to scrollToFirstStroke,
+            SCROLL_PI_TO_PREVIOUS_USER_MESSAGE_ACTION_ID to previousUserMessageStroke,
+            SCROLL_PI_TO_NEXT_USER_MESSAGE_ACTION_ID to nextUserMessageStroke,
         ).forEach { (actionId, stroke) ->
             keymap.removeAllActionShortcuts(actionId)
             if (stroke != null) keymap.addShortcut(actionId, KeyboardShortcut(stroke, null))
@@ -180,6 +188,8 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         const val NEXT_PI_TAB_ACTION_ID = "dev.pi.jetbrains.NextPiTab"
         const val SCROLL_PI_TO_LATEST_ACTION_ID = "dev.pi.jetbrains.ScrollPiToLatest"
         const val SCROLL_PI_TO_FIRST_ACTION_ID = "dev.pi.jetbrains.ScrollPiToFirst"
+        const val SCROLL_PI_TO_PREVIOUS_USER_MESSAGE_ACTION_ID = "dev.pi.jetbrains.ScrollPiToPreviousUserMessage"
+        const val SCROLL_PI_TO_NEXT_USER_MESSAGE_ACTION_ID = "dev.pi.jetbrains.ScrollPiToNextUserMessage"
         const val DEFAULT_PANEL_SHORTCUT = "ctrl alt pressed K"
         const val DEFAULT_NEW_TAB_SHORTCUT = "ctrl shift pressed O"
         const val DEFAULT_CLOSE_TAB_SHORTCUT = "ctrl pressed W"
@@ -187,6 +197,8 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         const val DEFAULT_NEXT_TAB_SHORTCUT = "ctrl pressed PAGE_DOWN"
         const val DEFAULT_SCROLL_TO_LATEST_SHORTCUT = "ctrl pressed END"
         const val DEFAULT_SCROLL_TO_FIRST_SHORTCUT = "ctrl pressed HOME"
+        const val DEFAULT_PREVIOUS_USER_MESSAGE_SHORTCUT = "ctrl pressed UP"
+        const val DEFAULT_NEXT_USER_MESSAGE_SHORTCUT = "ctrl pressed DOWN"
         const val DEFAULT_CHAT_FONT_SIZE = 14
         const val MIN_CHAT_FONT_SIZE = 10
         const val MAX_CHAT_FONT_SIZE = 32

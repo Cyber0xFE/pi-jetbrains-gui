@@ -31,6 +31,28 @@ it("opens sent images in a dismissible preview", () => {
   expect(view.queryByRole("dialog", { name: "Image preview" })).toBeNull();
 });
 
+it("shows an omitted-image placeholder for empty image payloads", () => {
+  const view = render(
+    <MessageList
+      messages={[{
+        id: "omitted-image-message",
+        role: "assistant",
+        blocks: [{ kind: "image", data: "", mimeType: "image/png" }],
+        timestamp: 1,
+        streaming: false,
+      }]}
+      tools={{}}
+      loadingHistory={false}
+      emptyHint=""
+      thinkingLabel={null}
+      connecting={false}
+    />,
+  );
+
+  expect(view.getByText("图片过大，未在会话视图中加载")).toBeDefined();
+  expect(view.queryByRole("button", { name: "Preview image" })).toBeNull();
+});
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
@@ -364,4 +386,55 @@ it("reuses navigation offsets while scrolling and keeps the latest button outsid
   scroll(1250);
   positions.forEach((read) => expect(read).toHaveBeenCalledTimes(2));
   expect(view.getByRole("button", { name: "Jump to user message 3: Question 2" }).getAttribute("aria-current")).toBe("location");
+});
+
+it("jumps to the previous and next user message on navigation requests", () => {
+  HTMLElement.prototype.scrollIntoView = vi.fn();
+  const message = (id: string, role: "user" | "assistant", text: string, timestamp: number): ChatMessage => ({
+    id, role, blocks: [{ kind: "text", text }], timestamp, streaming: false,
+  });
+  const messages: ChatMessage[] = [
+    message("user-0", "user", "Question 0", 0),
+    message("assistant-0", "assistant", "Answer 0", 1),
+    message("user-1", "user", "Question 1", 2),
+    message("assistant-1", "assistant", "Answer 1", 3),
+    message("user-2", "user", "Question 2", 4),
+  ];
+  const props = { messages, tools: {}, loadingHistory: false, emptyHint: "", thinkingLabel: null, connecting: false };
+  const view = render(<MessageList {...props} previousUserMessageRequest={0} nextUserMessageRequest={0} />);
+  const log = view.getByRole("log");
+  Object.defineProperties(log, { scrollHeight: { configurable: true, value: 3000 }, clientHeight: { configurable: true, value: 400 } });
+  log.scrollTop = 1200;
+  Array.from(log.querySelectorAll(".message-user")).forEach((element, index) => {
+    Object.defineProperty(element, "offsetTop", { configurable: true, value: index * 600 });
+  });
+  expect(view.getByRole("button", { name: "Jump to user message 3: Question 2" }).getAttribute("aria-current")).toBe("location");
+
+  view.rerender(<MessageList {...props} previousUserMessageRequest={1} nextUserMessageRequest={0} />);
+  expect(view.getByRole("button", { name: "Jump to user message 2: Question 1" }).getAttribute("aria-current")).toBe("location");
+
+  // Simulate the viewport following the jump, then navigate forward again.
+  log.scrollTop = 600;
+  view.rerender(<MessageList {...props} previousUserMessageRequest={1} nextUserMessageRequest={1} />);
+  expect(view.getByRole("button", { name: "Jump to user message 3: Question 2" }).getAttribute("aria-current")).toBe("location");
+});
+
+it("does not move past the first or last user message", () => {
+  HTMLElement.prototype.scrollIntoView = vi.fn();
+  const messages: ChatMessage[] = [
+    { id: "user-0", role: "user", blocks: [{ kind: "text", text: "Question 0" }], timestamp: 0, streaming: false },
+  ];
+  const props = { messages, tools: {}, loadingHistory: false, emptyHint: "", thinkingLabel: null, connecting: false };
+  const view = render(<MessageList {...props} previousUserMessageRequest={0} nextUserMessageRequest={0} />);
+  const log = view.getByRole("log");
+  Object.defineProperties(log, { scrollHeight: { configurable: true, value: 600 }, clientHeight: { configurable: true, value: 400 } });
+  log.scrollTop = 0;
+  Array.from(log.querySelectorAll(".message-user")).forEach((element) => {
+    Object.defineProperty(element, "offsetTop", { configurable: true, value: 0 });
+  });
+  expect(view.getByRole("button", { name: "Jump to user message 1: Question 0" }).getAttribute("aria-current")).toBe("location");
+
+  view.rerender(<MessageList {...props} previousUserMessageRequest={1} nextUserMessageRequest={0} />);
+  view.rerender(<MessageList {...props} previousUserMessageRequest={1} nextUserMessageRequest={1} />);
+  expect(view.getByRole("button", { name: "Jump to user message 1: Question 0" }).getAttribute("aria-current")).toBe("location");
 });

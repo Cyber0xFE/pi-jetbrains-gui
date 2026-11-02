@@ -52,6 +52,12 @@
         <action id="dev.pi.jetbrains.ScrollPiToFirst" class="dev.pi.jetbrains.ui.ScrollPiToFirstAction">
             <keyboard-shortcut keymap="$default" first-keystroke="control HOME"/>
         </action>
+        <action id="dev.pi.jetbrains.ScrollPiToPreviousUserMessage" class="dev.pi.jetbrains.ui.ScrollPiToPreviousUserMessageAction">
+            <keyboard-shortcut keymap="$default" first-keystroke="control UP"/>
+        </action>
+        <action id="dev.pi.jetbrains.ScrollPiToNextUserMessage" class="dev.pi.jetbrains.ui.ScrollPiToNextUserMessageAction">
+            <keyboard-shortcut keymap="$default" first-keystroke="control DOWN"/>
+        </action>
         <action id="dev.pi.jetbrains.SendConsoleSelectionToPi" class="dev.pi.jetbrains.editor.SendConsoleSelectionToPiAction" icon="/icons/toolWindowPi.svg">
             <add-to-group group-id="ConsoleView.PopupMenu" anchor="last"/>
         </action>

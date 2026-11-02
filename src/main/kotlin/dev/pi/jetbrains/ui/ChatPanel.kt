@@ -237,6 +237,14 @@ class ChatPanel(
         bridge?.send(HostMessages.scrollToFirst())
     }
 
+    fun scrollToPreviousUserMessage() {
+        bridge?.send(HostMessages.scrollToUserMessage("previous"))
+    }
+
+    fun scrollToNextUserMessage() {
+        bridge?.send(HostMessages.scrollToUserMessage("next"))
+    }
+
     /** Queues a record for the webview, or parks it while the transcript is still hydrating. */
     private fun routeRecord(record: JsonElement) {
         synchronized(hydrationLock) {

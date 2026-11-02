@@ -209,6 +209,8 @@ function applyInbound(state: ChatState, message: Inbound): ChatState {
       return state;
     case "scroll_to_first":
       return state;
+    case "scroll_to_user_message":
+      return state;
     case "extension_status": {
       const extensionStatuses = { ...state.extensionStatuses };
       if (message.text == null || message.text.trim().length === 0) delete extensionStatuses[message.key];

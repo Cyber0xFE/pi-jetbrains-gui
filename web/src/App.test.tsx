@@ -228,6 +228,40 @@ describe("App", () => {
     await waitFor(() => expect(log.scrollTop).toBe(2000));
   });
 
+  it("jumps between user messages when the host requests navigation", async () => {
+    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(3000);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(400);
+    let top = 2400;
+    vi.spyOn(HTMLElement.prototype, "scrollTop", "get").mockImplementation(() => top);
+    vi.spyOn(HTMLElement.prototype, "scrollTop", "set").mockImplementation((value: number) => { top = value; });
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    render(<App />);
+    await waitFor(() => expect(window.__piDeliver).toBeDefined());
+    deliver({
+      type: "history",
+      final: true,
+      messages: [
+        { role: "user" as const, content: "question-0", timestamp: 0 },
+        { role: "assistant" as const, content: "answer-0", timestamp: 1 },
+        { role: "user" as const, content: "question-1", timestamp: 2 },
+        { role: "assistant" as const, content: "answer-1", timestamp: 3 },
+        { role: "user" as const, content: "question-2", timestamp: 4 },
+      ],
+    });
+    await screen.findByText("question-2");
+    Array.from(document.querySelectorAll<HTMLElement>(".message-user")).forEach((element, index) => {
+      Object.defineProperty(element, "offsetTop", { configurable: true, value: index * 1200 });
+    });
+    await waitFor(() => expect(screen.getByTitle("question-2").getAttribute("aria-current")).toBe("location"));
+
+    deliver({ type: "scroll_to_user_message", direction: "previous" });
+    await waitFor(() => expect(screen.getByTitle("question-1").getAttribute("aria-current")).toBe("location"));
+
+    top = 1200;
+    deliver({ type: "scroll_to_user_message", direction: "next" });
+    await waitFor(() => expect(screen.getByTitle("question-2").getAttribute("aria-current")).toBe("location"));
+  });
+
   it("loads the first message and scrolls to it when the host requests it", async () => {
     vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(2000);
     vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(400);

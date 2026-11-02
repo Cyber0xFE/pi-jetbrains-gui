@@ -82,6 +82,7 @@ Windows 本机构建成功后，还会自动为 `%APPDATA%/JetBrains/` 下已有
 | 关闭标签页 | `Ctrl+W` |
 | 上一个/下一个标签页 | `Ctrl+PageUp` / `Ctrl+PageDown` |
 | 跳转到最新/第一条消息 | `Ctrl+End` / `Ctrl+Home` |
+| 上一条/下一条用户消息 | `Ctrl+↑` / `Ctrl+↓` |
 
 快捷键会写入当前 IDE keymap；如果当前 keymap 不可修改，插件会创建名为 `Pi JetBrains GUI` 的派生 keymap。代理设置只注入 Pi 子进程的 `HTTP_PROXY` 和 `HTTPS_PROXY`，不会修改 IDE 或其他进程的环境变量。
 

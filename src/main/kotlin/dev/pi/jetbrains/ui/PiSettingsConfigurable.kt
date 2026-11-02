@@ -64,6 +64,10 @@ class PiSettingsConfigurable : Configurable {
     private var scrollToLatestShortcutValue = ""
     private val scrollToFirstShortcut = JTextField()
     private var scrollToFirstShortcutValue = ""
+    private val previousUserMessageShortcut = JTextField()
+    private var previousUserMessageShortcutValue = ""
+    private val nextUserMessageShortcut = JTextField()
+    private var nextUserMessageShortcutValue = ""
     private var panel: JPanel? = null
 
     override fun getDisplayName(): String = "Pi"
@@ -259,6 +263,30 @@ class PiSettingsConfigurable : Configurable {
             },
             "点击输入框后按下新的组合键。",
         )
+        configureShortcut(previousUserMessageShortcut, "上一条用户消息快捷键") { stroke ->
+            previousUserMessageShortcutValue = stroke.toString()
+            previousUserMessageShortcut.text = KeymapUtil.getKeystrokeText(stroke)
+        }
+        addField(
+            "上一条用户消息快捷键：",
+            shortcutRow(previousUserMessageShortcut, "清除上一条用户消息快捷键") {
+                previousUserMessageShortcutValue = ""
+                previousUserMessageShortcut.text = "未设置"
+            },
+            "点击输入框后按下新的组合键。",
+        )
+        configureShortcut(nextUserMessageShortcut, "下一条用户消息快捷键") { stroke ->
+            nextUserMessageShortcutValue = stroke.toString()
+            nextUserMessageShortcut.text = KeymapUtil.getKeystrokeText(stroke)
+        }
+        addField(
+            "下一条用户消息快捷键：",
+            shortcutRow(nextUserMessageShortcut, "清除下一条用户消息快捷键") {
+                nextUserMessageShortcutValue = ""
+                nextUserMessageShortcut.text = "未设置"
+            },
+            "点击输入框后按下新的组合键。",
+        )
         val chatFontSizeRow = JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
             isOpaque = false
             add(chatFontSize)
@@ -304,7 +332,9 @@ class PiSettingsConfigurable : Configurable {
             previousTabShortcutValue != state.previousTabShortcut ||
             nextTabShortcutValue != state.nextTabShortcut ||
             scrollToLatestShortcutValue != state.scrollToLatestShortcut ||
-            scrollToFirstShortcutValue != state.scrollToFirstShortcut
+            scrollToFirstShortcutValue != state.scrollToFirstShortcut ||
+            previousUserMessageShortcutValue != state.previousUserMessageShortcut ||
+            nextUserMessageShortcutValue != state.nextUserMessageShortcut
     }
 
     override fun apply() {
@@ -327,6 +357,8 @@ class PiSettingsConfigurable : Configurable {
         state.nextTabShortcut = nextTabShortcutValue
         state.scrollToLatestShortcut = scrollToLatestShortcutValue
         state.scrollToFirstShortcut = scrollToFirstShortcutValue
+        state.previousUserMessageShortcut = previousUserMessageShortcutValue
+        state.nextUserMessageShortcut = nextUserMessageShortcutValue
         settings.applyShortcuts()
         if (proxyChanged) settings.notifyNetworkProxyChanged()
         if (fontSizeChanged) settings.notifyChatFontSizeChanged()
@@ -362,6 +394,12 @@ class PiSettingsConfigurable : Configurable {
         scrollToFirstShortcutValue = state.scrollToFirstShortcut
         val scrollToFirstKeyStroke = scrollToFirstShortcutValue.takeIf { it.isNotBlank() }?.let { KeyStroke.getKeyStroke(it) }
         scrollToFirstShortcut.text = scrollToFirstKeyStroke?.let(KeymapUtil::getKeystrokeText) ?: "未设置"
+        previousUserMessageShortcutValue = state.previousUserMessageShortcut
+        val previousUserMessageKeyStroke = previousUserMessageShortcutValue.takeIf { it.isNotBlank() }?.let { KeyStroke.getKeyStroke(it) }
+        previousUserMessageShortcut.text = previousUserMessageKeyStroke?.let(KeymapUtil::getKeystrokeText) ?: "未设置"
+        nextUserMessageShortcutValue = state.nextUserMessageShortcut
+        val nextUserMessageKeyStroke = nextUserMessageShortcutValue.takeIf { it.isNotBlank() }?.let { KeyStroke.getKeyStroke(it) }
+        nextUserMessageShortcut.text = nextUserMessageKeyStroke?.let(KeymapUtil::getKeystrokeText) ?: "未设置"
     }
 
     override fun disposeUIResources() {

@@ -236,6 +236,7 @@ export type Inbound =
   | { type: "focus_composer" }
   | { type: "scroll_to_latest" }
   | { type: "scroll_to_first" }
+  | { type: "scroll_to_user_message"; direction: "previous" | "next" }
   | { type: "widget"; key: string; lines: string[]; placement: "aboveEditor" | "belowEditor" }
   | { type: "extension_status"; key: string; text: string | null };
 

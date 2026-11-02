@@ -26,6 +26,8 @@ interface Props {
   connecting: boolean;
   scrollToLatestRequest?: number;
   scrollToFirstRequest?: number;
+  previousUserMessageRequest?: number;
+  nextUserMessageRequest?: number;
 }
 
 export function MessageList({
@@ -38,6 +40,8 @@ export function MessageList({
   connecting,
   scrollToLatestRequest = 0,
   scrollToFirstRequest = 0,
+  previousUserMessageRequest = 0,
+  nextUserMessageRequest = 0,
 }: Props): JSX.Element {
   recordPerf("message_list_render", 0, { messages: messages.length, tools: Object.keys(tools).length });
   const scroller = useRef<HTMLDivElement>(null);
@@ -242,6 +246,40 @@ export function MessageList({
     setActiveMessageId(messageId);
     setVisibleCount((current) => Math.max(current, messages.length - messageIndex));
   };
+
+  // Picks the user message above/below the current viewport top and scrolls to it. Mirrors
+  // updateScrollPosition's threshold so repeated keystrokes walk the outline in order.
+  const navigateUserMessage = (direction: -1 | 1): void => {
+    const element = scroller.current;
+    if (!element || userMessages.length === 0) return;
+    const offsets = Array.from(
+      element.querySelectorAll<HTMLElement>(".message-user[data-message-id]"),
+      (message) => ({ id: message.dataset.messageId!, top: message.offsetTop }),
+    );
+    const threshold = element.scrollTop + 96;
+    let currentId: string | null = null;
+    for (const message of offsets) {
+      if (message.top > threshold) break;
+      currentId = message.id;
+    }
+    const currentIndex = currentId === null
+      ? -1
+      : userMessages.findIndex(({ message }) => message.id === currentId);
+    const target = direction < 0
+      ? (currentIndex > 0 ? userMessages[currentIndex - 1] : null)
+      : (userMessages[currentIndex + 1] ?? null);
+    if (!target) return;
+    stickToBottom.current = false;
+    jumpToMessage(target.message.id, target.index);
+  };
+
+  useEffect(() => {
+    if (previousUserMessageRequest > 0) navigateUserMessage(-1);
+  }, [previousUserMessageRequest]);
+
+  useEffect(() => {
+    if (nextUserMessageRequest > 0) navigateUserMessage(1);
+  }, [nextUserMessageRequest]);
 
   return (
     <div className="conversation-shell">
@@ -771,6 +809,9 @@ function BlockView({ block, fileReferences, tools, streaming, thinkingLabel, dur
     case "tool":
       return <ToolCard name={block.name} callId={block.callId} tool={tools[block.callId]} tools={tools} />;
     case "image":
+      if (!block.data) {
+        return <div className="image-omitted">图片过大，未在会话视图中加载</div>;
+      }
       return (
         <ImagePreview
           className="image"

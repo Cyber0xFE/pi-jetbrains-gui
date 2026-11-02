@@ -26,6 +26,8 @@ export function App(): JSX.Element {
   const [pendingPrompt, setPendingPrompt] = useState(false);
   const [scrollToLatestRequest, setScrollToLatestRequest] = useState(0);
   const [scrollToFirstRequest, setScrollToFirstRequest] = useState(0);
+  const [previousUserMessageRequest, setPreviousUserMessageRequest] = useState(0);
+  const [nextUserMessageRequest, setNextUserMessageRequest] = useState(0);
   const pendingPromptStartedAt = useRef<number | null>(null);
   const pendingPromptTimer = useRef<number | null>(null);
 
@@ -80,6 +82,11 @@ export function App(): JSX.Element {
       }
       if (message.type === "scroll_to_first") {
         setScrollToFirstRequest((current) => current + 1);
+        return;
+      }
+      if (message.type === "scroll_to_user_message") {
+        if (message.direction === "previous") setPreviousUserMessageRequest((current) => current + 1);
+        else setNextUserMessageRequest((current) => current + 1);
         return;
       }
       store.dispatch({ kind: "inbound", message });
@@ -277,6 +284,8 @@ export function App(): JSX.Element {
         connecting={pendingPrompt || (state.sending && !state.busy)}
         scrollToLatestRequest={scrollToLatestRequest}
         scrollToFirstRequest={scrollToFirstRequest}
+        previousUserMessageRequest={previousUserMessageRequest}
+        nextUserMessageRequest={nextUserMessageRequest}
       />
       <Composer
         value={draft}
