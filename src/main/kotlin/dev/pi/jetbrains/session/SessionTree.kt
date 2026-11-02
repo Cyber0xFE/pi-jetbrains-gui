@@ -35,9 +35,6 @@ private data class ToolCallInfo(val name: String, val arguments: JsonObject)
  * entries plus text-less assistant messages are hidden by default.
  */
 object SessionTree {
-    /** Entry types pi's default tree filter hides. */
-    private val SETTINGS_TYPES = setOf("label", "context_edit", "custom", "model_change", "thinking_level_change", "session_info")
-
     fun flatten(tree: List<RpcSessionTreeNode>, leafId: String?): List<FlatTreeEntry> {
         val nodeById = LinkedHashMap<String, RpcSessionTreeNode>()
         val parentOf = HashMap<String, String?>()
@@ -59,22 +56,13 @@ object SessionTree {
         }
         tree.forEach { computeContains(it) }
 
-        // Default filter, mirroring pi's `applyFilter` in default mode.
+        // The RPC fork command accepts user-message entries only, so the tree shows only rows
+        // that can be selected as fork points. Hidden entries are skipped while their user
+        // descendants are attached to the nearest visible ancestor below.
         fun isVisible(node: RpcSessionTreeNode): Boolean {
             val entry = node.entry
-            val id = entry.string("id") ?: return false
-            val type = entry.string("type") ?: return true
-            if (type == "usage" || type in SETTINGS_TYPES) return false
-            if (type == "message" && id != leafId) {
-                val message = entry["message"] as? JsonObject
-                if (message?.string("role") == "assistant") {
-                    val hasText = hasTextContent(message["content"])
-                    val stopReason = message.string("stopReason")
-                    val isErrorOrAborted = stopReason != null && stopReason != "stop" && stopReason != "toolUse"
-                    if (!hasText && !isErrorOrAborted) return false
-                }
-            }
-            return true
+            val message = entry["message"] as? JsonObject
+            return entry.string("type") == "message" && message?.string("role") == "user"
         }
 
         // Attach each visible node to its nearest visible ancestor (pi's `recalculateVisualStructure`).
@@ -255,18 +243,6 @@ object SessionTree {
     private fun shortenPath(path: String): String {
         val home = System.getProperty("user.home") ?: return path
         return if (home.isNotEmpty() && path.startsWith(home)) "~${path.substring(home.length)}" else path
-    }
-
-    private fun hasTextContent(content: Any?): Boolean {
-        return when (content) {
-            is JsonPrimitive -> content.contentOrNull?.trim()?.isNotEmpty() == true
-            is JsonArray -> content.any { block ->
-                val obj = block as? JsonObject ?: return@any false
-                if (obj.string("type") != "text") return@any false
-                obj.string("text")?.trim()?.isNotEmpty() == true
-            }
-            else -> false
-        }
     }
 
     private fun contentText(entry: JsonObject): String {

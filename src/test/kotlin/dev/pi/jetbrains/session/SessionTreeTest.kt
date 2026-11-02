@@ -4,7 +4,6 @@ import dev.pi.jetbrains.rpc.PiJson
 import dev.pi.jetbrains.rpc.RpcSessionTreeNode
 import kotlinx.serialization.json.decodeFromJsonElement
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -34,16 +33,36 @@ class SessionTreeTest {
 
         val rows = SessionTree.flatten(tree, leafId = "e2")
 
-        assertEquals(listOf("e1", "e2", "e3"), rows.map { it.id })
-        assertEquals(listOf(0, 1, 0), rows.map { it.depth })
+        assertEquals(listOf("e1"), rows.map { it.id })
+        assertEquals(listOf(0), rows.map { it.depth })
         assertEquals("start", rows[0].label)
         assertEquals("user: hello", rows[0].text)
-        assertEquals("assistant: hi there", rows[1].text)
         assertTrue(rows[0].forkable)
-        assertFalse(rows[1].forkable)
-        assertTrue(rows[0].active && rows[1].active)
-        assertFalse(rows[2].active)
-        assertTrue(rows[2].text.contains("150k") || rows[2].text.contains("compaction"))
+        assertTrue(rows[0].active)
+    }
+
+    @Test
+    fun `shows only user messages while preserving user branches across hidden entries`() {
+        val tree = decode(
+            """
+            [
+              {
+                "entry": {"type":"message","id":"u1","parentId":null,"message":{"role":"user","content":"first"}},
+                "children": [
+                  {"entry": {"type":"message","id":"a1","parentId":"u1","message":{"role":"assistant","content":[{"type":"text","text":"answer"}]}}, "children": [
+                    {"entry": {"type":"message","id":"u2","parentId":"a1","message":{"role":"user","content":"second"}}, "children": []}
+                  ]}
+                ]
+              }
+            ]
+            """.trimIndent(),
+        )
+
+        val rows = SessionTree.flatten(tree, leafId = "u2")
+
+        assertEquals(listOf("u1", "u2"), rows.map { it.id })
+        assertEquals(listOf(0, 0), rows.map { it.depth })
+        assertTrue(rows.all { it.role == "user" && it.forkable })
     }
 
     @Test
@@ -69,11 +88,10 @@ class SessionTreeTest {
 
         val rows = SessionTree.flatten(tree, leafId = "e5")
 
-        // Bookkeeping entries and the text-less assistant message are hidden (TUI default filter),
-        // and the visible chain stays at depth 0 instead of cascading.
-        assertEquals(listOf("e1", "e5"), rows.map { it.id })
-        assertEquals(listOf(0, 0), rows.map { it.depth })
-        assertEquals("[bash: ls -la]", rows[1].text)
+        // Bookkeeping entries, assistant messages and tool results are hidden; only the user
+        // message remains in the tree.
+        assertEquals(listOf("e1"), rows.map { it.id })
+        assertEquals(listOf(0), rows.map { it.depth })
     }
 
     @Test
@@ -84,10 +102,10 @@ class SessionTreeTest {
               {
                 "entry": {"type":"message","id":"root","parentId":null,"message":{"role":"user","content":"q"}},
                 "children": [
-                  {"entry": {"type":"message","id":"a1","parentId":"root","message":{"role":"assistant","content":[{"type":"text","text":"branch a"}]}}, "children": [
-                    {"entry": {"type":"message","id":"a2","parentId":"a1","message":{"role":"assistant","content":[{"type":"text","text":"a2"}]}}, "children": []}
+                  {"entry": {"type":"message","id":"a1","parentId":"root","message":{"role":"user","content":"branch a"}}, "children": [
+                    {"entry": {"type":"message","id":"a2","parentId":"a1","message":{"role":"user","content":"a2"}}, "children": []}
                   ]},
-                  {"entry": {"type":"message","id":"b1","parentId":"root","message":{"role":"assistant","content":[{"type":"text","text":"branch b"}]}}, "children": []}
+                  {"entry": {"type":"message","id":"b1","parentId":"root","message":{"role":"user","content":"branch b"}}, "children": []}
                 ]
               }
             ]

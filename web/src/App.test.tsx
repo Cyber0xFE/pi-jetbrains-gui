@@ -394,7 +394,11 @@ describe("App", () => {
       { type: "status", status: { phase: "running", message: "ready", model: "m" } },
       {
         type: "session_tree",
-        entries: [{ id: "entry-1", type: "message", role: "user", text: "hello", depth: 0, forkable: true, active: true }],
+        entries: [
+          { id: "entry-1", type: "message", role: "user", text: "hello", depth: 0, forkable: true, active: true },
+          { id: "assistant-1", type: "message", role: "assistant", text: "assistant: hidden", depth: 0, forkable: false, active: true },
+          { id: "tool-1", type: "message", role: "toolResult", text: "[bash: hidden]", depth: 0, forkable: false, active: true },
+        ],
         leafId: "entry-1",
         sessionId: "session-1",
       },
@@ -406,6 +410,8 @@ describe("App", () => {
 
     expect(await screen.findByRole("dialog", { name: "Session tree" })).toBeDefined();
     expect(screen.getByText("hello")).toBeDefined();
+    expect(screen.queryByText("assistant: hidden")).toBeNull();
+    expect(screen.queryByText("[bash: hidden]")).toBeNull();
     expect(input.value).toBe("");
     expect(window.__piSent?.filter((message) => message.type === "prompt")).toEqual([]);
   });

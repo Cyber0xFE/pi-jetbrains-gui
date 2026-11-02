@@ -64,16 +64,7 @@ export function SessionDialog({
   );
 
   const treeItems = useMemo<PickerItem[]>(
-    () =>
-      tree.map((entry) => ({
-        key: entry.id,
-        label: entry.label?.trim() || entry.text || `[${entry.type}]`,
-        detail: entry.forkable ? "fork from here" : `${entry.type}${entry.role ? `/${entry.role}` : ""}`,
-        badge: entry.active ? "active" : undefined,
-        active: entry.active || entry.id === leafId,
-        disabled: !entry.forkable,
-        depth: entry.depth,
-      })),
+    () => tree.filter((entry) => entry.type === "message" && entry.role === "user").map((entry) => treeItem(entry, leafId)),
     [tree, leafId],
   );
 
@@ -170,4 +161,16 @@ export function SessionDialog({
     )}
     </>
   );
+}
+
+function treeItem(entry: TreeEntry, leafId: string | null): PickerItem {
+  return {
+    key: entry.id,
+    label: entry.label?.trim() || entry.text || `[${entry.type}]`,
+    detail: entry.forkable ? "fork from here" : `${entry.type}${entry.role ? `/${entry.role}` : ""}`,
+    badge: entry.active ? "active" : undefined,
+    active: entry.active || entry.id === leafId,
+    disabled: !entry.forkable,
+    depth: entry.depth,
+  };
 }
