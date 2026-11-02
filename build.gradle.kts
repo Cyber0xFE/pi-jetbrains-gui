@@ -89,6 +89,31 @@ intellijPlatform {
             <p><b>Requirement:</b> Install the pi CLI before use, for example with <code>npm install -g @earendil-works/pi-coding-agent</code>.</p>
             <p>Source code and issue tracker: <a href="https://github.com/Cyber0xFE/pi-jetbrains-gui">https://github.com/Cyber0xFE/pi-jetbrains-gui</a></p>
         """.trimIndent()
+
+        changeNotes = """
+            <h2>What's New in 0.2.0</h2>
+            <h3>Features</h3>
+            <ul>
+              <li>Work with multiple pi sessions side by side in separate tabs, each showing live task status, with shortcuts for opening and closing tabs.</li>
+              <li>Configure a network proxy for the pi process and toggle it on or off from settings.</li>
+              <li>Set a default model and keep it in sync across sessions.</li>
+              <li>Navigate messages faster: jump to the first or latest message and skip through your own user messages.</li>
+              <li>Preview attached images before sending; forking a session now keeps image attachments.</li>
+              <li>Click file links in AI replies to open the referenced file, including line numbers and code ranges.</li>
+              <li>Slash commands now match by keyword, and file reference candidates skip virtual environments and cache directories.</li>
+              <li>Long tool output is collapsed with expand actions to keep conversations readable.</li>
+              <li>Configure the tool window shortcut in settings; the composer is focused automatically when the panel opens.</li>
+              <li>Smoother, more responsive scrolling inside the tool window.</li>
+              <li>Refreshed plugin icons for light and dark themes, plus polished cards, copy buttons, status bar, and thinking/connection indicators.</li>
+            </ul>
+            <h3>Fixes</h3>
+            <ul>
+              <li>Opening a historical session now scrolls to the latest message by default.</li>
+              <li>Fixed skill message display, user message alignment, and scroll chaining between cards and the session view.</li>
+              <li>Reduced WebView memory usage and improved diagnostics for large conversations.</li>
+              <li>Replaced a deprecated platform API for better forward compatibility.</li>
+            </ul>
+        """.trimIndent()
     }
 }
 
