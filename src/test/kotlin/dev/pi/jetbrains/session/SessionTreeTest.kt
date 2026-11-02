@@ -66,6 +66,20 @@ class SessionTreeTest {
     }
 
     @Test
+    fun `retains user image blocks on forkable tree rows`() {
+        val tree = decode(
+            """
+            [{"entry":{"type":"message","id":"u1","message":{"role":"user","content":[{"type":"text","text":"inspect"},{"type":"image","data":"aGVsbG8=","mimeType":"image/png"}]}},"children":[]}]
+            """.trimIndent(),
+        )
+
+        val row = SessionTree.flatten(tree, leafId = "u1").single()
+
+        assertEquals("user: inspect", row.text)
+        assertEquals(listOf(SessionTreeImage("aGVsbG8=", "image/png")), row.images)
+    }
+
+    @Test
     fun `keeps single-child chains flat like the TUI`() {
         val tree = decode(
             """

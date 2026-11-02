@@ -416,6 +416,31 @@ describe("App", () => {
     expect(window.__piSent?.filter((message) => message.type === "prompt")).toEqual([]);
   });
 
+  it("preserves images when forking from an image-bearing user message", async () => {
+    render(<App />);
+    await waitFor(() => expect(window.__piDeliver).toBeDefined());
+    const image = { data: "aGVsbG8=", mimeType: "image/png" };
+    deliver(
+      { type: "status", status: { phase: "running", message: "ready", model: "m" } },
+      {
+        type: "session_tree",
+        entries: [{ id: "entry-image", type: "message", role: "user", text: "user: inspect", depth: 0, forkable: true, active: true, images: [image] }],
+        leafId: "entry-image",
+        sessionId: "session-1",
+      },
+    );
+
+    fireEvent.change(await screen.findByPlaceholderText(/Send a message to pi/), { target: { value: "/tree" } });
+    fireEvent.keyDown(await screen.findByPlaceholderText(/Send a message to pi/), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("option", { name: /inspect/ }));
+
+    await waitFor(() => expect(window.__piSent?.filter((message) => message.type === "fork")).toEqual([
+      { type: "fork", entryId: "entry-image", images: [image] },
+    ]));
+    deliver({ type: "prefill", text: "inspect", images: [image] });
+    expect(await screen.findByRole("img", { name: "Attachment 1" })).toBeDefined();
+  });
+
   it("completes slash commands in the composer", async () => {
     render(<App />);
     await waitFor(() => expect(window.__piDeliver).toBeDefined());

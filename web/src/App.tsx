@@ -64,6 +64,7 @@ export function App(): JSX.Element {
       // `prefill` seeds the composer (fork returns the original user message text).
       if (message.type === "prefill") {
         setDraft(message.text);
+        setImages(message.images ?? []);
         setFocusDraftRequest((current) => current + 1);
         return;
       }
@@ -334,8 +335,8 @@ export function App(): JSX.Element {
           onDelete={(path) => {
             post({ type: "delete_session", path });
           }}
-          onFork={(entryId) => {
-            post({ type: "fork", entryId });
+          onFork={(entryId, forkImages) => {
+            post({ type: "fork", entryId, images: forkImages });
             closeDialog();
           }}
         />

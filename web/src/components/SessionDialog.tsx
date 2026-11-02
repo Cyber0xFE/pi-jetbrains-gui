@@ -15,7 +15,7 @@ interface Props {
   onRefresh: () => void;
   onSwitch: (path: string) => void;
   onDelete: (path: string) => void;
-  onFork: (entryId: string) => void;
+  onFork: (entryId: string, images: TreeEntry["images"]) => void;
 }
 
 type Tab = "sessions" | "tree";
@@ -116,7 +116,10 @@ export function SessionDialog({
       }
       onSelect={(item) => {
         if (tab === "sessions") onSwitch(item.key);
-        else onFork(item.key);
+        else {
+          const entry = tree.find((candidate) => candidate.id === item.key);
+          onFork(item.key, entry?.images);
+        }
       }}
       onClose={onClose}
     />

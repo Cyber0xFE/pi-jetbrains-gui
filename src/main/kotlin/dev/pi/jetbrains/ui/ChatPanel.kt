@@ -337,7 +337,7 @@ class ChatPanel(
             }
             "fork" -> {
                 val entryId = message.entryId ?: return
-                scope.launch { changeSession("fork") { service.fork(entryId) } }
+                scope.launch { changeSession("fork", message.images) { service.fork(entryId) } }
             }
             "rename_session" -> {
                 val name = message.name?.trim() ?: return
@@ -538,7 +538,11 @@ class ChatPanel(
      * `new_session` / `switch_session` / `fork` share a response shape. Extensions may cancel the
      * change; otherwise the transcript is replaced and related surfaces refreshed.
      */
-    private suspend fun changeSession(reason: String, action: suspend () -> RpcResponse) {
+    private suspend fun changeSession(
+        reason: String,
+        forkImages: List<ClientImage> = emptyList(),
+        action: suspend () -> RpcResponse,
+    ) {
         val activeBridge = bridge ?: return
         val response = request(action) ?: return
         if (!response.success) return
@@ -551,8 +555,11 @@ class ChatPanel(
             return
         }
         if (reason == "fork") {
-            response.decodeDataAs<RpcForkResult>()?.text?.takeIf { it.isNotBlank() }?.let { text ->
-                activeBridge.send(HostMessages.prefill(text))
+            response.decodeDataAs<RpcForkResult>()?.let { fork ->
+                val text = fork.text.orEmpty()
+                if (text.isNotBlank() || forkImages.isNotEmpty()) {
+                    activeBridge.send(HostMessages.prefill(text, forkImages))
+                }
             }
         }
         reloadTranscript(reason)

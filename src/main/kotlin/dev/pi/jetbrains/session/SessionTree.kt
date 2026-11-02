@@ -21,7 +21,10 @@ data class FlatTreeEntry(
     val forkable: Boolean = false,
     /** On the path from the root to `leafId`; the UI highlights it. */
     val active: Boolean = false,
+    val images: List<SessionTreeImage> = emptyList(),
 )
+
+data class SessionTreeImage(val data: String, val mimeType: String)
 
 /** A `toolCall` block extracted from an assistant message, keyed by call id. */
 private data class ToolCallInfo(val name: String, val arguments: JsonObject)
@@ -166,7 +169,21 @@ object SessionTree {
             depth = depth,
             forkable = entry.string("type") == "message" && role == "user",
             active = id in activePath,
+            images = userImages(entry),
         )
+    }
+
+    private fun userImages(entry: JsonObject): List<SessionTreeImage> {
+        val message = entry["message"] as? JsonObject ?: return emptyList()
+        if (message.string("role") != "user") return emptyList()
+        val content = message["content"] as? JsonArray ?: return emptyList()
+        return content.mapNotNull { block ->
+            val image = block as? JsonObject ?: return@mapNotNull null
+            if (image.string("type") != "image") return@mapNotNull null
+            val data = image.string("data") ?: return@mapNotNull null
+            val mimeType = image.string("mimeType") ?: return@mapNotNull null
+            SessionTreeImage(data, mimeType)
+        }
     }
 
     private fun describe(entry: JsonObject, role: String?, toolCalls: Map<String, ToolCallInfo>): String {

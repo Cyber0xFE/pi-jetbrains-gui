@@ -190,6 +190,7 @@ export interface TreeEntry {
   depth: number;
   forkable: boolean;
   active: boolean;
+  images?: PromptImage[];
 }
 
 /** One row of the model picker (plan M3.4). */
@@ -231,7 +232,7 @@ export type Inbound =
   | { type: "commands"; commands: SlashCommand[] }
   | { type: "files"; files: string[] }
   | { type: "reset"; reason: string }
-  | { type: "prefill"; text: string }
+  | { type: "prefill"; text: string; images?: PromptImage[] }
   | { type: "focus_composer" }
   | { type: "widget"; key: string; lines: string[]; placement: "aboveEditor" | "belowEditor" }
   | { type: "extension_status"; key: string; text: string | null };
@@ -251,7 +252,7 @@ export type Outbound =
   | { type: "get_tree" }
   | { type: "new_session" }
   | { type: "switch_session"; path: string }
-  | { type: "fork"; entryId: string }
+  | { type: "fork"; entryId: string; images?: PromptImage[] }
   | { type: "rename_session"; name: string; path?: string }
   | { type: "delete_session"; path: string }
   // M3: model / thinking

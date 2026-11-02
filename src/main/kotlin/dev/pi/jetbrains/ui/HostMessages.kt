@@ -192,6 +192,7 @@ data class HostTreeEntry(
     val depth: Int = 0,
     val forkable: Boolean = false,
     val active: Boolean = false,
+    val images: List<ClientImage> = emptyList(),
 ) {
     companion object {
         fun from(entry: FlatTreeEntry): HostTreeEntry = HostTreeEntry(
@@ -204,6 +205,7 @@ data class HostTreeEntry(
             depth = entry.depth,
             forkable = entry.forkable,
             active = entry.active,
+            images = entry.images.map { ClientImage(data = it.data, mimeType = it.mimeType) },
         )
     }
 }
@@ -278,7 +280,11 @@ data class HostResetMessage(val type: String = "reset", val reason: String = "se
 
 /** Seeds the composer, e.g. with the prompt text returned by `fork`. */
 @Serializable
-data class HostPrefillMessage(val type: String = "prefill", val text: String)
+data class HostPrefillMessage(
+    val type: String = "prefill",
+    val text: String,
+    val images: List<ClientImage> = emptyList(),
+)
 
 @Serializable
 data class HostFocusComposerMessage(val type: String = "focus_composer")
@@ -402,8 +408,11 @@ object HostMessages {
     fun reset(reason: String = "session"): JsonElement =
         PiJson.encodeToJsonElement(HostResetMessage.serializer(), HostResetMessage(reason = reason))
 
-    fun prefill(text: String): JsonElement =
-        PiJson.encodeToJsonElement(HostPrefillMessage.serializer(), HostPrefillMessage(text = text))
+    fun prefill(text: String, images: List<ClientImage> = emptyList()): JsonElement =
+        PiJson.encodeToJsonElement(
+            HostPrefillMessage.serializer(),
+            HostPrefillMessage(text = text, images = images),
+        )
 
     fun focusComposer(): JsonElement =
         PiJson.encodeToJsonElement(HostFocusComposerMessage.serializer(), HostFocusComposerMessage())
