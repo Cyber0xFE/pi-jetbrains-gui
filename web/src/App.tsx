@@ -225,7 +225,6 @@ export function App(): JSX.Element {
         disabled={!ready}
         sessionFallback={sessionFallback}
         onOpenSessions={openSessions}
-        onNewSession={() => post({ type: "new_session" })}
       />
       {retry && (
         <div className="retrybar">

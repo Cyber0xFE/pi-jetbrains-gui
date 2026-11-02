@@ -1671,10 +1671,6 @@ body {
   overflow-x: auto;
 }
 
-.toolbar-spacer {
-  flex: 1 1 auto;
-}
-
 .toolbar-button {
   flex: 0 0 auto;
   border: 1px solid var(--border);
@@ -1742,28 +1738,6 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.toolbar-new {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.toolbar-new-icon {
-  width: 17px;
-  height: 17px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-width: 2;
 }
 
 .contextbar {
