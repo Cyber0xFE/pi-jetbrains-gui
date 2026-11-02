@@ -21,6 +21,15 @@
 
 - Windows 优先使用仓库中的 `gradlew.bat`；类 Unix 环境使用 `./gradlew`。
 
+## 目录与职责
+
+- `src/main/kotlin/dev/pi/jetbrains/runtime` 负责 Node.js/pi 的发现和进程启动；`rpc` 负责 JSONL 读写、协议模型和会话事件。
+- `src/main/kotlin/dev/pi/jetbrains/session` 只处理会话文件索引和树结构；`ui` 负责工具窗口、WebView bridge 和宿主消息；`editor` 负责编辑器/控制台上下文和文件导航。
+- `web/src/state` 维护前端会话 reducer，`web/src/components` 负责消息、工具卡片、会话选择器和输入框，`web/src/bridge.ts` 只负责与宿主通信。
+- `web/dist` 是前端生成目录，Gradle 会把其中的单文件 `index.html` 复制到插件资源；不要直接编辑生成文件。
+
+新增功能前先确定它属于 Kotlin 宿主、WebView，还是两者之间的消息契约。跨层消息应先在 `HostMessages.kt`、`web/src/types.ts` 和对应 reducer/组件中定义，再补充序列化测试；不要在 bridge 中实现会话或进程业务逻辑。
+
 ## 开发工作流
 
 1. 开始工作前先查看 `git status --short`，不要覆盖或回退用户已有的未提交改动。
@@ -28,6 +37,8 @@
 3. 前后端通信必须遵守 `rpc-schema.json` 和现有 bridge/host 消息结构；协议变化时同步更新 schema、Kotlin 模型、Web 类型和测试。
 4. 完成功能后运行相关测试，再按“自动构建”要求构建插件。
 5. 交付前说明改动文件、验证命令及结果；不要擅自执行 `git commit` 或 `git push`。
+
+文档改动也要检查命令、路径和版本号是否与 `build.gradle.kts`、`plugin.xml` 和设置界面一致。用户可见功能新增或变更时，同步更新 `README.md`；开发流程、测试边界和构建约定变更时，同步更新本文件。
 
 ## 常用命令
 
@@ -73,6 +84,8 @@ RPC schema 校验默认读取 `../pi`：
 
 `buildPlugin` 的 ZIP 输出在 `build/distributions/`。默认情况下，Windows 构建成功后会向本机已发现的 IntelliJ IDEA 和 PyCharm 配置目录排队插件更新；构建不会关闭或重启 IDE，必须重启目标 IDE 后更新才会生效。构建日志中的 `Queued plugin update` 仅表示已排队，不表示当前运行中的 IDE 已经加载新版本。需要指定目标插件目录时使用 `-PlocalIdePluginDirs=目录1;目录2`。
 
+本地安装逻辑要求目标 IDE 至少成功启动过一次，以便在 `%LOCALAPPDATA%/JetBrains/<配置目录名>/.home` 找到 IDE 安装目录。`localIdePluginDirs` 指向各 IDE 的 `plugins` 目录，不是 IDE 安装目录；自定义缓存路径当前不受支持。若只需验证 ZIP，可显式传入 `-PinstallLocalPlugin=false`。
+
 ## 自动构建
 
 - 代码改动完成后**必须自动重新构建插件**，无需用户提醒：
@@ -89,6 +102,9 @@ RPC schema 校验默认读取 `../pi`：
 - WebView 与宿主之间的消息必须保持可序列化、可回归测试；涉及异步消息、进程退出、会话切换、取消操作时补充异常和竞态测试。
 - UI 改动同时检查 IntelliJ 明暗主题、长文本、空状态、错误状态、滚动行为和键盘操作。
 - 外部 pi 进程的输出不可盲信；沿用现有 JSONL 解析、错误处理、日志和资源释放方式，避免阻塞 IDE UI 线程。
+- stdout 是 JSONL 协议，stderr 只用于诊断日志；不要把诊断文本混入协议流。未知的 pi 会话事件应记录并忽略，不能因为新版本增加事件类型而使旧插件崩溃。
+- 会话切换、fork、新建和代理变更都可能使旧进程的异步事件晚到；使用现有的会话代次/重置机制丢弃过期事件，避免旧消息写入新会话。
+- 日志可能包含项目路径、提示词和工具输出；诊断日志默认关闭，测试和文档示例不要提交真实日志或用户数据。
 - 不要提交本地构建产物、依赖目录、IDE 配置或日志：包括 `build/`、`out/`、`.gradle/`、`.idea/`、`.kotlin/`、`.intellijPlatform/`、`web/node_modules/` 和 `web/dist/`。
 
 ## 测试重点
@@ -96,7 +112,15 @@ RPC schema 校验默认读取 `../pi`：
 - RPC/进程相关改动：运行 `JsonlReaderTest`、`PiClientTest` 及相关 Gradle 测试，必要时检查 `src/test/resources/fake-pi/fake-pi.mjs`。
 - 会话、文件引用和 IDE 导航改动：运行对应的 `Session*Test`、`ProjectFileCollectorTest`、`ToolFileRefresherTest` 和 `EditorNavigator` 相关测试。
 - WebView 状态或组件改动：运行 `cd web && npm run typecheck && npm test`，并为 reducer、消息渲染、滚动、工具卡片和主题相关行为补测试。
+- 修改 `HostMessages`、RPC 模型或 Web 类型时，至少运行 Kotlin 测试、前端类型检查和前端测试；协议来源变化时额外运行 `dumpRpcSchema` 或 `./gradlew check`。
 - 涉及真实 Node/pi 环境的测试可能依赖本机安装；若环境不满足，应报告跳过或失败原因，不要伪造通过结果。
+
+## 交付检查
+
+- 确认 `git diff --check` 通过，且没有把 `build/`、`web/dist/` 或 `web/node_modules/` 加入变更。
+- 代码或插件资源改动必须报告 `buildPlugin` 结果；构建成功但本机更新排队失败时，明确说明失败的 IDE 配置目录和原因。
+- 文档、测试说明或计划文件的纯文本改动可以跳过插件构建，但交付时要明确说明未构建。
+- 不要为了验证而关闭或重启用户正在运行的 IDE；只报告构建排队结果，并提示用户自行重启后生效。
 
 ## Git 与安全
 
