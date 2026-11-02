@@ -37,6 +37,9 @@
         <action id="dev.pi.jetbrains.NewPiTab" class="dev.pi.jetbrains.ui.NewPiTabAction">
             <keyboard-shortcut keymap="$default" first-keystroke="control shift O"/>
         </action>
+        <action id="dev.pi.jetbrains.ClosePiTab" class="dev.pi.jetbrains.ui.ClosePiTabAction">
+            <keyboard-shortcut keymap="$default" first-keystroke="control W"/>
+        </action>
         <action id="dev.pi.jetbrains.SendConsoleSelectionToPi" class="dev.pi.jetbrains.editor.SendConsoleSelectionToPiAction" icon="/icons/toolWindowPi.svg">
             <add-to-group group-id="ConsoleView.PopupMenu" anchor="last"/>
         </action>

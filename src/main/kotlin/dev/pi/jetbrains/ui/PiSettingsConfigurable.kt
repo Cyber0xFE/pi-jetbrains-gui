@@ -6,6 +6,7 @@ import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import dev.pi.jetbrains.PiSettings
 import java.awt.BorderLayout
+import java.awt.Dimension
 import java.awt.Font
 import java.awt.FlowLayout
 import java.awt.GridBagConstraints
@@ -53,6 +54,8 @@ class PiSettingsConfigurable : Configurable {
     private var panelShortcutValue = ""
     private val newTabShortcut = JTextField()
     private var newTabShortcutValue = ""
+    private val closeTabShortcut = JTextField()
+    private var closeTabShortcutValue = ""
     private var panel: JPanel? = null
 
     override fun getDisplayName(): String = "Pi"
@@ -136,74 +139,70 @@ class PiSettingsConfigurable : Configurable {
         )
 
         addSection("界面与行为")
-        panelShortcut.isEditable = false
-        panelShortcut.toolTipText = "点击后按下快捷键组合"
-        panelShortcut.accessibleContext.accessibleName = "打开 Pi 面板快捷键"
-        panelShortcut.addKeyListener(object : KeyAdapter() {
-            override fun keyPressed(event: KeyEvent) {
-                if (event.keyCode == KeyEvent.VK_CONTROL || event.keyCode == KeyEvent.VK_ALT ||
-                    event.keyCode == KeyEvent.VK_SHIFT || event.keyCode == KeyEvent.VK_META
-                ) return
-                val stroke = KeyStroke.getKeyStrokeForEvent(event)
-                panelShortcutValue = stroke.toString()
-                panelShortcut.text = KeymapUtil.getKeystrokeText(stroke)
-                event.consume()
-            }
-        })
-        val shortcutRow = JPanel(GridBagLayout()).apply { isOpaque = false }
-        shortcutRow.add(panelShortcut, GridBagConstraints().apply {
-            gridx = 0
-            gridy = 0
-            fill = GridBagConstraints.HORIZONTAL
-            weightx = 1.0
-            insets = Insets(0, 0, 0, 8)
-        })
-        shortcutRow.add(JButton("清除").apply {
-            accessibleContext.accessibleName = "清除 Pi 面板快捷键"
-            addActionListener {
+        fun configureShortcut(field: JTextField, accessibleName: String, onStroke: (KeyStroke) -> Unit) {
+            field.isEditable = false
+            field.columns = 22
+            field.preferredSize = Dimension(JBUI.scale(260), field.preferredSize.height)
+            field.toolTipText = "点击后按下快捷键组合"
+            field.accessibleContext.accessibleName = accessibleName
+            field.addKeyListener(object : KeyAdapter() {
+                override fun keyPressed(event: KeyEvent) {
+                    if (event.keyCode == KeyEvent.VK_CONTROL || event.keyCode == KeyEvent.VK_ALT ||
+                        event.keyCode == KeyEvent.VK_SHIFT || event.keyCode == KeyEvent.VK_META
+                    ) return
+                    val stroke = KeyStroke.getKeyStrokeForEvent(event)
+                    onStroke(stroke)
+                    event.consume()
+                }
+            })
+        }
+
+        fun shortcutRow(field: JTextField, clearName: String, onClear: () -> Unit): JPanel = JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
+            isOpaque = false
+            add(field)
+            add(Box.createHorizontalStrut(8))
+            add(JButton("清除").apply {
+                accessibleContext.accessibleName = clearName
+                addActionListener { onClear() }
+            })
+        }
+
+        configureShortcut(panelShortcut, "打开 Pi 面板快捷键") { stroke ->
+            panelShortcutValue = stroke.toString()
+            panelShortcut.text = KeymapUtil.getKeystrokeText(stroke)
+        }
+        addField(
+            "打开 Pi 面板快捷键：",
+            shortcutRow(panelShortcut, "清除 Pi 面板快捷键") {
                 panelShortcutValue = ""
                 panelShortcut.text = "未设置"
-            }
-        }, GridBagConstraints().apply {
-            gridx = 1
-            gridy = 0
-            anchor = GridBagConstraints.EAST
-        })
-        addField("打开 Pi 面板快捷键：", shortcutRow, "点击输入框后按下新的组合键。")
-        newTabShortcut.isEditable = false
-        newTabShortcut.toolTipText = "点击后按下快捷键组合"
-        newTabShortcut.accessibleContext.accessibleName = "新建 Pi 标签页快捷键"
-        newTabShortcut.addKeyListener(object : KeyAdapter() {
-            override fun keyPressed(event: KeyEvent) {
-                if (event.keyCode == KeyEvent.VK_CONTROL || event.keyCode == KeyEvent.VK_ALT ||
-                    event.keyCode == KeyEvent.VK_SHIFT || event.keyCode == KeyEvent.VK_META
-                ) return
-                val stroke = KeyStroke.getKeyStrokeForEvent(event)
-                newTabShortcutValue = stroke.toString()
-                newTabShortcut.text = KeymapUtil.getKeystrokeText(stroke)
-                event.consume()
-            }
-        })
-        val newTabShortcutRow = JPanel(GridBagLayout()).apply { isOpaque = false }
-        newTabShortcutRow.add(newTabShortcut, GridBagConstraints().apply {
-            gridx = 0
-            gridy = 0
-            fill = GridBagConstraints.HORIZONTAL
-            weightx = 1.0
-            insets = Insets(0, 0, 0, 8)
-        })
-        newTabShortcutRow.add(JButton("清除").apply {
-            accessibleContext.accessibleName = "清除新建 Pi 标签页快捷键"
-            addActionListener {
+            },
+            "点击输入框后按下新的组合键。",
+        )
+        configureShortcut(newTabShortcut, "新建 Pi 标签页快捷键") { stroke ->
+            newTabShortcutValue = stroke.toString()
+            newTabShortcut.text = KeymapUtil.getKeystrokeText(stroke)
+        }
+        addField(
+            "新建 Pi 标签页快捷键：",
+            shortcutRow(newTabShortcut, "清除新建 Pi 标签页快捷键") {
                 newTabShortcutValue = ""
                 newTabShortcut.text = "未设置"
-            }
-        }, GridBagConstraints().apply {
-            gridx = 1
-            gridy = 0
-            anchor = GridBagConstraints.EAST
-        })
-        addField("新建 Pi 标签页快捷键：", newTabShortcutRow, "点击输入框后按下新的组合键。")
+            },
+            "点击输入框后按下新的组合键。",
+        )
+        configureShortcut(closeTabShortcut, "关闭 Pi 标签页快捷键") { stroke ->
+            closeTabShortcutValue = stroke.toString()
+            closeTabShortcut.text = KeymapUtil.getKeystrokeText(stroke)
+        }
+        addField(
+            "关闭 Pi 标签页快捷键：",
+            shortcutRow(closeTabShortcut, "清除关闭 Pi 标签页快捷键") {
+                closeTabShortcutValue = ""
+                closeTabShortcut.text = "未设置"
+            },
+            "点击输入框后按下新的组合键。",
+        )
         val chatFontSizeRow = JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
             isOpaque = false
             add(chatFontSize)
@@ -244,7 +243,8 @@ class PiSettingsConfigurable : Configurable {
             chatFontSizeValue() != state.chatFontSize ||
             taskCompletionSound.isSelected != state.taskCompletionSoundEnabled ||
             panelShortcutValue != state.panelShortcut ||
-            newTabShortcutValue != state.newTabShortcut
+            newTabShortcutValue != state.newTabShortcut ||
+            closeTabShortcutValue != state.closeTabShortcut
     }
 
     override fun apply() {
@@ -262,6 +262,7 @@ class PiSettingsConfigurable : Configurable {
         state.taskCompletionSoundEnabled = taskCompletionSound.isSelected
         state.panelShortcut = panelShortcutValue
         state.newTabShortcut = newTabShortcutValue
+        state.closeTabShortcut = closeTabShortcutValue
         settings.applyShortcuts()
         if (proxyChanged) settings.notifyNetworkProxyChanged()
         if (fontSizeChanged) settings.notifyChatFontSizeChanged()
@@ -282,6 +283,9 @@ class PiSettingsConfigurable : Configurable {
         newTabShortcutValue = state.newTabShortcut
         val newTabKeyStroke = newTabShortcutValue.takeIf { it.isNotBlank() }?.let { KeyStroke.getKeyStroke(it) }
         newTabShortcut.text = newTabKeyStroke?.let(KeymapUtil::getKeystrokeText) ?: "未设置"
+        closeTabShortcutValue = state.closeTabShortcut
+        val closeTabKeyStroke = closeTabShortcutValue.takeIf { it.isNotBlank() }?.let { KeyStroke.getKeyStroke(it) }
+        closeTabShortcut.text = closeTabKeyStroke?.let(KeymapUtil::getKeystrokeText) ?: "未设置"
     }
 
     override fun disposeUIResources() {

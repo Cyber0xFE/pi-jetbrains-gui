@@ -49,8 +49,9 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         /** Base font size in the Pi chat webview, in CSS pixels. */
         var chatFontSize: Int = DEFAULT_CHAT_FONT_SIZE,
         var logDirectory: String = "",
-        var panelShortcut: String = "ctrl alt pressed K",
-        var newTabShortcut: String = "ctrl shift pressed O",
+        var panelShortcut: String = DEFAULT_PANEL_SHORTCUT,
+        var newTabShortcut: String = DEFAULT_NEW_TAB_SHORTCUT,
+        var closeTabShortcut: String = DEFAULT_CLOSE_TAB_SHORTCUT,
         /** Preferred model shown as the default in the model picker. */
         var defaultModelProvider: String = "",
         var defaultModelId: String = "",
@@ -132,8 +133,10 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         var keymap = manager.activeKeymap
         val panelStroke = state.panelShortcut.toKeyStroke()
         val newTabStroke = state.newTabShortcut.toKeyStroke()
+        val closeTabStroke = state.closeTabShortcut.toKeyStroke()
         val usesOnlyDefaults = panelStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_PANEL_SHORTCUT) &&
-            newTabStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_NEW_TAB_SHORTCUT)
+            newTabStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_NEW_TAB_SHORTCUT) &&
+            closeTabStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_CLOSE_TAB_SHORTCUT)
         if (!keymap.canModify() && !usesOnlyDefaults) {
             keymap = manager.getKeymap("Pi JetBrains GUI") ?: keymap.deriveKeymap("Pi JetBrains GUI").also {
                 manager.schemeManager.addScheme(it)
@@ -144,6 +147,7 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         listOf(
             SHOW_PI_TOOL_WINDOW_ACTION_ID to panelStroke,
             NEW_PI_TAB_ACTION_ID to newTabStroke,
+            CLOSE_PI_TAB_ACTION_ID to closeTabStroke,
         ).forEach { (actionId, stroke) ->
             keymap.removeAllActionShortcuts(actionId)
             if (stroke != null) keymap.addShortcut(actionId, KeyboardShortcut(stroke, null))
@@ -155,8 +159,10 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         val CHAT_FONT_SIZE_CHANGED = Topic.create("Pi chat font size changed", PiChatFontSizeListener::class.java)
         const val SHOW_PI_TOOL_WINDOW_ACTION_ID = "dev.pi.jetbrains.ShowPiToolWindow"
         const val NEW_PI_TAB_ACTION_ID = "dev.pi.jetbrains.NewPiTab"
+        const val CLOSE_PI_TAB_ACTION_ID = "dev.pi.jetbrains.ClosePiTab"
         const val DEFAULT_PANEL_SHORTCUT = "ctrl alt pressed K"
         const val DEFAULT_NEW_TAB_SHORTCUT = "ctrl shift pressed O"
+        const val DEFAULT_CLOSE_TAB_SHORTCUT = "ctrl pressed W"
         const val DEFAULT_CHAT_FONT_SIZE = 14
         const val MIN_CHAT_FONT_SIZE = 10
         const val MAX_CHAT_FONT_SIZE = 32

@@ -130,5 +130,14 @@ class PiChatTabsService(private val project: Project) : Disposable {
         }
     }
 
+    fun closeSelectedTab() {
+        ApplicationManager.getApplication().invokeLater {
+            if (project.isDisposed) return@invokeLater
+            val window = ToolWindowManager.getInstance(project).getToolWindow("Pi") ?: return@invokeLater
+            val content = window.contentManager.selectedContent ?: return@invokeLater
+            window.contentManager.removeContent(content, true)
+        }
+    }
+
     override fun dispose() = Unit // Content and child disposables release panels and processes.
 }
