@@ -39,6 +39,8 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
     data class State(
         var nodePath: String = "",
         var networkProxy: String = "",
+        /** Keeps existing configured proxies active when upgrading from older settings. */
+        var networkProxyEnabled: Boolean = true,
         /** Retained for compatibility with existing settings files; no approval extension is loaded. */
         var approvalsEnabled: Boolean = false,
         var approveBash: Boolean = false,
@@ -61,6 +63,7 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
 
     /** Only overrides inherited proxy variables when a proxy is explicitly configured. */
     fun processEnvironment(): Map<String, String> {
+        if (!state.networkProxyEnabled) return emptyMap()
         val proxy = state.networkProxy.trim()
         return if (proxy.isEmpty()) emptyMap() else mapOf("HTTP_PROXY" to proxy, "HTTPS_PROXY" to proxy)
     }

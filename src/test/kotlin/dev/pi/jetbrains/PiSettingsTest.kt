@@ -26,6 +26,15 @@ class PiSettingsTest {
     }
 
     @Test
+    fun `disabled proxy does not override inherited environment`() {
+        val settings = PiSettings()
+        settings.getState().networkProxy = "http://127.0.0.1:7890"
+        settings.getState().networkProxyEnabled = false
+
+        assertTrue(settings.processEnvironment().isEmpty())
+    }
+
+    @Test
     fun `loaded settings restore proxy and clearing removes overrides`() {
         val settings = PiSettings()
         settings.loadState(PiSettings.State(networkProxy = "http://localhost:8080"))

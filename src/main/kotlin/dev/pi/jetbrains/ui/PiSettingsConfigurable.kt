@@ -25,9 +25,13 @@ import javax.swing.KeyStroke
 /** Settings page for runtime discovery, approvals and diagnostics. */
 class PiSettingsConfigurable : Configurable {
     private val nodePath = JTextField()
+    private val networkProxyEnabled = JCheckBox("启用网络代理").apply {
+        toolTipText = "关闭后不使用此处配置的代理，Pi 将继承系统环境"
+        accessibleContext.accessibleName = "启用网络代理"
+    }
     private val networkProxy = JTextField().apply {
         toolTipText = "例如 http://127.0.0.1:7890；同时设置 HTTP_PROXY / HTTPS_PROXY；留空则继承系统环境"
-        accessibleContext.accessibleName = "网络代理"
+        accessibleContext.accessibleName = "网络代理地址"
     }
     private val logDirectory = JTextField()
     private val taskCompletionSound = JCheckBox("任务完成时播放声音")
@@ -103,10 +107,16 @@ class PiSettingsConfigurable : Configurable {
 
         addSection("运行环境")
         addField("Node.js 路径（可选）：", nodePath, "留空时自动从系统 PATH 中查找 Node.js。")
+        val networkProxyRow = JPanel(BorderLayout(0, 4)).apply {
+            isOpaque = false
+            add(networkProxyEnabled, BorderLayout.NORTH)
+            add(networkProxy, BorderLayout.CENTER)
+        }
+        networkProxyEnabled.addActionListener { networkProxy.isEnabled = networkProxyEnabled.isSelected }
         addField(
             "网络代理（可选）：",
-            networkProxy,
-            "<html>同时设置 HTTP_PROXY / HTTPS_PROXY，例如 http://127.0.0.1:7890；留空则继承系统环境。<br>应用代理更改会重启 Pi 并恢复会话，正在执行的任务会中断。</html>",
+            networkProxyRow,
+            "<html>同时设置 HTTP_PROXY / HTTPS_PROXY，例如 http://127.0.0.1:7890；关闭或留空则继承系统环境。<br>应用代理更改会重启 Pi 并恢复会话，正在执行的任务会中断。</html>",
         )
 
         addSection("界面与行为")
@@ -173,6 +183,7 @@ class PiSettingsConfigurable : Configurable {
     override fun isModified(): Boolean {
         val state = PiSettings.get().getState()
         return nodePath.text != state.nodePath ||
+            networkProxyEnabled.isSelected != state.networkProxyEnabled ||
             networkProxy.text.trim() != state.networkProxy ||
             logDirectory.text != state.logDirectory ||
             taskCompletionSound.isSelected != state.taskCompletionSoundEnabled ||
@@ -182,8 +193,10 @@ class PiSettingsConfigurable : Configurable {
     override fun apply() {
         val settings = PiSettings.get()
         val state = settings.getState()
+        val proxyEnabled = networkProxyEnabled.isSelected
         val proxy = networkProxy.text.trim()
-        val proxyChanged = proxy != state.networkProxy
+        val proxyChanged = proxyEnabled != state.networkProxyEnabled || proxy != state.networkProxy
+        state.networkProxyEnabled = proxyEnabled
         state.networkProxy = proxy
         state.nodePath = nodePath.text.trim()
         state.logDirectory = logDirectory.text.trim()
@@ -196,7 +209,9 @@ class PiSettingsConfigurable : Configurable {
     override fun reset() {
         val state = PiSettings.get().getState()
         nodePath.text = state.nodePath
+        networkProxyEnabled.isSelected = state.networkProxyEnabled
         networkProxy.text = state.networkProxy
+        networkProxy.isEnabled = state.networkProxyEnabled
         logDirectory.text = state.logDirectory
         taskCompletionSound.isSelected = state.taskCompletionSoundEnabled
         panelShortcutValue = state.panelShortcut
