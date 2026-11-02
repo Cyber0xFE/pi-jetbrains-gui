@@ -17,7 +17,11 @@ describe("Toolbar", () => {
 
     expect(screen.queryByRole("button", { name: "新建会话" })).toBeNull();
     expect(screen.getAllByRole("button")).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", { name: "未命名会话" }));
+
+    const sessionButton = screen.getByRole("button", { name: "未命名会话" });
+    expect(sessionButton.querySelector(".toolbar-session-chevron")).not.toBeNull();
+
+    fireEvent.click(sessionButton);
     expect(onOpenSessions).toHaveBeenCalledTimes(1);
   });
 });

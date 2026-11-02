@@ -33,6 +33,22 @@ export function Toolbar({
       >
         <span className="toolbar-session-mark" aria-hidden="true" />
         <span className="toolbar-session-label">{sessionLabel}</span>
+        <svg
+          className="toolbar-session-chevron"
+          aria-hidden="true"
+          width="10"
+          height="10"
+          viewBox="0 0 10 10"
+        >
+          <path
+            d="M2 3.5 L5 6.5 L8 3.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       </button>
     </header>
   );
