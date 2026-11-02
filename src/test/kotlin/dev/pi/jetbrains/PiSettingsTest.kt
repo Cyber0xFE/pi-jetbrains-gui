@@ -12,6 +12,8 @@ class PiSettingsTest {
         assertEquals(PiSettings.DEFAULT_CHAT_FONT_SIZE, settings.getState().chatFontSize)
         assertEquals(PiSettings.DEFAULT_NEW_TAB_SHORTCUT, settings.getState().newTabShortcut)
         assertEquals(PiSettings.DEFAULT_CLOSE_TAB_SHORTCUT, settings.getState().closeTabShortcut)
+        assertEquals(PiSettings.DEFAULT_PREVIOUS_TAB_SHORTCUT, settings.getState().previousTabShortcut)
+        assertEquals(PiSettings.DEFAULT_NEXT_TAB_SHORTCUT, settings.getState().nextTabShortcut)
 
         settings.getState().networkProxy = "   "
         assertTrue(settings.processEnvironment().isEmpty())

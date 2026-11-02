@@ -318,7 +318,7 @@ export function Composer({
             type="button"
             className="composer-send"
             onClick={onSend}
-            disabled={disabled || (value.trim().length === 0 && images.length === 0)}
+            disabled={disabled || (value.trim().length === 0 && images.length === 0 && !pendingContext)}
             title="Send"
             aria-label="Send"
           >

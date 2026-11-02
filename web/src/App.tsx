@@ -24,6 +24,7 @@ export function App(): JSX.Element {
   const [sessionDialogTab, setSessionDialogTab] = useState<SessionDialogTab>("sessions");
   const [images, setImages] = useState<PromptImage[]>([]);
   const [pendingPrompt, setPendingPrompt] = useState(false);
+  const [scrollToLatestRequest, setScrollToLatestRequest] = useState(0);
   const pendingPromptStartedAt = useRef<number | null>(null);
   const pendingPromptTimer = useRef<number | null>(null);
 
@@ -116,10 +117,11 @@ export function App(): JSX.Element {
 
   const send = useCallback(() => {
     const text = draft.trim();
-    if (text.length === 0 && images.length === 0) return;
+    if (text.length === 0 && images.length === 0 && !state.status.pendingContext) return;
     if (pendingPromptTimer.current !== null) window.clearTimeout(pendingPromptTimer.current);
     pendingPromptStartedAt.current = Date.now();
     setPendingPrompt(true);
+    setScrollToLatestRequest((current) => current + 1);
     store.dispatch({ kind: "submit" });
     setDraft("");
     setImages([]);
@@ -129,7 +131,7 @@ export function App(): JSX.Element {
     window.requestAnimationFrame(() => {
       post({ type: "prompt", message: text, images: images.length > 0 ? images : undefined });
     });
-  }, [draft, images, store]);
+  }, [draft, images, state.status.pendingContext, store]);
 
   const abort = useCallback(() => post({ type: "abort" }), []);
 
@@ -264,6 +266,7 @@ export function App(): JSX.Element {
         emptyHint={ready ? "Ask pi about this project…" : state.status.message}
         thinkingLabel={state.thinkingLabel}
         connecting={pendingPrompt || (state.sending && !state.busy)}
+        scrollToLatestRequest={scrollToLatestRequest}
       />
       <Composer
         value={draft}

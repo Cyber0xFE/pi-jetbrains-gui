@@ -23,9 +23,19 @@ interface Props {
   emptyHint: string;
   thinkingLabel: string | null;
   connecting: boolean;
+  scrollToLatestRequest?: number;
 }
 
-export function MessageList({ messages, files = EMPTY_FILE_REFERENCES, tools, loadingHistory, emptyHint, thinkingLabel, connecting }: Props): JSX.Element {
+export function MessageList({
+  messages,
+  files = EMPTY_FILE_REFERENCES,
+  tools,
+  loadingHistory,
+  emptyHint,
+  thinkingLabel,
+  connecting,
+  scrollToLatestRequest = 0,
+}: Props): JSX.Element {
   recordPerf("message_list_render", 0, { messages: messages.length, tools: Object.keys(tools).length });
   const scroller = useRef<HTMLDivElement>(null);
   const outlineScroller = useRef<HTMLDivElement>(null);
@@ -116,6 +126,16 @@ export function MessageList({ messages, files = EMPTY_FILE_REFERENCES, tools, lo
       previousScrollTop.current = element.scrollTop;
     }
   }, [messages, tools]);
+
+  useEffect(() => {
+    const element = scroller.current;
+    if (!element) return;
+    stickToBottom.current = true;
+    latestButtonVisible.current = false;
+    setShowLatestButton(false);
+    element.scrollTop = element.scrollHeight;
+    previousScrollTop.current = element.scrollTop;
+  }, [scrollToLatestRequest]);
 
   useEffect(() => () => {
     if (scrollFrame.current !== null) window.cancelAnimationFrame(scrollFrame.current);

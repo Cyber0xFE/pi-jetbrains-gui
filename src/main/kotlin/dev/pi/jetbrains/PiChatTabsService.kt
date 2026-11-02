@@ -139,5 +139,21 @@ class PiChatTabsService(private val project: Project) : Disposable {
         }
     }
 
+    /** Selects the neighboring Pi tab, wrapping at either end of the tab strip. */
+    fun switchTab(direction: Int) {
+        ApplicationManager.getApplication().invokeLater {
+            if (project.isDisposed) return@invokeLater
+            val window = ToolWindowManager.getInstance(project).getToolWindow("Pi") ?: return@invokeLater
+            val contents = window.contentManager.contents
+            if (contents.size < 2) return@invokeLater
+            val selectedIndex = window.contentManager.selectedContent?.let(contents::indexOf)
+                ?.takeIf { it >= 0 } ?: return@invokeLater
+            val nextIndex = (selectedIndex + direction).mod(contents.size)
+            val content = contents[nextIndex]
+            window.contentManager.setSelectedContent(content)
+            (content.component as? ChatPanel)?.requestComposerFocus()
+        }
+    }
+
     override fun dispose() = Unit // Content and child disposables release panels and processes.
 }

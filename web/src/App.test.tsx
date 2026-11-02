@@ -386,6 +386,49 @@ describe("App", () => {
     );
   });
 
+  it("completes a directory reference and sends it with the prompt", async () => {
+    render(<App />);
+    await waitFor(() => expect(window.__piDeliver).toBeDefined());
+
+    deliver(
+      { type: "status", status: { phase: "running", message: "ready", model: "m" } },
+      { type: "files", files: ["src", "src/main.kt", "docs"] },
+    );
+    const input = screen.getByRole("textbox", { name: "Message to pi" }) as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "Please inspect @doc" } });
+    fireEvent.click(await screen.findByRole("option", { name: /docs/ }));
+    expect(input.value).toBe("Please inspect @docs ");
+
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() =>
+      expect(window.__piSent).toContainEqual({ type: "prompt", message: "Please inspect @docs" }),
+    );
+  });
+
+  it("sends selected editor context when the message is empty", async () => {
+    render(<App />);
+    await waitFor(() => expect(window.__piDeliver).toBeDefined());
+
+    deliver(
+      {
+        type: "status",
+        status: { phase: "running", message: "ready", model: "m", pendingContext: "src/main.kt:4-6" },
+      },
+    );
+
+    const input = await screen.findByRole("textbox", { name: "Message to pi" });
+    const sendButton = screen.getByRole("button", { name: "Send" });
+    await waitFor(() => expect((sendButton as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(sendButton);
+
+    await waitFor(() =>
+      expect(window.__piSent?.filter((message) => message.type === "prompt")).toEqual([
+        { type: "prompt", message: "" },
+      ]),
+    );
+    expect((input as HTMLTextAreaElement).value).toBe("");
+  });
+
   it("opens the current session tree with /tree", async () => {
     render(<App />);
     await waitFor(() => expect(window.__piDeliver).toBeDefined());

@@ -56,6 +56,10 @@ class PiSettingsConfigurable : Configurable {
     private var newTabShortcutValue = ""
     private val closeTabShortcut = JTextField()
     private var closeTabShortcutValue = ""
+    private val previousTabShortcut = JTextField()
+    private var previousTabShortcutValue = ""
+    private val nextTabShortcut = JTextField()
+    private var nextTabShortcutValue = ""
     private var panel: JPanel? = null
 
     override fun getDisplayName(): String = "Pi"
@@ -203,6 +207,30 @@ class PiSettingsConfigurable : Configurable {
             },
             "点击输入框后按下新的组合键。",
         )
+        configureShortcut(previousTabShortcut, "上一个 Pi 标签页快捷键") { stroke ->
+            previousTabShortcutValue = stroke.toString()
+            previousTabShortcut.text = KeymapUtil.getKeystrokeText(stroke)
+        }
+        addField(
+            "上一个 Pi 标签页快捷键：",
+            shortcutRow(previousTabShortcut, "清除上一个 Pi 标签页快捷键") {
+                previousTabShortcutValue = ""
+                previousTabShortcut.text = "未设置"
+            },
+            "点击输入框后按下新的组合键。",
+        )
+        configureShortcut(nextTabShortcut, "下一个 Pi 标签页快捷键") { stroke ->
+            nextTabShortcutValue = stroke.toString()
+            nextTabShortcut.text = KeymapUtil.getKeystrokeText(stroke)
+        }
+        addField(
+            "下一个 Pi 标签页快捷键：",
+            shortcutRow(nextTabShortcut, "清除下一个 Pi 标签页快捷键") {
+                nextTabShortcutValue = ""
+                nextTabShortcut.text = "未设置"
+            },
+            "点击输入框后按下新的组合键。",
+        )
         val chatFontSizeRow = JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
             isOpaque = false
             add(chatFontSize)
@@ -244,7 +272,9 @@ class PiSettingsConfigurable : Configurable {
             taskCompletionSound.isSelected != state.taskCompletionSoundEnabled ||
             panelShortcutValue != state.panelShortcut ||
             newTabShortcutValue != state.newTabShortcut ||
-            closeTabShortcutValue != state.closeTabShortcut
+            closeTabShortcutValue != state.closeTabShortcut ||
+            previousTabShortcutValue != state.previousTabShortcut ||
+            nextTabShortcutValue != state.nextTabShortcut
     }
 
     override fun apply() {
@@ -263,6 +293,8 @@ class PiSettingsConfigurable : Configurable {
         state.panelShortcut = panelShortcutValue
         state.newTabShortcut = newTabShortcutValue
         state.closeTabShortcut = closeTabShortcutValue
+        state.previousTabShortcut = previousTabShortcutValue
+        state.nextTabShortcut = nextTabShortcutValue
         settings.applyShortcuts()
         if (proxyChanged) settings.notifyNetworkProxyChanged()
         if (fontSizeChanged) settings.notifyChatFontSizeChanged()
@@ -286,6 +318,12 @@ class PiSettingsConfigurable : Configurable {
         closeTabShortcutValue = state.closeTabShortcut
         val closeTabKeyStroke = closeTabShortcutValue.takeIf { it.isNotBlank() }?.let { KeyStroke.getKeyStroke(it) }
         closeTabShortcut.text = closeTabKeyStroke?.let(KeymapUtil::getKeystrokeText) ?: "未设置"
+        previousTabShortcutValue = state.previousTabShortcut
+        val previousTabKeyStroke = previousTabShortcutValue.takeIf { it.isNotBlank() }?.let { KeyStroke.getKeyStroke(it) }
+        previousTabShortcut.text = previousTabKeyStroke?.let(KeymapUtil::getKeystrokeText) ?: "未设置"
+        nextTabShortcutValue = state.nextTabShortcut
+        val nextTabKeyStroke = nextTabShortcutValue.takeIf { it.isNotBlank() }?.let { KeyStroke.getKeyStroke(it) }
+        nextTabShortcut.text = nextTabKeyStroke?.let(KeymapUtil::getKeystrokeText) ?: "未设置"
     }
 
     override fun disposeUIResources() {

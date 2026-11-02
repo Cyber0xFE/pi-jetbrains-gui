@@ -350,13 +350,17 @@ class PiChatService(private val project: Project) : Disposable {
     /** Sends a prompt; queued editor context is prepended only once. */
     suspend fun prompt(message: String, images: List<RpcImage> = emptyList()): RpcResponse {
         val context = editorContext
-        val fullMessage = if (context.isNullOrBlank()) message else "$context\n\n$message"
+        val fullMessage = when {
+            context.isNullOrBlank() -> message
+            message.isBlank() -> context
+            else -> "$context\n\n$message"
+        }
         return requireClient().send(
             RpcCommand(type = "prompt", message = fullMessage, images = images.takeIf { it.isNotEmpty() }),
         ).await()
     }
 
-    /** Returns project-relative regular files used by the composer @ reference picker. */
+    /** Returns project-relative files and directories used by the composer @ reference picker. */
     fun projectFiles(): List<String> {
         val base = projectWorkDir() ?: return emptyList()
         return ProjectFileCollector.collect(base)

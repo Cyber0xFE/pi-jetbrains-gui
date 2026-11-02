@@ -19,7 +19,7 @@ class ProjectFileCollectorTest {
 
         val files = ProjectFileCollector.collect(tempDir)
 
-        assertEquals(5002, files.size)
+        assertEquals(5004, files.size)
         assertEquals("visuals/agent-flow.html", files.last())
     }
 
@@ -40,7 +40,10 @@ class ProjectFileCollectorTest {
         write("visuals/agent-flow.html")
         write("api/agent.py")
 
-        assertEquals(listOf("api/agent.py", "visuals/agent-flow.html"), ProjectFileCollector.collect(tempDir))
+        assertEquals(
+            listOf("api", "api/agent.py", "visuals", "visuals/agent-flow.html", "web"),
+            ProjectFileCollector.collect(tempDir),
+        )
     }
 
     @Test
@@ -54,8 +57,9 @@ class ProjectFileCollectorTest {
 
         assertEquals(
             listOf(
-                ".agents/skills/example/SKILL.md", ".gitignore", "docs/build",
-                "visuals/agent-flow.drawio", "visuals/agent-flow.html", "visuals/agent-flow.png",
+                ".agents", ".agents/skills", ".agents/skills/example", ".agents/skills/example/SKILL.md",
+                ".gitignore", "docs", "docs/build", "visuals", "visuals/agent-flow.drawio",
+                "visuals/agent-flow.html", "visuals/agent-flow.png",
             ),
             ProjectFileCollector.collect(tempDir),
         )

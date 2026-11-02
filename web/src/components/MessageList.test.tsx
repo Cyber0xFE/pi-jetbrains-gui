@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { MessageList } from "./MessageList";
 import type { ChatMessage } from "../state/sessionReducer";
@@ -249,6 +249,30 @@ it("keeps streaming updates from pulling an upward wheel gesture back to the bot
   const readingPosition = log.scrollTop;
   view.rerender(<MessageList {...props} tools={{}} />);
   expect(log.scrollTop).toBe(readingPosition);
+});
+
+it("returns to the latest message when a prompt is sent while reading upward", async () => {
+  const props = {
+    messages: [{
+      id: "user-1", role: "user" as const, blocks: [{ kind: "text" as const, text: "Question" }],
+      timestamp: 1, streaming: false,
+    }],
+    tools: {}, loadingHistory: false, emptyHint: "", thinkingLabel: null, connecting: false,
+  };
+  const view = render(<MessageList {...props} scrollToLatestRequest={0} />);
+  const log = view.getByRole("log");
+  Object.defineProperties(log, {
+    scrollHeight: { configurable: true, value: 2000 },
+    clientHeight: { configurable: true, value: 400 },
+  });
+  log.scrollTop = 600;
+  fireEvent.scroll(log);
+  await waitFor(() => expect(view.getByRole("button", { name: "Back to latest" })).toBeDefined());
+
+  view.rerender(<MessageList {...props} scrollToLatestRequest={1} />);
+
+  expect(log.scrollTop).toBe(2000);
+  expect(view.queryByRole("button", { name: "Back to latest" })).toBeNull();
 });
 
 it("reuses navigation offsets while scrolling and keeps the latest button outside the transcript layout", () => {

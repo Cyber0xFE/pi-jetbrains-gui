@@ -40,6 +40,12 @@
         <action id="dev.pi.jetbrains.ClosePiTab" class="dev.pi.jetbrains.ui.ClosePiTabAction">
             <keyboard-shortcut keymap="$default" first-keystroke="control W"/>
         </action>
+        <action id="dev.pi.jetbrains.PreviousPiTab" class="dev.pi.jetbrains.ui.PreviousPiTabAction">
+            <keyboard-shortcut keymap="$default" first-keystroke="control PAGE_UP"/>
+        </action>
+        <action id="dev.pi.jetbrains.NextPiTab" class="dev.pi.jetbrains.ui.NextPiTabAction">
+            <keyboard-shortcut keymap="$default" first-keystroke="control PAGE_DOWN"/>
+        </action>
         <action id="dev.pi.jetbrains.SendConsoleSelectionToPi" class="dev.pi.jetbrains.editor.SendConsoleSelectionToPiAction" icon="/icons/toolWindowPi.svg">
             <add-to-group group-id="ConsoleView.PopupMenu" anchor="last"/>
         </action>

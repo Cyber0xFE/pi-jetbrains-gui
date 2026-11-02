@@ -319,7 +319,8 @@ class ChatPanel(
                 bridge?.send(HostMessages.status(service.status.value))
             }
             "prompt" -> {
-                val text = message.message?.takeIf { it.isNotBlank() } ?: return
+                val text = message.message.orEmpty()
+                if (text.isBlank() && service.status.value.pendingContext == null) return
                 val images = message.images.map { RpcImage(data = it.data, mimeType = it.mimeType) }
                 scope.launch { request { service.prompt(text, images) } }
             }
