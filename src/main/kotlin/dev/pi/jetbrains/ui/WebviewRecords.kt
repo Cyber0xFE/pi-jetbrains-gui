@@ -78,24 +78,7 @@ internal object WebviewRecords {
 
     /** Bounded recursion (at most 64 levels), preserving JSON kinds and protocol metadata. */
     private fun project(value: JsonElement, budget: Int, depth: Int): JsonElement = when (value) {
-        is JsonObject -> {
-            val fields = LinkedHashMap<String, JsonElement>()
-            var remaining = budget - 2
-            if (depth < MAX_DEPTH) {
-                val keys = metadataKeys.asSequence().filter { it in value } +
-                    value.keys.asSequence().filter { it !in metadataKeys }
-                for (key in keys) {
-                    val overhead = stringBytes(key, remaining) + 1 + if (fields.isEmpty()) 0 else 1
-                    // Four bytes allow any empty JSON kind or a primitive placeholder.
-                    if (overhead + 4 > remaining) continue
-                    val child = project(value.getValue(key), remaining - overhead, depth + 1)
-                    fields[key] = child
-                    remaining -= overhead + jsonBytes(child)
-                    if (fields.size >= MAX_CONTAINER_ITEMS) break
-                }
-            }
-            JsonObject(fields)
-        }
+        is JsonObject -> projectObject(value, budget, depth)
         is JsonArray -> {
             val items = ArrayList<JsonElement>()
             var remaining = budget - 2
@@ -115,6 +98,35 @@ internal object WebviewRecords {
             if (value.isString) JsonPrimitive(truncate(value.content, minOf(budget, MAX_STRING_BYTES)))
             else if (jsonBytes(value, budget) <= budget) value else JsonNull
         }
+    }
+
+    private fun projectObject(value: JsonObject, budget: Int, depth: Int): JsonElement {
+        val fields = LinkedHashMap<String, JsonElement>()
+        var remaining = budget - 2
+        if (depth < MAX_DEPTH) {
+            val keys = metadataKeys.asSequence().filter { it in value } +
+                value.keys.asSequence().filter { it !in metadataKeys }
+            for (key in keys) {
+                val overhead = stringBytes(key, remaining) + 1 + if (fields.isEmpty()) 0 else 1
+                // Four bytes allow any empty JSON kind or a primitive placeholder.
+                if (overhead + 4 > remaining) continue
+                val child = project(value.getValue(key), remaining - overhead, depth + 1)
+                fields[key] = child
+                remaining -= overhead + jsonBytes(child)
+                if (fields.size >= MAX_CONTAINER_ITEMS) break
+            }
+        }
+        val projected = JsonObject(fields)
+        // A truncated or dropped image payload would render as a broken <img> in the webview;
+        // replace it with an explicit empty marker the webview shows as an omitted-image card.
+        val originalData = (value["data"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+        if (originalData != null &&
+            (value["type"] as? JsonPrimitive)?.contentOrNull == "image" &&
+            (projected["data"] as? JsonPrimitive)?.takeIf { it.isString }?.content != originalData
+        ) {
+            return JsonObject(projected.toMutableMap().apply { put("data", JsonPrimitive("")) })
+        }
+        return projected
     }
 
     private fun truncate(text: String, budget: Int): String {

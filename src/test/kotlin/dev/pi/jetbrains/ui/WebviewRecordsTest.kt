@@ -147,6 +147,53 @@ class WebviewRecordsTest {
         assertEquals(101, WebviewRecords.jsonBytes(JsonPrimitive("x".repeat(10000)), 100))
     }
 
+    @Test
+    fun `image payload that cannot survive projection becomes an empty placeholder`() {
+        val image = JsonObject(linkedMapOf(
+            "type" to JsonPrimitive("image"),
+            "data" to JsonPrimitive("aGVsbG8=".repeat(60_000)),
+            "mimeType" to JsonPrimitive("image/png"),
+        ))
+        val record = JsonObject(linkedMapOf(
+            "message" to JsonObject(linkedMapOf(
+                "role" to JsonPrimitive("user"),
+                "content" to JsonArray(listOf(image)),
+            )),
+            "type" to JsonPrimitive("message_start"),
+        ))
+        val safe = WebviewRecords.protect(record) as JsonObject
+        assertBounded(safe)
+        assertEquals(JsonPrimitive(true), safe["recordTruncated"])
+        val projectedImage = (((safe["message"] as JsonObject)["content"] as JsonArray)[0]) as JsonObject
+        assertEquals(JsonPrimitive("image"), projectedImage["type"])
+        assertEquals(JsonPrimitive("image/png"), projectedImage["mimeType"])
+        assertEquals(JsonPrimitive(""), projectedImage["data"])
+    }
+
+    @Test
+    fun `image payload that fits the budget stays intact`() {
+        val image = JsonObject(linkedMapOf(
+            "type" to JsonPrimitive("image"),
+            "data" to JsonPrimitive("aGVsbG8=".repeat(8_000)),
+            "mimeType" to JsonPrimitive("image/png"),
+        ))
+        val record = JsonObject(linkedMapOf(
+            "message" to JsonObject(linkedMapOf(
+                "role" to JsonPrimitive("user"),
+                "content" to JsonArray(listOf(
+                    JsonObject(linkedMapOf("type" to JsonPrimitive("text"), "text" to JsonPrimitive("x".repeat(200_000)))),
+                    image,
+                )),
+            )),
+            "type" to JsonPrimitive("message_start"),
+        ))
+        val safe = WebviewRecords.protect(record) as JsonObject
+        assertBounded(safe)
+        val content = (safe["message"] as JsonObject)["content"] as JsonArray
+        assertEquals(2, content.size)
+        assertEquals(image, content[1])
+    }
+
     private fun parse(json: String): JsonElement = PiJson.parseToJsonElement(json)
 
     private fun assertBounded(value: JsonElement) {

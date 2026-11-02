@@ -1415,6 +1415,17 @@ body {
   border-radius: 4px;
 }
 
+.image-omitted {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  font-size: 0.82em;
+  color: var(--fg-dim);
+}
+
 .image-preview-trigger {
   display: inline-flex;
   max-width: 100%;
