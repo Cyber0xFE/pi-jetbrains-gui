@@ -52,7 +52,7 @@ class PiChatTabsService(private val project: Project) : Disposable {
         Disposer.register(this, session)
         val number = nextTabNumber++
         var content: Content? = null
-        val panel = ChatPanel(project, session, ::activateSession) { status ->
+        val panel = ChatPanel(project, session, ::activateSession, diagnosticName = "Chat $number") { status ->
             val currentContent = content ?: return@ChatPanel
             val running = status.isStreaming || status.isCompacting
             when {

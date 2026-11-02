@@ -75,6 +75,7 @@ class ChatPanel(
     private val project: Project,
     private val service: PiChatService,
     private val activateSession: (String) -> Boolean,
+    private val diagnosticName: String = "chat",
     private val onStatusChanged: (PiChatService.Status) -> Unit = {},
 ) : JPanel(BorderLayout()), Disposable {
     val sessionFile: String? get() = service.status.value.sessionFile
@@ -147,8 +148,9 @@ class ChatPanel(
         }
         val created = JBCefBrowser()
         val createdBridge = WebViewBridge(created, ::onClientMessage, log = { text ->
-            LOG.debug(text)
-            scope.launch { service.logDiagnostic(text) }
+            val prefix = diagnosticPrefix()
+            LOG.debug("$prefix $text")
+            scope.launch { service.logDiagnostic("$prefix $text") }
         })
         browser = created
         bridge = createdBridge
@@ -254,13 +256,31 @@ class ChatPanel(
             // A session switch reset the transcript while this batch was coalescing; the events
             // belong to the old session and must not be appended after the reset.
             if (synchronized(hydrationLock) { generation } != startGeneration) continue
-            bridge?.send(HostMessages.records(batch))
-            batchCount++
-            recordCount += batch.size
+            val recordBatches = WebviewRecords.batches(batch)
+            for (records in recordBatches) {
+                // Check every split batch: a reset can occur while a large drain is being split.
+                val message = HostMessages.records(records)
+                val sent = synchronized(hydrationLock) {
+                    if (generation != startGeneration) false else {
+                        bridge?.send(message)
+                        true
+                    }
+                }
+                if (!sent) break
+                val bytes = WebviewRecords.jsonBytes(message)
+                if (bytes >= WebviewRecords.DIAGNOSTIC_BYTES) {
+                    service.logDiagnostic(
+                        "${diagnosticPrefix()} [webview-records] records=${records.size} " +
+                            "payloadBytes=$bytes entries=${WebviewRecords.describe(records)}",
+                    )
+                }
+                batchCount++
+                recordCount += records.size
+            }
             val now = System.nanoTime()
             if (now - lastDiagnosticAt >= DIAGNOSTIC_INTERVAL_NS) {
                 service.logDiagnostic(
-                    "[webview-perf] native_records batches=$batchCount records=$recordCount pending=${pending.size} " +
+                    "${diagnosticPrefix()} [webview-perf] native_records batches=$batchCount records=$recordCount pending=${pending.size} " +
                     "heldUpdates=${synchronized(heldUpdatesLock) { heldUpdates.size }}",
                 )
                 batchCount = 0
@@ -269,6 +289,9 @@ class ChatPanel(
             }
         }
     }
+
+    private fun diagnosticPrefix(): String =
+        "[tab=$diagnosticName session=${service.status.value.sessionFile ?: "-"}]"
 
     private fun onClientMessage(message: ClientMessage) {
         when (message.type) {
@@ -295,8 +318,9 @@ class ChatPanel(
             }
             "open_url" -> message.url?.let { EditorNavigator.openUrl(it) }
             "log" -> message.message?.let { text ->
-                LOG.info("[webview] $text")
-                scope.launch { service.logDiagnostic(text) }
+                val prefix = diagnosticPrefix()
+                LOG.info("$prefix [webview] $text")
+                scope.launch { service.logDiagnostic("$prefix $text") }
             }
 
             // ---- M3: sessions ------------------------------------------------------------------
@@ -727,11 +751,17 @@ class ChatPanel(
     }
 
     private fun toRecord(event: PiEvent): JsonElement? = when (event) {
-        is PiEvent.Session -> capJsonDepth(protectLargeToolRecord(event.payload))
-        is PiEvent.ExtensionUiRequest -> capJsonDepth(event.payload)
-        is PiEvent.Response -> HostMessages.response(event.response)
+        is PiEvent.Session -> protectWebviewRecord(event.payload)
+        is PiEvent.ExtensionUiRequest -> protectWebviewRecord(event.payload)
+        is PiEvent.Response -> protectWebviewRecord(HostMessages.response(event.response))
         is PiEvent.Unknown -> null
     }
+
+    /** Bounds every live record before it can enter the WebView, not only tool results. */
+    private fun protectWebviewRecord(record: JsonElement): JsonElement =
+        WebviewRecords.protect(record) { text ->
+            service.logDiagnostic("${diagnosticPrefix()} $text")
+        }
 
     /**
      * Rebuilds the tree with a depth cap, iteratively. Both kotlinx's tree encoder and
@@ -776,16 +806,6 @@ class ChatPanel(
         val depth: Int,
         val assign: (JsonElement) -> Unit,
     )
-
-    /** Prevents a multi-megabyte tool result from being injected into JCEF and rendered at once. */
-    private fun protectLargeToolRecord(payload: JsonObject): JsonElement {
-        val type = payload.string("type") ?: return payload
-        if (type != "tool_execution_update" && type != "tool_execution_end") return payload
-        val resultKey = if (type == "tool_execution_update") "partialResult" else "result"
-        val result = payload[resultKey] ?: return payload
-        val protectedResult = compactLargeResult(result) ?: return payload
-        return JsonObject(payload.toMutableMap().apply { put(resultKey, protectedResult) })
-    }
 
     private fun protectLargeHistoryMessage(message: JsonElement): JsonElement {
         val objectMessage = message as? JsonObject ?: return message
