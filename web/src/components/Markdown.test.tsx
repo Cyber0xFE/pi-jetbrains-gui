@@ -21,6 +21,22 @@ describe("closeOpenFence", () => {
 });
 
 describe("Markdown", () => {
+  it("keeps file paths inside inline code as code", () => {
+    const source = "你指向的 `api/app/agents/specialists.py:154-232` 是 **`QualityReviewAgent`（质量审查 Agent）**。";
+    const { container } = render(
+      <Markdown text={source} streaming={false} fileReferences={["api/app/agents/specialists.py"]} />,
+    );
+    expect(container.querySelector(".md-file-reference")).toBeNull();
+    expect(container.querySelectorAll("code")).toHaveLength(2);
+    expect(container.querySelector("strong")?.textContent).toBe("QualityReviewAgent（质量审查 Agent）");
+  });
+
+  it("keeps ordinary inline code containing an operator untouched", () => {
+    const source = "Use `a ** b` in the expression.";
+    const { container } = render(<Markdown text={source} streaming={false} />);
+    expect(container.querySelector("code")?.textContent).toBe("a ** b");
+  });
+
   it("parses line numbers from local file links", () => {
     expect(fileReferenceFromLink("api/app/services/agent_runs.py:499")).toEqual({
       path: "api/app/services/agent_runs.py",

@@ -229,6 +229,10 @@ class ChatPanel(
         bridge?.send(HostMessages.focusComposer())
     }
 
+    fun scrollToLatest() {
+        bridge?.send(HostMessages.scrollToLatest())
+    }
+
     /** Queues a record for the webview, or parks it while the transcript is still hydrating. */
     private fun routeRecord(record: JsonElement) {
         synchronized(hydrationLock) {
@@ -320,7 +324,7 @@ class ChatPanel(
             }
             "prompt" -> {
                 val text = message.message.orEmpty()
-                if (text.isBlank() && service.status.value.pendingContext == null) return
+                if (text.isBlank() && message.images.isEmpty() && service.status.value.pendingContext == null) return
                 val images = message.images.map { RpcImage(data = it.data, mimeType = it.mimeType) }
                 scope.launch { request { service.prompt(text, images) } }
             }

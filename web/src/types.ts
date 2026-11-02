@@ -234,6 +234,7 @@ export type Inbound =
   | { type: "reset"; reason: string }
   | { type: "prefill"; text: string; images?: PromptImage[] }
   | { type: "focus_composer" }
+  | { type: "scroll_to_latest" }
   | { type: "widget"; key: string; lines: string[]; placement: "aboveEditor" | "belowEditor" }
   | { type: "extension_status"; key: string; text: string | null };
 

@@ -60,6 +60,8 @@ class PiSettingsConfigurable : Configurable {
     private var previousTabShortcutValue = ""
     private val nextTabShortcut = JTextField()
     private var nextTabShortcutValue = ""
+    private val scrollToLatestShortcut = JTextField()
+    private var scrollToLatestShortcutValue = ""
     private var panel: JPanel? = null
 
     override fun getDisplayName(): String = "Pi"
@@ -231,6 +233,18 @@ class PiSettingsConfigurable : Configurable {
             },
             "点击输入框后按下新的组合键。",
         )
+        configureShortcut(scrollToLatestShortcut, "跳转到 Pi 最新消息快捷键") { stroke ->
+            scrollToLatestShortcutValue = stroke.toString()
+            scrollToLatestShortcut.text = KeymapUtil.getKeystrokeText(stroke)
+        }
+        addField(
+            "跳转到 Pi 最新消息快捷键：",
+            shortcutRow(scrollToLatestShortcut, "清除跳转到 Pi 最新消息快捷键") {
+                scrollToLatestShortcutValue = ""
+                scrollToLatestShortcut.text = "未设置"
+            },
+            "点击输入框后按下新的组合键。",
+        )
         val chatFontSizeRow = JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
             isOpaque = false
             add(chatFontSize)
@@ -274,7 +288,8 @@ class PiSettingsConfigurable : Configurable {
             newTabShortcutValue != state.newTabShortcut ||
             closeTabShortcutValue != state.closeTabShortcut ||
             previousTabShortcutValue != state.previousTabShortcut ||
-            nextTabShortcutValue != state.nextTabShortcut
+            nextTabShortcutValue != state.nextTabShortcut ||
+            scrollToLatestShortcutValue != state.scrollToLatestShortcut
     }
 
     override fun apply() {
@@ -295,6 +310,7 @@ class PiSettingsConfigurable : Configurable {
         state.closeTabShortcut = closeTabShortcutValue
         state.previousTabShortcut = previousTabShortcutValue
         state.nextTabShortcut = nextTabShortcutValue
+        state.scrollToLatestShortcut = scrollToLatestShortcutValue
         settings.applyShortcuts()
         if (proxyChanged) settings.notifyNetworkProxyChanged()
         if (fontSizeChanged) settings.notifyChatFontSizeChanged()
@@ -324,6 +340,9 @@ class PiSettingsConfigurable : Configurable {
         nextTabShortcutValue = state.nextTabShortcut
         val nextTabKeyStroke = nextTabShortcutValue.takeIf { it.isNotBlank() }?.let { KeyStroke.getKeyStroke(it) }
         nextTabShortcut.text = nextTabKeyStroke?.let(KeymapUtil::getKeystrokeText) ?: "未设置"
+        scrollToLatestShortcutValue = state.scrollToLatestShortcut
+        val scrollToLatestKeyStroke = scrollToLatestShortcutValue.takeIf { it.isNotBlank() }?.let { KeyStroke.getKeyStroke(it) }
+        scrollToLatestShortcut.text = scrollToLatestKeyStroke?.let(KeymapUtil::getKeystrokeText) ?: "未设置"
     }
 
     override fun disposeUIResources() {

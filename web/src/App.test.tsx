@@ -216,6 +216,18 @@ describe("App", () => {
     expect(log.scrollTop).toBe(2600);
   });
 
+  it("scrolls to the latest message when the host requests it", async () => {
+    render(<App />);
+    await waitFor(() => expect(window.__piDeliver).toBeDefined());
+    const log = screen.getByRole("log");
+    Object.defineProperty(log, "scrollHeight", { configurable: true, value: 2000 });
+    Object.defineProperty(log, "scrollTop", { configurable: true, writable: true, value: 0 });
+
+    deliver({ type: "scroll_to_latest" });
+
+    await waitFor(() => expect(log.scrollTop).toBe(2000));
+  });
+
   it("renames the current session from the session picker", async () => {
     render(<App />);
     await waitFor(() => expect(window.__piDeliver).toBeDefined());

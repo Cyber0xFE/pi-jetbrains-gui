@@ -5,6 +5,32 @@ import type { ChatMessage } from "../state/sessionReducer";
 import { initialState, reduce } from "../state/sessionReducer";
 import type { AssistantDelta } from "../types";
 
+it("opens sent images in a dismissible preview", () => {
+  const view = render(
+    <MessageList
+      messages={[{
+        id: "image-message",
+        role: "assistant",
+        blocks: [{ kind: "image", data: "aGVsbG8=", mimeType: "image/png" }],
+        timestamp: 1,
+        streaming: false,
+      }]}
+      tools={{}}
+      loadingHistory={false}
+      emptyHint=""
+      thinkingLabel={null}
+      connecting={false}
+    />,
+  );
+
+  fireEvent.click(view.getByRole("button", { name: "Preview image" }));
+  expect(view.getByRole("dialog", { name: "Image preview" })).toBeDefined();
+  expect(view.getByRole("button", { name: "Close image preview" })).toBeDefined();
+
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(view.queryByRole("dialog", { name: "Image preview" })).toBeNull();
+});
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
@@ -30,6 +56,30 @@ it.each([
   await act(async () => { fireEvent.click(button); });
   expect(writeText).toHaveBeenCalledWith(expected);
   expect(view.getByRole("button", { name: "已复制" })).toBeDefined();
+});
+
+it("renders file-only editor context as a clickable file chip", () => {
+  const view = render(
+    <MessageList
+      messages={[{
+        id: "context-only",
+        role: "user",
+        blocks: [{ kind: "text", text: "--- scripts/dump-rpc-schema.ts:8-18 ---\n" }],
+        timestamp: 1,
+        streaming: false,
+      }]}
+      tools={{}}
+      loadingHistory={false}
+      emptyHint=""
+      thinkingLabel={null}
+      connecting={false}
+    />,
+  );
+
+  expect(view.getByRole("button", { name: "Open scripts/dump-rpc-schema.ts and select lines 8-18" })).toBeDefined();
+  expect(view.container.querySelector(".message-editor-context")).not.toBeNull();
+  expect(view.container.querySelector(".message-user-body")).toBeNull();
+  expect(view.queryByText("--- scripts/dump-rpc-schema.ts:8-18 ---")).toBeNull();
 });
 
 it("collapses expanded skill instructions and keeps the user request visible", () => {

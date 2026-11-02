@@ -1415,6 +1415,64 @@ body {
   border-radius: 4px;
 }
 
+.image-preview-trigger {
+  display: inline-flex;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: zoom-in;
+  text-align: inherit;
+}
+
+.image-preview-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.image-preview-backdrop {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  background: rgba(0, 0, 0, 0.78);
+  cursor: zoom-out;
+}
+
+.image-preview-image {
+  max-width: min(96vw, 1400px);
+  max-height: 92vh;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  cursor: default;
+}
+
+.image-preview-close {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 27px;
+}
+
+.image-preview-close:hover {
+  background: rgba(0, 0, 0, 0.6);
+}
+
 .typing {
   color: var(--fg-dim);
 }
@@ -1515,12 +1573,18 @@ body {
   height: 52px;
 }
 
-.composer-image img {
+.composer-image-preview img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   border: 1px solid var(--border);
   border-radius: 4px;
+}
+
+.composer-image-preview {
+  width: 100%;
+  height: 100%;
+  cursor: zoom-in;
 }
 
 .composer-image-remove {

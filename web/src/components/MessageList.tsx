@@ -3,6 +3,7 @@ import { normalizeTaggedBlocks, type Block, type ChatMessage, type ToolState } f
 import { Markdown } from "./Markdown";
 import { CopyButton } from "./CopyButton";
 import { ToolCard } from "./tools/ToolCard";
+import { ImagePreview } from "./ImagePreview";
 import { recordPerf } from "../perfLog";
 import { useSmoothWheelScroll } from "../scroll";
 import { post } from "../bridge";
@@ -411,13 +412,16 @@ function MessageView({ message, fileReferences, previousAssistantModel, tools, t
       })
       .join("\n\n")
     : "";
+  const showUserBody = message.role !== "user" || !contextualText || contextualText.prompt.length > 0 ||
+    message.blocks.some((block) => block !== contextualText.block);
 
   return (
     <article className={`message message-${message.role}${contextualText ? " message-user-with-context" : ""}`} data-message-id={message.id}>
       {contextualText && <EditorContextView context={contextualText.context} />}
-      <div className={message.role === "user"
+      {showUserBody && <div className={message.role === "user"
         ? `message-user-content${contextualText ? " message-user-body" : ""}` : undefined}>
         {message.blocks.map((block, index) => {
+          if (contextualText && block === contextualText.block && contextualText.prompt.length === 0) return null;
           if (skillInvocation && block === skillInvocation.block) {
             return (
               <Fragment key={index}>
@@ -450,7 +454,7 @@ function MessageView({ message, fileReferences, previousAssistantModel, tools, t
           );
         })}
         {userText && <CopyButton className="message-user-copy" text={userText} title="复制用户消息" iconOnly />}
-      </div>
+      </div>}
       {message.streaming && message.blocks.length === 0 && <div className="typing">...</div>}
       {message.stopReason === "error" && (
         <div className="message-error">{message.errorMessage ?? "the request failed"}</div>
@@ -509,7 +513,22 @@ function findEditorContext(blocks: Block[]): { block: Extract<Block, { kind: "te
 
   const remainder = block.text.slice(header[0].length);
   const separator = /\r?\n\r?\n/.exec(remainder);
-  if (!separator || separator.index === undefined) return null;
+  if (!separator || separator.index === undefined) {
+    // Saved-file context has no selection text or follow-up prompt, so the payload ends
+    // immediately after the header's newline. Render it as a file chip instead of Markdown.
+    if (remainder.trim().length > 0) return null;
+    return {
+      block,
+      context: {
+        path: header[1] ?? "",
+        startLine: Number(header[2]),
+        endLine: header[3] ? Number(header[3]) : null,
+        buffer: Boolean(header[4]),
+        selection: "",
+      },
+      prompt: "",
+    };
+  }
   return {
     block,
     context: {
@@ -729,7 +748,13 @@ function BlockView({ block, fileReferences, tools, streaming, thinkingLabel, dur
     case "tool":
       return <ToolCard name={block.name} callId={block.callId} tool={tools[block.callId]} tools={tools} />;
     case "image":
-      return <img className="image" alt="" src={`data:${block.mimeType};base64,${block.data}`} />;
+      return (
+        <ImagePreview
+          className="image"
+          alt="Image"
+          src={`data:${block.mimeType};base64,${block.data}`}
+        />
+      );
     default:
       return null;
   }

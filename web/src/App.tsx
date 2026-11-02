@@ -73,6 +73,10 @@ export function App(): JSX.Element {
         setFocusDraftRequest((current) => current + 1);
         return;
       }
+      if (message.type === "scroll_to_latest") {
+        setScrollToLatestRequest((current) => current + 1);
+        return;
+      }
       store.dispatch({ kind: "inbound", message });
     });
     post({ type: "ready" });

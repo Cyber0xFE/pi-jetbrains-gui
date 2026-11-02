@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClipboardEvent, KeyboardEvent } from "react";
 import type { PromptImage, SlashCommand } from "../types";
+import { ImagePreview } from "./ImagePreview";
 
 interface Props {
   value: string;
@@ -238,7 +239,11 @@ export function Composer({
         <div className="composer-images" aria-label="Attached images">
           {images.map((image, index) => (
             <div className="composer-image" key={`${image.mimeType}:${index}`}>
-              <img src={`data:${image.mimeType};base64,${image.data}`} alt={`Attachment ${index + 1}`} />
+              <ImagePreview
+                src={`data:${image.mimeType};base64,${image.data}`}
+                alt={`Attachment ${index + 1}`}
+                triggerClassName="composer-image-preview"
+              />
               <button type="button" className="composer-image-remove" onClick={() => onRemoveImage(index)} aria-label="Remove image">
                 ×
               </button>

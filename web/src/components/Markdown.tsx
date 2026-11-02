@@ -64,6 +64,7 @@ function createRenderer(withHighlight: boolean, fileReferences: readonly string[
   });
   const referenceTrie = createReferenceTrie(fileReferences);
   renderer.inline.ruler.before("text", "file_reference", (state, silent) => {
+    if (state.src[state.pos] !== "@") return false;
     const preceding = state.src[state.pos - 1] ?? " ";
     if (!/[\s([{*_]/.test(preceding)) return false;
     const path = longestReferenceAt(state.src, state.pos + 1, referenceTrie);
