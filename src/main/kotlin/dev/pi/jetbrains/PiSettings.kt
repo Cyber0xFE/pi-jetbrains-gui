@@ -46,8 +46,11 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         var approveBash: Boolean = false,
         var approveWrite: Boolean = false,
         var taskCompletionSoundEnabled: Boolean = true,
+        /** Base font size in the Pi chat webview, in CSS pixels. */
+        var chatFontSize: Int = DEFAULT_CHAT_FONT_SIZE,
         var logDirectory: String = "",
         var panelShortcut: String = "ctrl alt pressed K",
+        var newTabShortcut: String = "ctrl shift pressed O",
         /** Preferred model shown as the default in the model picker. */
         var defaultModelProvider: String = "",
         var defaultModelId: String = "",
@@ -70,6 +73,10 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
 
     fun notifyNetworkProxyChanged() {
         ApplicationManager.getApplication().messageBus.syncPublisher(NETWORK_PROXY_CHANGED).networkProxyChanged()
+    }
+
+    fun notifyChatFontSizeChanged() {
+        ApplicationManager.getApplication().messageBus.syncPublisher(CHAT_FONT_SIZE_CHANGED).chatFontSizeChanged()
     }
 
     /**
@@ -118,28 +125,41 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         }.getOrDefault(false)
     }
 
-    fun applyPanelShortcut() {
-        val requestedStroke = state.panelShortcut.takeIf { it.isNotBlank() }
-            ?.let { javax.swing.KeyStroke.getKeyStroke(it) }
-        val isDefaultShortcut = requestedStroke == javax.swing.KeyStroke.getKeyStroke("ctrl alt pressed K")
+    fun applyPanelShortcut() = applyShortcuts()
+
+    fun applyShortcuts() {
         val manager = KeymapManagerEx.getInstanceEx()
         var keymap = manager.activeKeymap
-        if (!keymap.canModify()) {
-            if (isDefaultShortcut) return
+        val panelStroke = state.panelShortcut.toKeyStroke()
+        val newTabStroke = state.newTabShortcut.toKeyStroke()
+        val usesOnlyDefaults = panelStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_PANEL_SHORTCUT) &&
+            newTabStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_NEW_TAB_SHORTCUT)
+        if (!keymap.canModify() && !usesOnlyDefaults) {
             keymap = manager.getKeymap("Pi JetBrains GUI") ?: keymap.deriveKeymap("Pi JetBrains GUI").also {
                 manager.schemeManager.addScheme(it)
             }
             manager.setActiveKeymap(keymap)
         }
-        keymap.removeAllActionShortcuts(SHOW_PI_TOOL_WINDOW_ACTION_ID)
-        if (requestedStroke != null) {
-            keymap.addShortcut(SHOW_PI_TOOL_WINDOW_ACTION_ID, KeyboardShortcut(requestedStroke, null))
+        if (!keymap.canModify()) return
+        listOf(
+            SHOW_PI_TOOL_WINDOW_ACTION_ID to panelStroke,
+            NEW_PI_TAB_ACTION_ID to newTabStroke,
+        ).forEach { (actionId, stroke) ->
+            keymap.removeAllActionShortcuts(actionId)
+            if (stroke != null) keymap.addShortcut(actionId, KeyboardShortcut(stroke, null))
         }
     }
 
     companion object {
         val NETWORK_PROXY_CHANGED = Topic.create("Pi network proxy changed", PiNetworkProxyListener::class.java)
+        val CHAT_FONT_SIZE_CHANGED = Topic.create("Pi chat font size changed", PiChatFontSizeListener::class.java)
         const val SHOW_PI_TOOL_WINDOW_ACTION_ID = "dev.pi.jetbrains.ShowPiToolWindow"
+        const val NEW_PI_TAB_ACTION_ID = "dev.pi.jetbrains.NewPiTab"
+        const val DEFAULT_PANEL_SHORTCUT = "ctrl alt pressed K"
+        const val DEFAULT_NEW_TAB_SHORTCUT = "ctrl shift pressed O"
+        const val DEFAULT_CHAT_FONT_SIZE = 14
+        const val MIN_CHAT_FONT_SIZE = 10
+        const val MAX_CHAT_FONT_SIZE = 32
 
         private fun piAgentSettingsPath(): Path = Paths.get(
             System.getProperty("user.home") ?: ".",
@@ -150,4 +170,10 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
 
         fun get(): PiSettings = service()
     }
+}
+
+private fun String.toKeyStroke(): javax.swing.KeyStroke? = takeIf { it.isNotBlank() }?.let(javax.swing.KeyStroke::getKeyStroke)
+
+fun interface PiChatFontSizeListener {
+    fun chatFontSizeChanged()
 }

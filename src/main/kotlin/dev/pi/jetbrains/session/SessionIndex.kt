@@ -8,6 +8,7 @@ import kotlinx.serialization.json.longOrNull
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.nio.file.attribute.BasicFileAttributes
 import java.time.Instant
 import java.time.format.DateTimeParseException
 
@@ -37,6 +38,15 @@ object SessionIndex {
 
     private const val ENV_AGENT_DIR = "PI_CODING_AGENT_DIR"
     private const val ENV_SESSION_DIR = "PI_CODING_AGENT_SESSION_DIR"
+    private const val MAX_CACHE_ENTRIES = 4096
+    private val cacheLock = Any()
+    private val cache = object : LinkedHashMap<Path, CachedSummary>(256, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Path, CachedSummary>?): Boolean =
+            size > MAX_CACHE_ENTRIES
+    }
+
+    private data class CacheStamp(val modified: Long, val size: Long, val maxBytes: Long)
+    private data class CachedSummary(val stamp: CacheStamp, val summary: SessionSummary?)
 
     /** `~/.pi/agent`, or `PI_CODING_AGENT_DIR` when set (mirrors `config.ts`). */
     fun agentDir(env: Map<String, String> = System.getenv()): Path {
@@ -88,6 +98,14 @@ object SessionIndex {
 
     /** Reads one session file, returning null when it has no valid header. */
     fun read(file: Path, maxBytesPerFile: Long = MAX_SCAN_BYTES_PER_FILE): SessionSummary? {
+        val absoluteFile = file.toAbsolutePath().normalize()
+        val attributes = runCatching { Files.readAttributes(absoluteFile, BasicFileAttributes::class.java) }.getOrNull()
+            ?: return null
+        val stamp = CacheStamp(attributes.lastModifiedTime().toMillis(), attributes.size(), maxBytesPerFile)
+        synchronized(cacheLock) {
+            cache[absoluteFile]?.takeIf { it.stamp == stamp }?.let { return it.summary }
+        }
+
         var id: String? = null
         var cwd: String? = null
         var parentSessionPath: String? = null
@@ -141,18 +159,19 @@ object SessionIndex {
         }
 
         val sessionId = id ?: return null
-        val fileModified = runCatching { Files.getLastModifiedTime(file).toMillis() }.getOrDefault(0L)
-        return SessionSummary(
-            path = file.toAbsolutePath().normalize().toString(),
+        val summary = SessionSummary(
+            path = absoluteFile.toString(),
             id = sessionId,
             name = name,
             cwd = cwd,
             created = created,
-            modified = lastActivity ?: created ?: fileModified,
+            modified = lastActivity ?: created ?: attributes.lastModifiedTime().toMillis(),
             messageCount = messageCount,
             firstMessage = firstMessage,
             parentSessionPath = parentSessionPath,
         )
+        synchronized(cacheLock) { cache[absoluteFile] = CachedSummary(stamp, summary) }
+        return summary
     }
 
     private fun userText(entry: JsonObject): String? {

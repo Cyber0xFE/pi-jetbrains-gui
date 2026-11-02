@@ -10,7 +10,7 @@ import dev.pi.jetbrains.PiSettings
 /** Opens the Pi chat tool window. */
 class ShowPiToolWindowAction : AnAction("打开 Pi 面板", "打开 Pi 聊天面板", null) {
     init {
-        PiSettings.get().applyPanelShortcut()
+        PiSettings.get().applyShortcuts()
     }
 
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT

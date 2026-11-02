@@ -62,22 +62,20 @@ function createRenderer(withHighlight: boolean, fileReferences: readonly string[
     breaks: true,
     ...(withHighlight ? { highlight } : {}),
   });
-  const references = [...fileReferences].sort((left, right) => right.length - left.length);
+  const referenceTrie = createReferenceTrie(fileReferences);
   renderer.inline.ruler.before("text", "file_reference", (state, silent) => {
     const preceding = state.src[state.pos - 1] ?? " ";
     if (!/[\s([{*_]/.test(preceding)) return false;
-    for (const path of references) {
-      if (!state.src.startsWith(`@${path}`, state.pos)) continue;
-      const next = state.src[state.pos + path.length + 1] ?? "";
-      if (next && /[A-Za-z0-9_./\\-]/.test(next)) continue;
-      if (!silent) {
-        const token = state.push("file_reference", "", 0);
-        token.content = path;
-      }
-      state.pos += path.length + 1;
-      return true;
+    const path = longestReferenceAt(state.src, state.pos + 1, referenceTrie);
+    if (!path) return false;
+    const next = state.src[state.pos + path.length + 1] ?? "";
+    if (next && /[A-Za-z0-9_./\\-]/.test(next)) return false;
+    if (!silent) {
+      const token = state.push("file_reference", "", 0);
+      token.content = path;
     }
-    return false;
+    state.pos += path.length + 1;
+    return true;
   });
   renderer.renderer.rules.file_reference = (tokens, index) => {
     const path = tokens[index]?.content ?? "";
@@ -94,6 +92,41 @@ function createRenderer(withHighlight: boolean, fileReferences: readonly string[
     return self.renderToken(tokens, index, options);
   };
   return renderer;
+}
+
+interface ReferenceTrieNode {
+  terminal?: string;
+  children: Map<string, ReferenceTrieNode>;
+}
+
+function createReferenceTrie(fileReferences: readonly string[]): ReferenceTrieNode {
+  const root: ReferenceTrieNode = { children: new Map() };
+  for (const path of fileReferences) {
+    if (!path) continue;
+    let node = root;
+    for (const character of path) {
+      let child = node.children.get(character);
+      if (!child) {
+        child = { children: new Map() };
+        node.children.set(character, child);
+      }
+      node = child;
+    }
+    node.terminal = path;
+  }
+  return root;
+}
+
+function longestReferenceAt(source: string, start: number, root: ReferenceTrieNode): string | undefined {
+  let node = root;
+  let match: string | undefined;
+  for (let index = start; index < source.length; index += 1) {
+    const child = node.children.get(source[index] ?? "");
+    if (!child) break;
+    node = child;
+    if (node.terminal) match = node.terminal;
+  }
+  return match;
 }
 
 const EMPTY_FILE_REFERENCES: readonly string[] = [];

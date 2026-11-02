@@ -176,7 +176,7 @@ function applyInbound(state: ChatState, message: Inbound): ChatState {
     case "status":
       return { ...state, status: message.status };
     case "records":
-      return message.records.reduce(applyRecord, state);
+      return applyRecords(state, message.records);
     case "history":
       return applyHistory(state, message.messages, message.final);
     case "notice":
@@ -266,6 +266,28 @@ function applyRecord(state: ChatState, record: WireRecord): ChatState {
   }
 }
 
+/** Apply consecutive stream deltas with one messages-array copy per inbound batch. */
+function applyRecords(state: ChatState, records: WireRecord[]): ChatState {
+  let next = state;
+  let deltas: AssistantDelta[] = [];
+  const flushDeltas = (): void => {
+    if (deltas.length === 0) return;
+    next = applyMessageUpdates(next, deltas);
+    deltas = [];
+  };
+
+  for (const record of records) {
+    if (record.type === "message_update" && record.assistantMessageEvent) {
+      deltas.push(record.assistantMessageEvent);
+      continue;
+    }
+    flushDeltas();
+    next = applyRecord(next, record);
+  }
+  flushDeltas();
+  return next;
+}
+
 function onMessageStart(state: ChatState, message: WireMessage | undefined): ChatState {
   if (!message) return state;
   if (message.role === "toolResult") return attachToolResult(state, message);
@@ -294,7 +316,11 @@ function onMessageStart(state: ChatState, message: WireMessage | undefined): Cha
 }
 
 function onMessageUpdate(state: ChatState, delta: AssistantDelta | undefined): ChatState {
-  if (!delta) return state;
+  return delta ? applyMessageUpdates(state, [delta]) : state;
+}
+
+function applyMessageUpdates(state: ChatState, deltas: AssistantDelta[]): ChatState {
+  if (deltas.length === 0) return state;
 
   let base = state;
   if (!base.streamingMessageId) {
@@ -319,23 +345,33 @@ function onMessageUpdate(state: ChatState, delta: AssistantDelta | undefined): C
 
   const streamingId = base.streamingMessageId as string;
   let tools = base.tools;
-  if (delta.type === "toolcall_end" && delta.toolCall) {
-    const call = delta.toolCall;
-    const previous = tools[call.id];
-    tools = {
-      ...tools,
-      [call.id]: {
-        ...(previous ?? { callId: call.id, name: call.name, status: "running" as ToolStatus }),
-        name: call.name,
-        args: call.arguments === undefined ? previous?.args : truncateToolValue(call.arguments),
-      },
-    };
+  let message = base.messages.find((candidate) => candidate.id === streamingId);
+  if (!message) return base;
+  for (const delta of deltas) {
+    if (delta.type === "toolcall_end" && delta.toolCall) {
+      const call = delta.toolCall;
+      const previous = tools[call.id];
+      tools = {
+        ...tools,
+        [call.id]: {
+          ...(previous ?? { callId: call.id, name: call.name, status: "running" as ToolStatus }),
+          name: call.name,
+          args: call.arguments === undefined ? previous?.args : truncateToolValue(call.arguments),
+        },
+      };
+    }
+    message = patchBlocks(message, delta);
   }
+
+  const messageIndex = base.messages.findIndex((candidate) => candidate.id === streamingId);
+  if (messageIndex < 0) return base;
+  const messages = base.messages.slice();
+  messages[messageIndex] = message;
 
   return {
     ...base,
     tools,
-    messages: base.messages.map((message) => (message.id === streamingId ? patchBlocks(message, delta) : message)),
+    messages,
   };
 }
 
@@ -662,34 +698,35 @@ function onResponse(state: ChatState, record: WireRecord): ChatState {
 
 function applyHistory(state: ChatState, messages: WireMessage[], final: boolean): ChatState {
   let next = state;
+  const existingIds = new Set(state.messages.map((message) => message.id));
+  const appended: ChatMessage[] = [];
   for (const message of messages) {
     if (message.role === "toolResult") {
       next = attachToolResult(next, message);
       continue;
     }
     const id = messageId(message);
-    if (next.messages.some((existing) => existing.id === id)) continue;
-    next = {
-      ...next,
-      messages: [
-        ...next.messages,
-        {
-          id,
-          role: toRole(message.role),
-          blocks: blocksFromMessage(message),
-          timestamp: message.timestamp ?? Date.now(),
-          streaming: false,
-          stopReason: message.stopReason,
-          errorMessage: message.errorMessage,
-          model: message.model,
-          durationMs: message.durationMs,
-        },
-      ],
-    };
+    if (existingIds.has(id)) continue;
+    existingIds.add(id);
+    appended.push({
+      id,
+      role: toRole(message.role),
+      blocks: blocksFromMessage(message),
+      timestamp: message.timestamp ?? Date.now(),
+      streaming: false,
+      stopReason: message.stopReason,
+      errorMessage: message.errorMessage,
+      model: message.model,
+      durationMs: message.durationMs,
+    });
     next = seedToolCalls(next, message, "done");
     next = withCacheHitRate(next, message);
   }
-  return { ...next, historyLoading: !final };
+  return {
+    ...next,
+    messages: appended.length === 0 ? next.messages : [...next.messages, ...appended],
+    historyLoading: !final,
+  };
 }
 
 function withNotice(state: ChatState, level: NoticeLevel, message: string): ChatState {

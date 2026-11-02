@@ -11,6 +11,8 @@ import { post } from "../bridge";
 const VISIBLE_BATCH = 60;
 /** Keep the outline readable; larger histories scroll inside the outline itself. */
 const OUTLINE_MAX_VISIBLE = 15;
+const OUTLINE_ITEM_STEP = 27;
+const OUTLINE_OVERSCAN = 20;
 const EMPTY_FILE_REFERENCES: string[] = [];
 
 interface Props {
@@ -42,6 +44,8 @@ export function MessageList({ messages, files = EMPTY_FILE_REFERENCES, tools, lo
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
   const [pendingMessageId, setPendingMessageId] = useState<string | null>(null);
   const [hoverPreview, setHoverPreview] = useState<{ text: string; x: number; y: number } | null>(null);
+  const [outlineScrollTop, setOutlineScrollTop] = useState(0);
+  const outlineScrollFrame = useRef<number | null>(null);
   const userMessages = useMemo(
     () => messages.flatMap((message, index) => (message.role === "user" ? [{ message, index }] : [])),
     [messages],
@@ -52,6 +56,14 @@ export function MessageList({ messages, files = EMPTY_FILE_REFERENCES, tools, lo
   );
   const hiddenCount = messages.length - visible.length;
   const toolStatesByMessage = useMessageToolStates(visible, tools);
+  const outlineVirtualized = userMessages.length > OUTLINE_MAX_VISIBLE;
+  const outlineStart = outlineVirtualized
+    ? Math.max(0, Math.floor(Math.max(0, outlineScrollTop - 18) / OUTLINE_ITEM_STEP) - OUTLINE_OVERSCAN)
+    : 0;
+  const outlineEnd = outlineVirtualized
+    ? Math.min(userMessages.length, outlineStart + Math.ceil(435 / OUTLINE_ITEM_STEP) + OUTLINE_OVERSCAN * 2)
+    : userMessages.length;
+  const visibleUserMessages = outlineVirtualized ? userMessages.slice(outlineStart, outlineEnd) : userMessages;
 
   const updateOutlineEdges = (): void => {
     const element = outlineScroller.current;
@@ -107,6 +119,7 @@ export function MessageList({ messages, files = EMPTY_FILE_REFERENCES, tools, lo
 
   useEffect(() => () => {
     if (scrollFrame.current !== null) window.cancelAnimationFrame(scrollFrame.current);
+    if (outlineScrollFrame.current !== null) window.cancelAnimationFrame(outlineScrollFrame.current);
   }, []);
 
   // Cache message positions between layout changes. Reading every message's bounds on every
@@ -202,6 +215,12 @@ export function MessageList({ messages, files = EMPTY_FILE_REFERENCES, tools, lo
               onScroll={() => {
                 updateOutlineEdges();
                 setHoverPreview(null);
+                if (outlineScrollFrame.current === null) {
+                  outlineScrollFrame.current = window.requestAnimationFrame(() => {
+                    outlineScrollFrame.current = null;
+                    setOutlineScrollTop(outlineScroller.current?.scrollTop ?? 0);
+                  });
+                }
               }}
               data-more-above={outlineEdges.up}
               data-more-below={outlineEdges.down}
@@ -209,7 +228,9 @@ export function MessageList({ messages, files = EMPTY_FILE_REFERENCES, tools, lo
                 userMessages.length > OUTLINE_MAX_VISIBLE ? " message-outline-track-dense" : ""
               }`}
             >
-              {userMessages.map(({ message, index }, outlineIndex) => {
+              {outlineVirtualized && <div style={{ height: outlineStart * OUTLINE_ITEM_STEP, marginBottom: -12, flex: "0 0 auto" }} />}
+              {visibleUserMessages.map(({ message, index }, offset) => {
+                const outlineIndex = outlineStart + offset;
                 const preview = messagePreview(message);
                 const isActive = message.id === activeMessageId;
                 return (
@@ -233,6 +254,7 @@ export function MessageList({ messages, files = EMPTY_FILE_REFERENCES, tools, lo
                   </button>
                 );
               })}
+              {outlineVirtualized && <div style={{ height: Math.max(0, (userMessages.length - outlineEnd) * OUTLINE_ITEM_STEP), marginTop: -12, flex: "0 0 auto" }} />}
             </div>
             {outlineEdges.up && (
               <button type="button" className="message-outline-scroll message-outline-scroll-up"

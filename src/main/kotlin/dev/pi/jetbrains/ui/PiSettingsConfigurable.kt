@@ -7,6 +7,7 @@ import com.intellij.util.ui.UIUtil
 import dev.pi.jetbrains.PiSettings
 import java.awt.BorderLayout
 import java.awt.Font
+import java.awt.FlowLayout
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.awt.Insets
@@ -19,7 +20,9 @@ import javax.swing.JComponent
 import javax.swing.JLabel
 import javax.swing.JPanel
 import javax.swing.JSeparator
+import javax.swing.JSpinner
 import javax.swing.JTextField
+import javax.swing.SpinnerNumberModel
 import javax.swing.KeyStroke
 
 /** Settings page for runtime discovery, approvals and diagnostics. */
@@ -35,8 +38,21 @@ class PiSettingsConfigurable : Configurable {
     }
     private val logDirectory = JTextField()
     private val taskCompletionSound = JCheckBox("任务完成时播放声音")
+    private val chatFontSize = JSpinner(
+        SpinnerNumberModel(
+            PiSettings.DEFAULT_CHAT_FONT_SIZE,
+            PiSettings.MIN_CHAT_FONT_SIZE,
+            PiSettings.MAX_CHAT_FONT_SIZE,
+            1,
+        ),
+    ).apply {
+        toolTipText = "调整 Pi 聊天面板的基础字体大小"
+        accessibleContext.accessibleName = "Pi 聊天字体大小"
+    }
     private val panelShortcut = JTextField()
     private var panelShortcutValue = ""
+    private val newTabShortcut = JTextField()
+    private var newTabShortcutValue = ""
     private var panel: JPanel? = null
 
     override fun getDisplayName(): String = "Pi"
@@ -154,6 +170,45 @@ class PiSettingsConfigurable : Configurable {
             anchor = GridBagConstraints.EAST
         })
         addField("打开 Pi 面板快捷键：", shortcutRow, "点击输入框后按下新的组合键。")
+        newTabShortcut.isEditable = false
+        newTabShortcut.toolTipText = "点击后按下快捷键组合"
+        newTabShortcut.accessibleContext.accessibleName = "新建 Pi 标签页快捷键"
+        newTabShortcut.addKeyListener(object : KeyAdapter() {
+            override fun keyPressed(event: KeyEvent) {
+                if (event.keyCode == KeyEvent.VK_CONTROL || event.keyCode == KeyEvent.VK_ALT ||
+                    event.keyCode == KeyEvent.VK_SHIFT || event.keyCode == KeyEvent.VK_META
+                ) return
+                val stroke = KeyStroke.getKeyStrokeForEvent(event)
+                newTabShortcutValue = stroke.toString()
+                newTabShortcut.text = KeymapUtil.getKeystrokeText(stroke)
+                event.consume()
+            }
+        })
+        val newTabShortcutRow = JPanel(GridBagLayout()).apply { isOpaque = false }
+        newTabShortcutRow.add(newTabShortcut, GridBagConstraints().apply {
+            gridx = 0
+            gridy = 0
+            fill = GridBagConstraints.HORIZONTAL
+            weightx = 1.0
+            insets = Insets(0, 0, 0, 8)
+        })
+        newTabShortcutRow.add(JButton("清除").apply {
+            accessibleContext.accessibleName = "清除新建 Pi 标签页快捷键"
+            addActionListener {
+                newTabShortcutValue = ""
+                newTabShortcut.text = "未设置"
+            }
+        }, GridBagConstraints().apply {
+            gridx = 1
+            gridy = 0
+            anchor = GridBagConstraints.EAST
+        })
+        addField("新建 Pi 标签页快捷键：", newTabShortcutRow, "点击输入框后按下新的组合键。")
+        val chatFontSizeRow = JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
+            isOpaque = false
+            add(chatFontSize)
+        }
+        addField("聊天字体大小（px）：", chatFontSizeRow, "调整 Pi 聊天面板的基础字体大小，范围为 10–32px。")
         form.add(taskCompletionSound.apply {
             isOpaque = false
             accessibleContext.accessibleName = "任务完成时播放声音"
@@ -186,13 +241,16 @@ class PiSettingsConfigurable : Configurable {
             networkProxyEnabled.isSelected != state.networkProxyEnabled ||
             networkProxy.text.trim() != state.networkProxy ||
             logDirectory.text != state.logDirectory ||
+            chatFontSizeValue() != state.chatFontSize ||
             taskCompletionSound.isSelected != state.taskCompletionSoundEnabled ||
-            panelShortcutValue != state.panelShortcut
+            panelShortcutValue != state.panelShortcut ||
+            newTabShortcutValue != state.newTabShortcut
     }
 
     override fun apply() {
         val settings = PiSettings.get()
         val state = settings.getState()
+        val fontSizeChanged = chatFontSizeValue() != state.chatFontSize
         val proxyEnabled = networkProxyEnabled.isSelected
         val proxy = networkProxy.text.trim()
         val proxyChanged = proxyEnabled != state.networkProxyEnabled || proxy != state.networkProxy
@@ -200,10 +258,13 @@ class PiSettingsConfigurable : Configurable {
         state.networkProxy = proxy
         state.nodePath = nodePath.text.trim()
         state.logDirectory = logDirectory.text.trim()
+        state.chatFontSize = chatFontSizeValue()
         state.taskCompletionSoundEnabled = taskCompletionSound.isSelected
         state.panelShortcut = panelShortcutValue
-        settings.applyPanelShortcut()
+        state.newTabShortcut = newTabShortcutValue
+        settings.applyShortcuts()
         if (proxyChanged) settings.notifyNetworkProxyChanged()
+        if (fontSizeChanged) settings.notifyChatFontSizeChanged()
     }
 
     override fun reset() {
@@ -213,13 +274,21 @@ class PiSettingsConfigurable : Configurable {
         networkProxy.text = state.networkProxy
         networkProxy.isEnabled = state.networkProxyEnabled
         logDirectory.text = state.logDirectory
+        chatFontSize.value = state.chatFontSize.coerceIn(PiSettings.MIN_CHAT_FONT_SIZE, PiSettings.MAX_CHAT_FONT_SIZE)
         taskCompletionSound.isSelected = state.taskCompletionSoundEnabled
         panelShortcutValue = state.panelShortcut
         val keyStroke = panelShortcutValue.takeIf { it.isNotBlank() }?.let { KeyStroke.getKeyStroke(it) }
         panelShortcut.text = keyStroke?.let(KeymapUtil::getKeystrokeText) ?: "未设置"
+        newTabShortcutValue = state.newTabShortcut
+        val newTabKeyStroke = newTabShortcutValue.takeIf { it.isNotBlank() }?.let { KeyStroke.getKeyStroke(it) }
+        newTabShortcut.text = newTabKeyStroke?.let(KeymapUtil::getKeystrokeText) ?: "未设置"
     }
 
     override fun disposeUIResources() {
         panel = null
     }
+
+    private fun chatFontSizeValue(): Int = (chatFontSize.value as? Number)?.toInt()
+        ?.coerceIn(PiSettings.MIN_CHAT_FONT_SIZE, PiSettings.MAX_CHAT_FONT_SIZE)
+        ?: PiSettings.DEFAULT_CHAT_FONT_SIZE
 }

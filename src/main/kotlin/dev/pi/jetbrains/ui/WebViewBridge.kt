@@ -14,8 +14,11 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
@@ -44,10 +47,23 @@ class WebViewBridge(
 
     /** Number of JCEF delivery callbacks currently queued on the IntelliJ EDT. */
     private val queuedDeliveries = AtomicInteger()
+    private val deliverySlots = Semaphore(MAX_EDT_DELIVERIES)
     private val lastQueueDiagnosticAt = AtomicLong(System.nanoTime())
-    private val serializationExecutor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "pi-webview-serialization").apply { isDaemon = true }
-    }
+    /**
+     * JCEF can stop accepting script calls while its renderer is busy. Keep the queue bounded so a
+     * burst of tool output cannot retain an unbounded number of large JSON payloads. When the
+     * queue is full, the submitting worker performs serialization and enqueueing itself, which
+     * propagates backpressure to the record flusher instead of growing memory without a limit.
+     */
+    private val serializationExecutor: ExecutorService = ThreadPoolExecutor(
+        1,
+        1,
+        0L,
+        TimeUnit.MILLISECONDS,
+        ArrayBlockingQueue(MAX_SERIALIZATION_QUEUE),
+        { runnable -> Thread(runnable, "pi-webview-serialization").apply { isDaemon = true } },
+        ThreadPoolExecutor.CallerRunsPolicy(),
+    )
     private val deliveryStatsLock = Any()
     private var deliveryCount = 0
     private var maxSerializationQueueMs = 0.0
@@ -126,6 +142,21 @@ class WebViewBridge(
                 val payloadChars = payload.length
                 val payloadBytes = payload.toByteArray(Charsets.UTF_8).size
                 val recordCount = recordCount(message)
+                val slotAcquired = if (ApplicationManager.getApplication().isDispatchThread) {
+                    deliverySlots.tryAcquire()
+                } else {
+                    try {
+                        deliverySlots.acquire()
+                        true
+                    } catch (_: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                        false
+                    }
+                }
+                if (!slotAcquired) {
+                    log("dropping webview message while EDT delivery queue is full: ${messageType(message)}")
+                    return@execute
+                }
                 val edtQueuedAt = System.nanoTime()
                 val queued = queuedDeliveries.incrementAndGet()
                 val previousQueueDiagnosticAt = lastQueueDiagnosticAt.get()
@@ -142,7 +173,10 @@ class WebViewBridge(
                     val callbackStartedAt = System.nanoTime()
                     val edtQueueMs = (callbackStartedAt - edtQueuedAt) / 1_000_000.0
                     val outstanding = queuedDeliveries.decrementAndGet()
-                    if (disposed || browser.isDisposed) return@invokeLater
+                    if (disposed || browser.isDisposed) {
+                        deliverySlots.release()
+                        return@invokeLater
+                    }
                     val frame = browser.cefBrowser.mainFrame
                     if (frame == null) {
                         recordDelivery(
@@ -156,6 +190,7 @@ class WebViewBridge(
                             payloadBytes,
                             recordCount,
                         )
+                        deliverySlots.release()
                         return@invokeLater
                     }
                     frame.executeJavaScript("window.__piDeliver && window.__piDeliver($payload)", frame.url, 0)
@@ -171,6 +206,7 @@ class WebViewBridge(
                         payloadBytes,
                         recordCount,
                     )
+                    deliverySlots.release()
                 }, ModalityState.any())
             }
         } catch (_: RejectedExecutionException) {
@@ -243,6 +279,8 @@ class WebViewBridge(
     companion object {
         const val BRIDGE_MARKER: String = "/*__PI_BRIDGE__*/"
         private const val MAX_PENDING = 64
+        private const val MAX_SERIALIZATION_QUEUE = 32
+        private const val MAX_EDT_DELIVERIES = 64
         private const val QUEUE_WARNING_THRESHOLD = 20
         private const val QUEUE_DELAY_WARNING_MS = 100.0
         private const val SERIALIZATION_QUEUE_WARNING_MS = 100.0

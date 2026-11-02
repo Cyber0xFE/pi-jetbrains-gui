@@ -9,6 +9,8 @@ class PiSettingsTest {
     fun `default and blank proxy preserve inherited environment`() {
         val settings = PiSettings()
         assertTrue(settings.processEnvironment().isEmpty())
+        assertEquals(PiSettings.DEFAULT_CHAT_FONT_SIZE, settings.getState().chatFontSize)
+        assertEquals(PiSettings.DEFAULT_NEW_TAB_SHORTCUT, settings.getState().newTabShortcut)
 
         settings.getState().networkProxy = "   "
         assertTrue(settings.processEnvironment().isEmpty())

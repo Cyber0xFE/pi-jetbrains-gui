@@ -17,6 +17,7 @@ import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
 import dev.pi.jetbrains.PiChatService
+import dev.pi.jetbrains.PiChatFontSizeListener
 import dev.pi.jetbrains.PiSettings
 import dev.pi.jetbrains.editor.EditorNavigator
 import dev.pi.jetbrains.rpc.PiEvent
@@ -55,6 +56,7 @@ import java.awt.Toolkit
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.atomic.AtomicLong
 import javax.swing.JLabel
 import javax.swing.JPanel
 import javax.swing.SwingConstants
@@ -85,10 +87,14 @@ class ChatPanel(
     fun prefillComposer(text: String) = service.prefillComposer(text)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    private val pending = LinkedBlockingQueue<JsonElement>()
+    private val pending = LinkedBlockingQueue<JsonElement>(MAX_PENDING_RECORDS)
+    private val lastPendingDropLogAt = AtomicLong(0L)
     private val hydrationQueue = ArrayDeque<JsonElement>()
     private val hydrationLock = Any()
     private val hydrateMutex = Mutex()
+    private val projectFilesRefreshLock = Any()
+    private var projectFilesRefreshJob: kotlinx.coroutines.Job? = null
+    private var projectFilesRefreshRequested = false
 
     /**
      * `tool_execution_update` carries a full output snapshot per event, so a chatty tool would
@@ -126,6 +132,10 @@ class ChatPanel(
         project.messageBus.connect(this).subscribe(
             EditorColorsManager.TOPIC,
             EditorColorsListener { bridge?.send(themeMessage()) },
+        )
+        ApplicationManager.getApplication().messageBus.connect(this).subscribe(
+            PiSettings.CHAT_FONT_SIZE_CHANGED,
+            PiChatFontSizeListener { bridge?.send(themeMessage()) },
         )
         project.messageBus.connect(this).subscribe(
             VirtualFileManager.VFS_CHANGES,
@@ -227,7 +237,15 @@ class ChatPanel(
                 return
             }
         }
-        pending.add(record)
+        if (!pending.offer(record)) {
+            val now = System.nanoTime()
+            val previous = lastPendingDropLogAt.get()
+            if (now - previous >= DROP_LOG_INTERVAL_NS &&
+                lastPendingDropLogAt.compareAndSet(previous, now)
+            ) {
+                service.logDiagnostic("${diagnosticPrefix()} [webview-records] pending queue full; dropping records")
+            }
+        }
     }
 
     /** Releases throttled tool snapshots at a fixed cadence; each call keeps only its latest one. */
@@ -739,10 +757,34 @@ class ChatPanel(
     }
 
     private fun refreshProjectFiles() {
-        scope.launch {
-            val files = service.projectFiles()
-            ApplicationManager.getApplication().invokeLater {
-                bridge?.send(HostMessages.files(files))
+        synchronized(projectFilesRefreshLock) {
+            projectFilesRefreshRequested = true
+            if (projectFilesRefreshJob?.isActive == true) return
+            projectFilesRefreshJob = scope.launch {
+                while (isActive) {
+                    delay(PROJECT_FILES_REFRESH_DEBOUNCE_MS)
+                    val refresh = synchronized(projectFilesRefreshLock) {
+                        if (!projectFilesRefreshRequested) {
+                            projectFilesRefreshJob = null
+                            false
+                        } else {
+                            projectFilesRefreshRequested = false
+                            true
+                        }
+                    }
+                    if (!refresh) return@launch
+
+                    val files = service.projectFiles()
+                    bridge?.send(HostMessages.files(files))
+
+                    val done = synchronized(projectFilesRefreshLock) {
+                        if (projectFilesRefreshRequested) false else {
+                            projectFilesRefreshJob = null
+                            true
+                        }
+                    }
+                    if (done) return@launch
+                }
             }
         }
     }
@@ -896,9 +938,9 @@ class ChatPanel(
                 error = cssColor(error),
                 errorBackground = cssColor(blend(background, error, 0.14f)),
                 dark = EditorColorsManager.getInstance().isDarkEditor,
-                // CSS pixels in JCEF are logical pixels already handled by the OS scale,
-                // so pass the editor font size through without JBUI.scale (double-scaling).
-                fontSize = scheme.editorFontSize.toFloat(),
+                fontSize = PiSettings.get().getState().chatFontSize
+                    .coerceIn(PiSettings.MIN_CHAT_FONT_SIZE, PiSettings.MAX_CHAT_FONT_SIZE)
+                    .toFloat(),
             ),
         )
     }
@@ -931,6 +973,9 @@ class ChatPanel(
         private const val WEBVIEW_RESOURCE = "/webview/index.html"
         private const val FLUSH_INTERVAL_MS = 16L
         private const val TOOL_UPDATE_FLUSH_MS = 100L
+        private const val PROJECT_FILES_REFRESH_DEBOUNCE_MS = 250L
+        private const val MAX_PENDING_RECORDS = 4096
+        private const val DROP_LOG_INTERVAL_NS = 1_000_000_000L
         private const val HISTORY_CHUNK_CHARS = 256 * 1024
         private const val COMPACT_TIMEOUT_NOTICE = "compaction did not finish in time"
         private const val MAX_TOOL_RESULT_BYTES = 512 * 1024
