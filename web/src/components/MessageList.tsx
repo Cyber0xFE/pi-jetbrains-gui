@@ -25,6 +25,7 @@ interface Props {
   thinkingLabel: string | null;
   connecting: boolean;
   scrollToLatestRequest?: number;
+  scrollToFirstRequest?: number;
 }
 
 export function MessageList({
@@ -36,6 +37,7 @@ export function MessageList({
   thinkingLabel,
   connecting,
   scrollToLatestRequest = 0,
+  scrollToFirstRequest = 0,
 }: Props): JSX.Element {
   recordPerf("message_list_render", 0, { messages: messages.length, tools: Object.keys(tools).length });
   const scroller = useRef<HTMLDivElement>(null);
@@ -137,6 +139,27 @@ export function MessageList({
     element.scrollTop = element.scrollHeight;
     previousScrollTop.current = element.scrollTop;
   }, [scrollToLatestRequest]);
+
+  useEffect(() => {
+    if (scrollToFirstRequest === 0) return;
+    setVisibleCount(messages.length || VISIBLE_BATCH);
+    const firstUserMessage = userMessages[0]?.message;
+    if (firstUserMessage) setActiveMessageId(firstUserMessage.id);
+    stickToBottom.current = false;
+    latestButtonVisible.current = false;
+    setShowLatestButton(false);
+    const frame = window.requestAnimationFrame(() => {
+      const element = scroller.current;
+      if (!element) return;
+      element.scrollTop = 0;
+      previousScrollTop.current = 0;
+      const hasMore = element.scrollHeight - element.clientHeight > 1;
+      latestButtonVisible.current = hasMore;
+      setShowLatestButton(hasMore);
+      if (outlineScroller.current) outlineScroller.current.scrollTop = 0;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [scrollToFirstRequest]);
 
   useEffect(() => () => {
     if (scrollFrame.current !== null) window.cancelAnimationFrame(scrollFrame.current);

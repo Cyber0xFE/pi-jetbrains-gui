@@ -292,6 +292,9 @@ data class HostFocusComposerMessage(val type: String = "focus_composer")
 @Serializable
 data class HostScrollToLatestMessage(val type: String = "scroll_to_latest")
 
+@Serializable
+data class HostScrollToFirstMessage(val type: String = "scroll_to_first")
+
 /** One message from the webview to Kotlin; see `web/src/types.ts` (`Outbound`). */
 @Serializable
 data class ClientMessage(
@@ -422,4 +425,7 @@ object HostMessages {
 
     fun scrollToLatest(): JsonElement =
         PiJson.encodeToJsonElement(HostScrollToLatestMessage.serializer(), HostScrollToLatestMessage())
+
+    fun scrollToFirst(): JsonElement =
+        PiJson.encodeToJsonElement(HostScrollToFirstMessage.serializer(), HostScrollToFirstMessage())
 }

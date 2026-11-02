@@ -49,6 +49,9 @@
         <action id="dev.pi.jetbrains.ScrollPiToLatest" class="dev.pi.jetbrains.ui.ScrollPiToLatestAction">
             <keyboard-shortcut keymap="$default" first-keystroke="control END"/>
         </action>
+        <action id="dev.pi.jetbrains.ScrollPiToFirst" class="dev.pi.jetbrains.ui.ScrollPiToFirstAction">
+            <keyboard-shortcut keymap="$default" first-keystroke="control HOME"/>
+        </action>
         <action id="dev.pi.jetbrains.SendConsoleSelectionToPi" class="dev.pi.jetbrains.editor.SendConsoleSelectionToPiAction" icon="/icons/toolWindowPi.svg">
             <add-to-group group-id="ConsoleView.PopupMenu" anchor="last"/>
         </action>

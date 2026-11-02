@@ -163,5 +163,13 @@ class PiChatTabsService(private val project: Project) : Disposable {
         }
     }
 
+    fun scrollSelectedToFirst() {
+        ApplicationManager.getApplication().invokeLater {
+            if (project.isDisposed) return@invokeLater
+            val window = ToolWindowManager.getInstance(project).getToolWindow("Pi") ?: return@invokeLater
+            (window.contentManager.selectedContent?.component as? ChatPanel)?.scrollToFirst()
+        }
+    }
+
     override fun dispose() = Unit // Content and child disposables release panels and processes.
 }

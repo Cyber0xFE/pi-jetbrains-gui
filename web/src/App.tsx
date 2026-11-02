@@ -25,6 +25,7 @@ export function App(): JSX.Element {
   const [images, setImages] = useState<PromptImage[]>([]);
   const [pendingPrompt, setPendingPrompt] = useState(false);
   const [scrollToLatestRequest, setScrollToLatestRequest] = useState(0);
+  const [scrollToFirstRequest, setScrollToFirstRequest] = useState(0);
   const pendingPromptStartedAt = useRef<number | null>(null);
   const pendingPromptTimer = useRef<number | null>(null);
 
@@ -75,6 +76,10 @@ export function App(): JSX.Element {
       }
       if (message.type === "scroll_to_latest") {
         setScrollToLatestRequest((current) => current + 1);
+        return;
+      }
+      if (message.type === "scroll_to_first") {
+        setScrollToFirstRequest((current) => current + 1);
         return;
       }
       store.dispatch({ kind: "inbound", message });
@@ -271,6 +276,7 @@ export function App(): JSX.Element {
         thinkingLabel={state.thinkingLabel}
         connecting={pendingPrompt || (state.sending && !state.busy)}
         scrollToLatestRequest={scrollToLatestRequest}
+        scrollToFirstRequest={scrollToFirstRequest}
       />
       <Composer
         value={draft}

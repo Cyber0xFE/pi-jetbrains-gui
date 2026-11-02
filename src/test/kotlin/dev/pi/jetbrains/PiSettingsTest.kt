@@ -15,6 +15,7 @@ class PiSettingsTest {
         assertEquals(PiSettings.DEFAULT_PREVIOUS_TAB_SHORTCUT, settings.getState().previousTabShortcut)
         assertEquals(PiSettings.DEFAULT_NEXT_TAB_SHORTCUT, settings.getState().nextTabShortcut)
         assertEquals(PiSettings.DEFAULT_SCROLL_TO_LATEST_SHORTCUT, settings.getState().scrollToLatestShortcut)
+        assertEquals(PiSettings.DEFAULT_SCROLL_TO_FIRST_SHORTCUT, settings.getState().scrollToFirstShortcut)
 
         settings.getState().networkProxy = "   "
         assertTrue(settings.processEnvironment().isEmpty())

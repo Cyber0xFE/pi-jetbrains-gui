@@ -55,6 +55,7 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         var previousTabShortcut: String = DEFAULT_PREVIOUS_TAB_SHORTCUT,
         var nextTabShortcut: String = DEFAULT_NEXT_TAB_SHORTCUT,
         var scrollToLatestShortcut: String = DEFAULT_SCROLL_TO_LATEST_SHORTCUT,
+        var scrollToFirstShortcut: String = DEFAULT_SCROLL_TO_FIRST_SHORTCUT,
         /** Preferred model shown as the default in the model picker. */
         var defaultModelProvider: String = "",
         var defaultModelId: String = "",
@@ -140,12 +141,14 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         val previousTabStroke = state.previousTabShortcut.toKeyStroke()
         val nextTabStroke = state.nextTabShortcut.toKeyStroke()
         val scrollToLatestStroke = state.scrollToLatestShortcut.toKeyStroke()
+        val scrollToFirstStroke = state.scrollToFirstShortcut.toKeyStroke()
         val usesOnlyDefaults = panelStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_PANEL_SHORTCUT) &&
             newTabStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_NEW_TAB_SHORTCUT) &&
             closeTabStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_CLOSE_TAB_SHORTCUT) &&
             previousTabStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_PREVIOUS_TAB_SHORTCUT) &&
             nextTabStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_NEXT_TAB_SHORTCUT) &&
-            scrollToLatestStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_SCROLL_TO_LATEST_SHORTCUT)
+            scrollToLatestStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_SCROLL_TO_LATEST_SHORTCUT) &&
+            scrollToFirstStroke == javax.swing.KeyStroke.getKeyStroke(DEFAULT_SCROLL_TO_FIRST_SHORTCUT)
         if (!keymap.canModify() && !usesOnlyDefaults) {
             keymap = manager.getKeymap("Pi JetBrains GUI") ?: keymap.deriveKeymap("Pi JetBrains GUI").also {
                 manager.schemeManager.addScheme(it)
@@ -160,6 +163,7 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
             PREVIOUS_PI_TAB_ACTION_ID to previousTabStroke,
             NEXT_PI_TAB_ACTION_ID to nextTabStroke,
             SCROLL_PI_TO_LATEST_ACTION_ID to scrollToLatestStroke,
+            SCROLL_PI_TO_FIRST_ACTION_ID to scrollToFirstStroke,
         ).forEach { (actionId, stroke) ->
             keymap.removeAllActionShortcuts(actionId)
             if (stroke != null) keymap.addShortcut(actionId, KeyboardShortcut(stroke, null))
@@ -175,12 +179,14 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         const val PREVIOUS_PI_TAB_ACTION_ID = "dev.pi.jetbrains.PreviousPiTab"
         const val NEXT_PI_TAB_ACTION_ID = "dev.pi.jetbrains.NextPiTab"
         const val SCROLL_PI_TO_LATEST_ACTION_ID = "dev.pi.jetbrains.ScrollPiToLatest"
+        const val SCROLL_PI_TO_FIRST_ACTION_ID = "dev.pi.jetbrains.ScrollPiToFirst"
         const val DEFAULT_PANEL_SHORTCUT = "ctrl alt pressed K"
         const val DEFAULT_NEW_TAB_SHORTCUT = "ctrl shift pressed O"
         const val DEFAULT_CLOSE_TAB_SHORTCUT = "ctrl pressed W"
         const val DEFAULT_PREVIOUS_TAB_SHORTCUT = "ctrl pressed PAGE_UP"
         const val DEFAULT_NEXT_TAB_SHORTCUT = "ctrl pressed PAGE_DOWN"
         const val DEFAULT_SCROLL_TO_LATEST_SHORTCUT = "ctrl pressed END"
+        const val DEFAULT_SCROLL_TO_FIRST_SHORTCUT = "ctrl pressed HOME"
         const val DEFAULT_CHAT_FONT_SIZE = 14
         const val MIN_CHAT_FONT_SIZE = 10
         const val MAX_CHAT_FONT_SIZE = 32

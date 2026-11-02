@@ -233,6 +233,10 @@ class ChatPanel(
         bridge?.send(HostMessages.scrollToLatest())
     }
 
+    fun scrollToFirst() {
+        bridge?.send(HostMessages.scrollToFirst())
+    }
+
     /** Queues a record for the webview, or parks it while the transcript is still hydrating. */
     private fun routeRecord(record: JsonElement) {
         synchronized(hydrationLock) {

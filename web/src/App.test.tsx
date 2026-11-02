@@ -228,6 +228,32 @@ describe("App", () => {
     await waitFor(() => expect(log.scrollTop).toBe(2000));
   });
 
+  it("loads the first message and scrolls to it when the host requests it", async () => {
+    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(2000);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(400);
+    let top = 0;
+    vi.spyOn(HTMLElement.prototype, "scrollTop", "get").mockImplementation(() => top);
+    vi.spyOn(HTMLElement.prototype, "scrollTop", "set").mockImplementation((value: number) => { top = value; });
+    render(<App />);
+    await waitFor(() => expect(window.__piDeliver).toBeDefined());
+    deliver({
+      type: "history",
+      final: true,
+      messages: Array.from({ length: 61 }, (_, index) => ({
+        role: "user" as const,
+        content: `question-${index}`,
+        timestamp: index,
+      })),
+    });
+    await screen.findByText("question-60");
+    expect(document.querySelectorAll(".message")).toHaveLength(60);
+
+    deliver({ type: "scroll_to_first" });
+
+    await waitFor(() => expect(document.querySelectorAll(".message")).toHaveLength(61));
+    await waitFor(() => expect(screen.getByRole("log").scrollTop).toBe(0));
+  });
+
   it("renames the current session from the session picker", async () => {
     render(<App />);
     await waitFor(() => expect(window.__piDeliver).toBeDefined());
