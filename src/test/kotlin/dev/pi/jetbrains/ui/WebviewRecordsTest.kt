@@ -148,7 +148,7 @@ class WebviewRecordsTest {
     }
 
     @Test
-    fun `image payload that cannot survive projection becomes an empty placeholder`() {
+    fun `image payload larger than the budget stays intact instead of being emptied`() {
         val image = JsonObject(linkedMapOf(
             "type" to JsonPrimitive("image"),
             "data" to JsonPrimitive("aGVsbG8=".repeat(60_000)),
@@ -161,13 +161,41 @@ class WebviewRecordsTest {
             )),
             "type" to JsonPrimitive("message_start"),
         ))
+        val logs = mutableListOf<String>()
+        val safe = WebviewRecords.protect(record, logs::add)
+        assertSame(record, safe)
+        assertFalse((safe as JsonObject).containsKey("recordTruncated"))
+        assertTrue(logs.isEmpty())
+        assertEquals(listOf(listOf(record)), WebviewRecords.batches(listOf(safe)))
+    }
+
+    @Test
+    fun `large image is preserved while surrounding text is capped`() {
+        val image = JsonObject(linkedMapOf(
+            "type" to JsonPrimitive("image"),
+            "data" to JsonPrimitive("aGVsbG8=".repeat(60_000)),
+            "mimeType" to JsonPrimitive("image/png"),
+        ))
+        val text = "x".repeat(200_000)
+        val record = JsonObject(linkedMapOf(
+            "message" to JsonObject(linkedMapOf(
+                "role" to JsonPrimitive("user"),
+                "content" to JsonArray(listOf(
+                    JsonObject(linkedMapOf("type" to JsonPrimitive("text"), "text" to JsonPrimitive(text))),
+                    image,
+                )),
+            )),
+            "type" to JsonPrimitive("message_start"),
+        ))
         val safe = WebviewRecords.protect(record) as JsonObject
-        assertBounded(safe)
+        assertTextBounded(safe)
         assertEquals(JsonPrimitive(true), safe["recordTruncated"])
-        val projectedImage = (((safe["message"] as JsonObject)["content"] as JsonArray)[0]) as JsonObject
-        assertEquals(JsonPrimitive("image"), projectedImage["type"])
-        assertEquals(JsonPrimitive("image/png"), projectedImage["mimeType"])
-        assertEquals(JsonPrimitive(""), projectedImage["data"])
+        val content = (safe["message"] as JsonObject)["content"] as JsonArray
+        assertEquals(2, content.size)
+        val keptText = content[0] as JsonObject
+        assertEquals(JsonPrimitive("text"), keptText["type"])
+        assertTrue((keptText["text"] as JsonPrimitive).content.contains("truncated for WebView"))
+        assertEquals(image, content[1])
     }
 
     @Test
@@ -195,6 +223,10 @@ class WebviewRecordsTest {
     }
 
     private fun parse(json: String): JsonElement = PiJson.parseToJsonElement(json)
+
+    private fun assertTextBounded(value: JsonElement) {
+        assertTrue(WebviewRecords.jsonBytesExcludingImageData(value) <= WebviewRecords.MAX_RECORD_BYTES)
+    }
 
     private fun assertBounded(value: JsonElement) {
         assertTrue(WebviewRecords.jsonBytes(value) <= WebviewRecords.MAX_RECORD_BYTES)

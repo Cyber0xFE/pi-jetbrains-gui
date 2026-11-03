@@ -29,16 +29,22 @@ internal object WebviewRecords {
     )
 
     fun protect(record: JsonElement, log: (String) -> Unit = {}): JsonElement {
-        val bytes = jsonBytes(record, SOURCE_SIZE_LIMIT)
-        if (bytes <= MAX_RECORD_BYTES && withinDepth(record)) return record
+        val totalBytes = jsonBytes(record, SOURCE_SIZE_LIMIT)
+        if (totalBytes <= MAX_RECORD_BYTES && withinDepth(record)) return record
+        // Image payloads are exempt from the byte budget so they always render in the webview;
+        // only the remaining text content is capped.
+        val stripped = stripImageData(record)
+        val textBytes = jsonBytes(stripped, SOURCE_SIZE_LIMIT)
+        if (textBytes <= MAX_RECORD_BYTES && withinDepth(record)) return record
         // Reserve space for the top-level diagnostic flag before projecting the payload.
-        val projected = project(record, MAX_RECORD_BYTES - 32, 0)
-        val safe = if (projected is JsonObject) {
-            JsonObject(projected.toMutableMap().apply { put("recordTruncated", JsonPrimitive(true)) })
-        } else projected
-        val sourceBytes = if (bytes > SOURCE_SIZE_LIMIT) ">${SOURCE_SIZE_LIMIT}" else bytes.toString()
-        log("[webview-records] capped event=${eventType(record)} sourceBytes=$sourceBytes payloadBytes=${jsonBytes(safe)}")
-        return safe
+        val projected = project(stripped, MAX_RECORD_BYTES - 32, 0)
+        val safe = restoreImageData(record, projected)
+        val flagged = if (safe is JsonObject) {
+            JsonObject(safe.toMutableMap().apply { put("recordTruncated", JsonPrimitive(true)) })
+        } else safe
+        val sourceBytes = if (totalBytes > SOURCE_SIZE_LIMIT) ">$SOURCE_SIZE_LIMIT" else totalBytes.toString()
+        log("[webview-records] capped event=${eventType(record)} sourceBytes=$sourceBytes textBytes=$textBytes payloadBytes=${jsonBytes(flagged, SOURCE_SIZE_LIMIT)}")
+        return flagged
     }
 
     /** Includes the records envelope and commas in the byte budget; preserves order and boundaries. */
@@ -48,7 +54,9 @@ internal object WebviewRecords {
         var bytes = envelopeBytes
         for (record in records) {
             val size = jsonBytes(record)
-            require(size <= MAX_RECORD_BYTES) { "Record must be protected before batching" }
+            require(
+                size <= MAX_RECORD_BYTES || jsonBytesExcludingImageData(record) <= MAX_RECORD_BYTES,
+            ) { "Record must be protected before batching" }
             if (batch.isNotEmpty() &&
                 (bytes + 1 + size > MAX_BATCH_BYTES || batch.size >= MAX_BATCH_RECORDS)
             ) {
@@ -119,6 +127,7 @@ internal object WebviewRecords {
         val projected = JsonObject(fields)
         // A truncated or dropped image payload would render as a broken <img> in the webview;
         // replace it with an explicit empty marker the webview shows as an omitted-image card.
+        // Payload data is stripped before projection, so this only guards unexpected drops.
         val originalData = (value["data"] as? JsonPrimitive)?.takeIf { it.isString }?.content
         if (originalData != null &&
             (value["type"] as? JsonPrimitive)?.contentOrNull == "image" &&
@@ -158,6 +167,119 @@ internal object WebviewRecords {
             }
         }
         return true
+    }
+
+    private fun isImagePayload(value: JsonObject): Boolean =
+        (value["type"] as? JsonPrimitive)?.contentOrNull == "image" && value["data"] is JsonPrimitive
+
+    /**
+     * Replaces image payload data with an empty marker, iteratively, so text content keeps the
+     * byte budget during projection; the full payloads are restored afterwards.
+     */
+    private fun stripImageData(root: JsonElement): JsonElement {
+        var result: JsonElement = JsonNull
+        val tasks = ArrayDeque<StripTask>()
+        tasks.addLast(StripTask(root) { result = it })
+        while (tasks.isNotEmpty()) {
+            val task = tasks.removeLast()
+            when (val element = task.element) {
+                is JsonObject -> {
+                    if (isImagePayload(element)) {
+                        task.assign(JsonObject(element.toMutableMap().apply { put("data", JsonPrimitive("")) }))
+                        continue
+                    }
+                    val values = LinkedHashMap<String, JsonElement>(element.size)
+                    task.assign(JsonObject(values))
+                    for ((key, value) in element) {
+                        tasks.addLast(StripTask(value) { stripped -> values[key] = stripped })
+                    }
+                }
+                is JsonArray -> {
+                    val values = ArrayList(element)
+                    task.assign(JsonArray(values))
+                    element.forEachIndexed { index, value ->
+                        tasks.addLast(StripTask(value) { stripped -> values[index] = stripped })
+                    }
+                }
+                else -> task.assign(element)
+            }
+        }
+        return result
+    }
+
+    private class StripTask(val element: JsonElement, val assign: (JsonElement) -> Unit)
+
+    /** Restores full image payloads from the original record into the projected tree. */
+    private fun restoreImageData(original: JsonElement, projected: JsonElement): JsonElement {
+        var result: JsonElement = projected
+        val tasks = ArrayDeque<RestoreTask>()
+        tasks.addLast(RestoreTask(original, projected) { result = it })
+        while (tasks.isNotEmpty()) {
+            val task = tasks.removeLast()
+            val source = task.original
+            val target = task.projected
+            val sameShape = source::class == target::class && (source is JsonObject || source is JsonArray)
+            if (!sameShape) {
+                task.assign(target)
+                continue
+            }
+            if (source is JsonObject && target is JsonObject) {
+                if (isImagePayload(source)) {
+                    task.assign(JsonObject(target.toMutableMap().apply { put("data", source.getValue("data")) }))
+                    continue
+                }
+                val values = LinkedHashMap<String, JsonElement>(target.size)
+                task.assign(JsonObject(values))
+                for ((key, value) in target) {
+                    val sourceChild = source[key]
+                    if (sourceChild == null) {
+                        values[key] = value
+                        continue
+                    }
+                    tasks.addLast(RestoreTask(sourceChild, value) { restored -> values[key] = restored })
+                }
+            } else {
+                source as JsonArray
+                target as JsonArray
+                val values = ArrayList(target)
+                task.assign(JsonArray(values))
+                target.forEachIndexed { index, value ->
+                    if (index >= source.size) return@forEachIndexed
+                    tasks.addLast(RestoreTask(source[index], value) { restored -> values[index] = restored })
+                }
+            }
+        }
+        return result
+    }
+
+    private class RestoreTask(val original: JsonElement, val projected: JsonElement, val assign: (JsonElement) -> Unit)
+
+    /** Byte count excluding image payload data, iteratively; validates text-only bounds. */
+    fun jsonBytesExcludingImageData(root: JsonElement, limit: Int = Int.MAX_VALUE - 1): Int {
+        val pending = ArrayDeque<JsonElement>()
+        pending.addLast(root)
+        var bytes = 0L
+        while (pending.isNotEmpty() && bytes <= limit) {
+            when (val value = pending.removeLast()) {
+                is JsonObject -> {
+                    bytes += 2L + (value.size - 1).coerceAtLeast(0)
+                    val imagePayload = isImagePayload(value)
+                    for ((key, child) in value) {
+                        if (imagePayload && key == "data") continue
+                        bytes += stringBytes(key, limit) + 1L
+                        if (bytes > limit) return limit + 1
+                        pending.addLast(child)
+                    }
+                }
+                is JsonArray -> {
+                    bytes += 2L + (value.size - 1).coerceAtLeast(0)
+                    pending.addAll(value)
+                }
+                is JsonPrimitive -> bytes += if (value.isString) stringBytes(value.content, limit)
+                    else value.content.length
+            }
+        }
+        return if (bytes > limit) limit + 1 else bytes.toInt()
     }
 
     /** Conservative UTF-8 JSON size, including escaping; stops after limit without serializing. */
