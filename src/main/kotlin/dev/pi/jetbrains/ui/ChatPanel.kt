@@ -79,6 +79,7 @@ class ChatPanel(
     private val activateSession: (String) -> Boolean,
     private val diagnosticName: String = "chat",
     private val onStatusChanged: (PiChatService.Status) -> Unit = {},
+    private val onTitleChanged: (String?) -> Unit = {},
 ) : JPanel(BorderLayout()), Disposable {
     val sessionFile: String? get() = service.status.value.sessionFile
 
@@ -110,6 +111,10 @@ class ChatPanel(
 
     /** Bumped on every reset so in-flight hydration and record batches from the old session drop. */
     private var generation = 0
+
+    /** First user message of the live transcript; tab title fallback when the session has no name. */
+    @Volatile
+    private var liveFirstUserText: String? = null
 
     @Volatile
     private var hydrated = false
@@ -187,6 +192,7 @@ class ChatPanel(
         scope.launch {
             service.status.collect { status ->
                 onStatusChanged(status)
+                emitTitle()
                 bridge?.send(HostMessages.status(status))
                 if (status.phase == PiChatService.Phase.RUNNING) maybeHydrate()
             }
@@ -194,7 +200,10 @@ class ChatPanel(
         scope.launch {
             service.events.collect { event ->
                 if (event is PiEvent.ExtensionUiRequest) handleExtensionUiRequest(event)
-                if (event is PiEvent.Session && event.type == "agent_settled") maybePlayTaskCompletionSound(event)
+                if (event is PiEvent.Session) {
+                    if (event.type == "agent_settled") maybePlayTaskCompletionSound(event)
+                    maybeCaptureFirstUserText(event.payload)
+                }
                 val record = toRecord(event) ?: return@collect
                 if (record is JsonObject) {
                     val callId = record.string("toolCallId")
@@ -658,6 +667,8 @@ class ChatPanel(
                     emptyList()
                 }
                 if (!isCurrent(startGeneration)) return@withLock
+                liveFirstUserText = firstUserText(messages)
+                emitTitle()
                 sendHistory(activeBridge, messages)
             } finally {
                 synchronized(hydrationLock) {
@@ -805,6 +816,45 @@ class ChatPanel(
                 }
             }
         }
+    }
+
+    /** Session name if set, else the first user message as a fallback tab title; null when neither exists. */
+    private fun emitTitle() {
+        val name = service.status.value.sessionName?.trim()?.takeIf { it.isNotEmpty() }
+        val fallback = liveFirstUserText?.trim()?.takeIf { it.isNotEmpty() }
+        onTitleChanged(name ?: fallback)
+    }
+
+    /** Captures the first user message from live session events for the tab title fallback. */
+    private fun maybeCaptureFirstUserText(payload: JsonElement) {
+        if (liveFirstUserText != null) return
+        val record = payload as? JsonObject ?: return
+        if (record.string("type") !in setOf("message_start", "message_update", "message_end")) return
+        val message = record["message"] as? JsonObject ?: return
+        if (message.string("role") != "user") return
+        val text = messageText(message) ?: return
+        liveFirstUserText = text
+        emitTitle()
+    }
+
+    /** First user message of a hydrated transcript, normalized like [dev.pi.jetbrains.session.SessionIndex]. */
+    private fun firstUserText(messages: List<JsonElement>): String? = messages.firstNotNullOfOrNull { element ->
+        val message = element as? JsonObject ?: return@firstNotNullOfOrNull null
+        if (message.string("role") != "user") return@firstNotNullOfOrNull null
+        messageText(message)
+    }
+
+    private fun messageText(message: JsonObject): String? {
+        val content = message["content"] ?: return null
+        val text = when (content) {
+            is JsonPrimitive -> content.contentOrNull
+            is JsonArray -> content.mapNotNull { block ->
+                val obj = block as? JsonObject ?: return@mapNotNull null
+                if (obj.string("type") == "text") obj.string("text") else null
+            }.joinToString(" ")
+            else -> null
+        } ?: return null
+        return text.replace(Regex("\\s+"), " ").trim().take(200).takeIf { it.isNotEmpty() }
     }
 
     private fun isProjectFileEvent(file: VirtualFile?): Boolean {

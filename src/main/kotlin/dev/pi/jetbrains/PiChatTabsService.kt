@@ -24,6 +24,11 @@ import dev.pi.jetbrains.ui.ChatPanel
 class PiChatTabsService(private val project: Project) : Disposable {
     private var nextTabNumber = 1
 
+    private companion object {
+        /** Tabs show a short prefix; the full title goes to the tab tooltip. */
+        const val TAB_TITLE_MAX_LENGTH = 12
+    }
+
     fun initialize(toolWindow: ToolWindow) {
         toolWindow.setToHideOnEmptyContent(false)
         toolWindow.setTitleActions(listOf(object : AnAction("新建任务标签页", "在独立标签页中运行另一项任务", AllIcons.General.Add) {
@@ -52,15 +57,32 @@ class PiChatTabsService(private val project: Project) : Disposable {
         Disposer.register(this, session)
         val number = nextTabNumber++
         var content: Content? = null
-        val panel = ChatPanel(project, session, ::activateSession, diagnosticName = "Chat $number") { status ->
-            val currentContent = content ?: return@ChatPanel
-            val running = status.isStreaming || status.isCompacting
-            when {
-                running -> setTabIcon(currentContent, running = true)
-                status.phase == PiChatService.Phase.RUNNING -> setTabIcon(currentContent, running = false)
-            }
-        }
-        val createdContent = ContentFactory.getInstance().createContent(panel, "Chat $number", false)
+        val panel = ChatPanel(
+            project,
+            session,
+            ::activateSession,
+            diagnosticName = "Chat $number",
+            onStatusChanged = { status ->
+                val currentContent = content ?: return@ChatPanel
+                val running = status.isStreaming || status.isCompacting
+                when {
+                    running -> setTabIcon(currentContent, running = true)
+                    status.phase == PiChatService.Phase.RUNNING -> setTabIcon(currentContent, running = false)
+                }
+            },
+            onTitleChanged = { title ->
+                val currentContent = content ?: return@ChatPanel
+                val full = title ?: "任务 $number"
+                val label = if (full.length > TAB_TITLE_MAX_LENGTH) full.take(TAB_TITLE_MAX_LENGTH) + "…" else full
+                ApplicationManager.getApplication().invokeLater {
+                    if (currentContent.isValid) {
+                        currentContent.description = full
+                        if (currentContent.displayName != label) currentContent.displayName = label
+                    }
+                }
+            },
+        )
+        val createdContent = ContentFactory.getInstance().createContent(panel, "任务 $number", false)
         createdContent.putUserData(ToolWindow.SHOW_CONTENT_ICON, true)
         createdContent.icon = CompletedTabIcon
         content = createdContent
