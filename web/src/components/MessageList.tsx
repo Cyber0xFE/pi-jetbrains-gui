@@ -397,7 +397,7 @@ export function MessageList({
         ))}
         {connecting && (
           <div className="connecting-status" role="status" aria-label="正在连接服务">
-            <ThinkingIcon />
+            <ThinkingIcon spinning />
             <span className="thinking-label">
               正在连接服务<AnimatedEllipsis className="thinking-ellipsis" />
             </span>
@@ -793,7 +793,7 @@ function BlockView({ block, fileReferences, tools, streaming, thinkingLabel, dur
       return (
         <details className="thinking">
           <summary>
-            <ThinkingIcon />
+            <ThinkingIcon spinning={thinkingActive} />
             <span className="thinking-label">
               {thinkingLabel ?? defaultLabel}
               {thinkingActive && <AnimatedEllipsis className="thinking-ellipsis" />}
@@ -824,12 +824,33 @@ function BlockView({ block, fileReferences, tools, streaming, thinkingLabel, dur
   }
 }
 
-function ThinkingIcon(): JSX.Element {
+function ThinkingIcon({ spinning = false }: { spinning?: boolean }): JSX.Element {
+  const radius = 8.5;
+  const circumference = 2 * Math.PI * radius;
+  const arc = circumference * 0.25;
   return (
     <svg className="thinking-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <ellipse cx="12" cy="12" rx="4.25" ry="10" transform="rotate(45 12 12)" />
-      <ellipse cx="12" cy="12" rx="4.25" ry="10" transform="rotate(-45 12 12)" />
-      <ellipse cx="12" cy="12" rx="4.25" ry="10" />
+      <g>
+        {spinning && (
+          <animateTransform
+            attributeName="transform"
+            attributeType="XML"
+            type="rotate"
+            from="0 12 12"
+            to="360 12 12"
+            dur="0.9s"
+            repeatCount="indefinite"
+          />
+        )}
+        <circle
+          cx="12"
+          cy="12"
+          r={radius}
+          strokeWidth={2.5}
+          strokeDasharray={`${arc} ${circumference - arc}`}
+          strokeLinecap="round"
+        />
+      </g>
     </svg>
   );
 }

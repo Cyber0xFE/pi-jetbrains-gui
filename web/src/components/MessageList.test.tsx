@@ -172,6 +172,7 @@ it("shows the thinking status icon, streaming ellipsis and completed duration", 
   expect(view.getByText("已思考")).toBeDefined();
   expect(view.getByText("（用时 21 秒）")).toBeDefined();
   expect(view.container.querySelectorAll(".thinking-icon")).toHaveLength(2);
+  expect(view.container.querySelectorAll("animateTransform")).toHaveLength(1);
   expect(view.container.querySelectorAll(".thinking-ellipsis")).toHaveLength(1);
 });
 

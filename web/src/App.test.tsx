@@ -136,7 +136,8 @@ describe("App", () => {
         { type: "prompt", message: "hello pi" },
       ]),
     );
-    expect(screen.getByRole("status", { name: "正在连接服务" })).toBeDefined();
+    const connectingStatus = screen.getByRole("status", { name: "正在连接服务" });
+    expect(connectingStatus.querySelector("animateTransform")).not.toBeNull();
     expect((input as HTMLTextAreaElement).value).toBe("");
 
     // The toolbar label switches from 未命名会话 to the first message once pi echoes it.
