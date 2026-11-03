@@ -247,9 +247,6 @@ export function Picker({ title, items, placeholder, emptyText, actions, onSelect
         <footer className="picker-footer">
           <span className="picker-count">{filtered.length} item(s)</span>
           {actions}
-          <button type="button" className="button button-secondary" onClick={onClose}>
-            Close
-          </button>
         </footer>
       </div>
     </div>
