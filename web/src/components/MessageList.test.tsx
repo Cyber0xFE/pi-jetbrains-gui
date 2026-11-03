@@ -80,6 +80,26 @@ it.each([
   expect(view.getByRole("button", { name: "已复制" })).toBeDefined();
 });
 
+it("renders user message Windows paths with backslashes intact", () => {
+  const view = render(
+    <MessageList
+      messages={[{
+        id: "user-path",
+        role: "user",
+        blocks: [{ kind: "text", text: "我刚才打开 @C:\\Users\\Bebop\\.pi\\agent\\models-store.json 怎么还有?" }],
+        timestamp: 1,
+        streaming: false,
+      }]}
+      tools={{}}
+      loadingHistory={false}
+      emptyHint=""
+      thinkingLabel={null}
+      connecting={false}
+    />,
+  );
+  expect(view.container.querySelector(".message-user-content")?.textContent).toContain("Bebop\\.pi\\agent");
+});
+
 it("renders file-only editor context as a clickable file chip", () => {
   const view = render(
     <MessageList

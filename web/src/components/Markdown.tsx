@@ -143,12 +143,16 @@ export function Markdown({
   text,
   streaming,
   fileReferences = EMPTY_FILE_REFERENCES,
-}: { text: string; streaming: boolean; fileReferences?: readonly string[] }): JSX.Element {
+  userText = false,
+}: { text: string; streaming: boolean; fileReferences?: readonly string[]; userText?: boolean }): JSX.Element {
   const shown = useThrottled(text, STREAM_THROTTLE_MS, streaming);
   const renderer = useMemo(() => createRenderer(!streaming, fileReferences), [fileReferences, streaming]);
   const html = useMemo(() => {
     const startedAt = performance.now();
-    const source = streaming ? closeOpenFence(shown) : text;
+    const raw = streaming ? closeOpenFence(shown) : text;
+    // User input is literal text, not authored Markdown: CommonMark would eat the backslash of
+    // `\` + punctuation (e.g. `Bebop\.pi` renders as `Bebop.pi`), so re-escape those pairs.
+    const source = userText ? escapeBackslashEscapes(raw) : raw;
     const rendered = addCodeCopyButtons(renderer.render(source));
     recordPerf("markdown_render", performance.now() - startedAt, {
       chars: source.length,
@@ -203,6 +207,13 @@ export function Markdown({
   };
 
   return <div className="markdown" onClick={handleClick} dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+const BACKSLASH_ESCAPE_PATTERN = /\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g;
+
+/** Doubles backslashes before ASCII punctuation so CommonMark renders them literally. */
+export function escapeBackslashEscapes(text: string): string {
+  return text.replace(BACKSLASH_ESCAPE_PATTERN, "\\\\$1");
 }
 
 type FileReference = { path: string; line?: number; endLine?: number };

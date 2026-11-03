@@ -495,6 +495,7 @@ function MessageView({ message, fileReferences, previousAssistantModel, tools, t
                     streaming={message.streaming}
                     thinkingLabel={thinkingLabel}
                     durationMs={message.durationMs}
+                    userText
                   />
                 )}
               </Fragment>
@@ -511,6 +512,7 @@ function MessageView({ message, fileReferences, previousAssistantModel, tools, t
               streaming={message.streaming}
               thinkingLabel={thinkingLabel}
               durationMs={message.durationMs}
+              userText={message.role === "user"}
             />
           );
         })}
@@ -763,13 +765,15 @@ interface BlockProps {
   streaming: boolean;
   thinkingLabel: string | null;
   durationMs?: number;
+  /** User-typed text renders backslashes literally instead of as Markdown escapes. */
+  userText?: boolean;
 }
 
-function BlockView({ block, fileReferences, tools, streaming, thinkingLabel, durationMs }: BlockProps): JSX.Element | null {
+function BlockView({ block, fileReferences, tools, streaming, thinkingLabel, durationMs, userText }: BlockProps): JSX.Element | null {
   switch (block.kind) {
     case "text": {
       if (!/<\/?thinking\b/i.test(block.text)) {
-        return <Markdown text={block.text} streaming={streaming} fileReferences={fileReferences} />;
+        return <Markdown text={block.text} streaming={streaming} fileReferences={fileReferences} userText={userText} />;
       }
       return (
         <>
@@ -782,6 +786,7 @@ function BlockView({ block, fileReferences, tools, streaming, thinkingLabel, dur
               streaming={streaming}
               thinkingLabel={thinkingLabel}
               durationMs={durationMs}
+              userText={userText}
             />
           ))}
         </>

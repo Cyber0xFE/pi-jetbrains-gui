@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { closeOpenFence, fileReferenceFromLink, Markdown } from "./Markdown";
+import { closeOpenFence, escapeBackslashEscapes, fileReferenceFromLink, Markdown } from "./Markdown";
 
 afterEach(() => {
   cleanup();
@@ -20,7 +20,29 @@ describe("closeOpenFence", () => {
   });
 });
 
+describe("escapeBackslashEscapes", () => {
+  it("doubles backslashes before ASCII punctuation", () => {
+    expect(escapeBackslashEscapes("C:\\Users\\Bebop\\.pi\\agent")).toBe("C:\\Users\\Bebop\\\\.pi\\agent");
+    expect(escapeBackslashEscapes("写 \\* 转义")).toBe("写 \\\\* 转义");
+  });
+
+  it("leaves backslashes before letters and digits untouched", () => {
+    expect(escapeBackslashEscapes("\\Users\\Bebop2")).toBe("\\Users\\Bebop2");
+  });
+});
+
 describe("Markdown", () => {
+  it("renders user text backslashes literally instead of eating CommonMark escapes", () => {
+    const source = "我刚才打开 @C:\\Users\\Bebop\\.pi\\agent\\models-store.json 怎么还有?";
+    const { container } = render(<Markdown text={source} streaming={false} userText />);
+    expect(container.textContent).toContain("Bebop\\.pi\\agent");
+  });
+
+  it("keeps assistant Markdown escape semantics by default", () => {
+    const { container } = render(<Markdown text={"C:\\Users\\Bebop\\.pi"} streaming={false} />);
+    expect(container.textContent).toContain("Bebop.pi");
+  });
+
   it("keeps file paths inside inline code as code", () => {
     const source = "你指向的 `api/app/agents/specialists.py:154-232` 是 **`QualityReviewAgent`（质量审查 Agent）**。";
     const { container } = render(
