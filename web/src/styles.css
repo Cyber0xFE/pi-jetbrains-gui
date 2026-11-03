@@ -1462,6 +1462,16 @@ body {
   border-radius: 4px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
   cursor: default;
+  user-select: none;
+  touch-action: none;
+}
+
+.image-preview-image.zoomed {
+  cursor: grab;
+}
+
+.image-preview-image.dragging {
+  cursor: grabbing;
 }
 
 .image-preview-close {
