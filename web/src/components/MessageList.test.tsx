@@ -173,6 +173,10 @@ it("shows the thinking status icon, streaming ellipsis and completed duration", 
   expect(view.getByText("（用时 21 秒）")).toBeDefined();
   expect(view.container.querySelectorAll(".thinking-icon")).toHaveLength(2);
   expect(view.container.querySelectorAll("animateTransform")).toHaveLength(1);
+  const spinningCircle = view.container.querySelector("animateTransform")!.parentElement!.querySelector("circle")!;
+  expect(spinningCircle.getAttribute("stroke-dasharray")).not.toBeNull();
+  const staticCircles = view.container.querySelectorAll(".thinking-icon circle:not([stroke-dasharray])");
+  expect(staticCircles).toHaveLength(1);
   expect(view.container.querySelectorAll(".thinking-ellipsis")).toHaveLength(1);
 });
 

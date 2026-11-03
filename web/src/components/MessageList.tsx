@@ -847,7 +847,7 @@ function ThinkingIcon({ spinning = false }: { spinning?: boolean }): JSX.Element
           cy="12"
           r={radius}
           strokeWidth={2.5}
-          strokeDasharray={`${arc} ${circumference - arc}`}
+          strokeDasharray={spinning ? `${arc} ${circumference - arc}` : undefined}
           strokeLinecap="round"
         />
       </g>
