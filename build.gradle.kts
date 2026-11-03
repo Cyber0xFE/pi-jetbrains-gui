@@ -91,6 +91,19 @@ intellijPlatform {
         """.trimIndent()
 
         changeNotes = """
+            <h2>What's New in 0.2.1</h2>
+            <h3>Features</h3>
+            <ul>
+              <li>Press Ctrl+Up/Ctrl+Down to jump to the previous or next user message.</li>
+              <li>Image previews now support wheel zoom and drag panning for a closer look at details.</li>
+            </ul>
+            <h3>Fixes</h3>
+            <ul>
+              <li>Large images sent by pi no longer render as broken previews or disappear from the WebView; image payloads are now preserved while surrounding text is capped.</li>
+              <li>Fixed the bundled Node.js runtime not being found when the platform plugin registry is unavailable.</li>
+              <li>Removed the redundant Close button from the picker footer.</li>
+              <li>Replaced deprecated platform APIs for better forward compatibility.</li>
+            </ul>
             <h2>What's New in 0.2.0</h2>
             <h3>Features</h3>
             <ul>
