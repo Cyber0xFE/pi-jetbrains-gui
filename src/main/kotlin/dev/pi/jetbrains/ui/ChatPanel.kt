@@ -709,13 +709,13 @@ class ChatPanel(
                 val options = (payload["options"] as? kotlinx.serialization.json.JsonArray)
                     ?.mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull }
                     ?.toTypedArray() ?: emptyArray()
-                val result = Messages.showChooseDialog(
+                val result = Messages.showDialog(
                     project,
                     payload.string("title") ?: "Select",
                     "pi extension",
-                    Messages.getQuestionIcon(),
                     options,
-                    options.firstOrNull(),
+                    0,
+                    Messages.getQuestionIcon(),
                 )
                 if (result >= 0 && result < options.size) respond(RpcExtensionUiResponse.Value(id = event.id, value = options[result]))
                 else respond(RpcExtensionUiResponse.Cancelled(id = event.id))
