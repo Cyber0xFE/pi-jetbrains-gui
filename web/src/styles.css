@@ -1537,6 +1537,7 @@ body {
   align-items: center;
   gap: 6px;
   align-self: flex-start;
+  min-width: 0;
   max-width: 100%;
   margin-bottom: 6px;
   padding: 4px 8px;
@@ -1553,7 +1554,8 @@ body {
 }
 
 .context-attachment-label {
-  max-width: 34ch;
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
