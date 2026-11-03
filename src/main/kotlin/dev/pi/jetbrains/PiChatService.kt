@@ -1,9 +1,7 @@
 package dev.pi.jetbrains
 
-import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
@@ -718,7 +716,7 @@ class PiChatService(private val project: Project) : Disposable {
 
     /** `<plugin>/node/<os>-<arch>/node[.exe]`, when the plugin ships a runtime (plan 7.1). */
     private fun bundledNodeBinary(): Path? {
-        val pluginPath = PluginManagerCore.getPlugin(PLUGIN_ID)?.pluginPath ?: return null
+        val pluginPath = pluginInstallPath() ?: return null
         val osName = System.getProperty("os.name").lowercase()
         val os = when {
             osName.contains("win") -> "windows"
@@ -734,10 +732,20 @@ class PiChatService(private val project: Project) : Disposable {
         return candidate.takeIf { Files.isRegularFile(it) }
     }
 
+    /** Finds the installed plugin root without consulting the platform's internal plugin registry. */
+    private fun pluginInstallPath(): Path? {
+        val codeSource = runCatching {
+            PiChatService::class.java.protectionDomain?.codeSource?.location?.toURI()
+        }.getOrNull() ?: return null
+        val location = runCatching { Paths.get(codeSource) }.getOrNull() ?: return null
+        return generateSequence(location) { it.parent }
+            .take(5)
+            .firstOrNull { Files.isDirectory(it.resolve("node")) }
+    }
+
     companion object {
         private val LOG = Logger.getInstance(PiChatService::class.java)
         private val diagnosticLogLock = Any()
-        private val PLUGIN_ID = PluginId.getId("dev.pi.jetbrains")
         private val COMPACT_TIMEOUT: Duration = Duration.ofSeconds(300)
         private val HEARTBEAT_TIMEOUT: Duration = Duration.ofSeconds(10)
         private const val HEARTBEAT_INTERVAL_MS = 30_000L
