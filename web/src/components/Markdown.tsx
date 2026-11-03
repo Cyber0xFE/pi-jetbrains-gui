@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import MarkdownIt from "markdown-it";
+import cjkFriendly from "markdown-it-cjk-friendly";
 import hljs from "highlight.js/lib/core";
 import bash from "highlight.js/lib/languages/bash";
 import css from "highlight.js/lib/languages/css";
@@ -62,6 +63,9 @@ function createRenderer(withHighlight: boolean, fileReferences: readonly string[
     breaks: true,
     ...(withHighlight ? { highlight } : {}),
   });
+  // CommonMark treats `**x（y）**后` as literal because the closing marker is preceded by
+  // CJK punctuation and followed by a CJK character; relax that for CJK-adjacent emphasis.
+  renderer.use(cjkFriendly);
   const referenceTrie = createReferenceTrie(fileReferences);
   renderer.inline.ruler.before("text", "file_reference", (state, silent) => {
     if (state.src[state.pos] !== "@") return false;

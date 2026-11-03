@@ -84,6 +84,20 @@ describe("Markdown", () => {
     expect(container.querySelectorAll("li")).toHaveLength(2);
   });
 
+  it("renders emphasis whose closing marker is followed by CJK text", () => {
+    // CommonMark leaves `**…（…）**一起` literal because the closer is preceded by fullwidth
+    // punctuation; the CJK-friendly rule renders it as bold instead.
+    const source = "会把**截至此刻的完整状态（含 payload）**一起写进 Postgres。";
+    const { container } = render(<Markdown text={source} streaming={false} />);
+    expect(container.querySelector("strong")?.textContent).toBe("截至此刻的完整状态（含 payload）");
+  });
+
+  it("keeps intraword underscores literal while rendering CJK-adjacent emphasis", () => {
+    const { container } = render(<Markdown text={"foo_bar_baz 与 **中文**一起"} streaming={false} />);
+    expect(container.querySelector("strong")?.textContent).toBe("中文");
+    expect(container.textContent).toContain("foo_bar_baz");
+  });
+
   it("highlights fenced code once the message is complete", () => {
     const { container } = render(
       <Markdown text={"```ts\nconst answer: number = 42;\n```"} streaming={false} />,
