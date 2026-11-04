@@ -3,13 +3,12 @@ package dev.pi.jetbrains.editor
 import com.intellij.ide.BrowserUtil
 import com.intellij.ide.projectView.ProjectView
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
-import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.editor.ScrollType
+import com.intellij.openapi.fileEditor.FileEditorManager
 import java.nio.file.Paths
 
 /**
@@ -49,12 +48,10 @@ object EditorNavigator {
                 descriptor.navigate(true)
                 return@invokeLater
             }
+            // openEditor(OpenFileDescriptor, boolean) is deprecated since 2024.3; openTextEditor is the
+            // supported replacement and returns the text editor directly (null for non-text files).
             val editor = FileEditorManager.getInstance(project)
-                .openEditor(descriptor, true)
-                .asSequence()
-                .filterIsInstance<TextEditor>()
-                .map(TextEditor::getEditor)
-                .firstOrNull() ?: return@invokeLater
+                .openTextEditor(descriptor, true) ?: return@invokeLater
             val document = editor.document
             val lastLine = (endLine - 1).coerceAtMost(document.lineCount - 1)
             val startOffset = document.getLineStartOffset((startLine - 1).coerceAtMost(document.lineCount - 1))
