@@ -91,18 +91,21 @@ intellijPlatform {
         """.trimIndent()
 
         changeNotes = """
-            <h2>What's New in 0.2.1</h2>
+            <h2>What's New in 0.2.2</h2>
             <h3>Features</h3>
             <ul>
-              <li>Press Ctrl+Up/Ctrl+Down to jump to the previous or next user message.</li>
-              <li>Image previews now support wheel zoom and drag panning for a closer look at details.</li>
+              <li>Search conversation messages with Ctrl+F, including case-sensitive, whole-word, and regular-expression matching.</li>
+              <li>Reuse sessions already open in another tab instead of loading duplicate session views.</li>
+              <li>Display user-message images as thumbnails and open the original image in a preview; previews support zoom, panning, and copying to the clipboard.</li>
+              <li>Configure a custom Pi chat theme color from the plugin settings.</li>
+              <li>Show session names or the first user message in task tab titles and improve navigation between user messages.</li>
             </ul>
             <h3>Fixes</h3>
             <ul>
-              <li>Large images sent by pi no longer render as broken previews or disappear from the WebView; image payloads are now preserved while surrounding text is capped.</li>
-              <li>Fixed the bundled Node.js runtime not being found when the platform plugin registry is unavailable.</li>
-              <li>Removed the redundant Close button from the picker footer.</li>
-              <li>Replaced deprecated platform APIs for better forward compatibility.</li>
+              <li>Prevent duplicated pasted-image messages and cap retained WebView records to protect memory usage.</li>
+              <li>Improve rendering of escaped backslashes and bold text containing CJK punctuation.</li>
+              <li>Keep conversation navigation and tree-view scrolling positioned at the expected message.</li>
+              <li>Replace deprecated IntelliJ APIs and improve compatibility with newer platform versions.</li>
             </ul>
 
         """.trimIndent()
