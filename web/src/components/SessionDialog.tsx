@@ -82,6 +82,7 @@ export function SessionDialog({
     <Picker
       title={tab === "sessions" ? "Sessions" : "Session tree"}
       items={items}
+      scrollPosition={tab === "tree" ? "bottom" : "top"}
       placeholder={tab === "sessions" ? "Filter sessions…" : "Filter entries…"}
       emptyText={
         loading

@@ -27,6 +27,8 @@ interface Props {
   emptyText?: string;
   /** Extra buttons rendered next to Close (e.g. "New session"). */
   actions?: JSX.Element | null;
+  /** Where the list scrolls when the item set changes (tree opens at the latest entry). */
+  scrollPosition?: "top" | "bottom";
   onSelect: (item: PickerItem) => void;
   onClose: () => void;
 }
@@ -41,7 +43,7 @@ const OVERSCAN = 4;
  *
  * The overlay closes on Escape, the backdrop click, or after a selection.
  */
-export function Picker({ title, items, placeholder, emptyText, actions, onSelect, onClose }: Props): JSX.Element {
+export function Picker({ title, items, placeholder, emptyText, actions, scrollPosition = "top", onSelect, onClose }: Props): JSX.Element {
   const [query, setQuery] = useState("");
   const [scrollTop, setScrollTop] = useState(0);
   const [selected, setSelected] = useState(0);
@@ -66,7 +68,15 @@ export function Picker({ title, items, placeholder, emptyText, actions, onSelect
     setSelected(firstEnabled(filtered));
     setScrollTop(0);
     if (listRef.current) listRef.current.scrollTop = 0;
-  }, [filtered]);
+  }, [query]);
+
+  useEffect(() => {
+    const list = listRef.current;
+    const bottom = scrollPosition === "bottom" && list ? Math.max(0, list.scrollHeight - list.clientHeight) : 0;
+    setSelected(scrollPosition === "bottom" ? lastEnabled(filtered) : firstEnabled(filtered));
+    setScrollTop(bottom);
+    if (list) list.scrollTop = bottom;
+  }, [scrollPosition, items]);
 
   useEffect(() => {
     rowRefs.current[selected]?.scrollIntoView?.({ block: "nearest" });
@@ -256,4 +266,11 @@ export function Picker({ title, items, placeholder, emptyText, actions, onSelect
 function firstEnabled(items: PickerItem[]): number {
   const index = items.findIndex((item) => !item.disabled);
   return index < 0 ? 0 : index;
+}
+
+function lastEnabled(items: PickerItem[]): number {
+  for (let index = items.length - 1; index >= 0; index--) {
+    if (!items[index]?.disabled) return index;
+  }
+  return 0;
 }
