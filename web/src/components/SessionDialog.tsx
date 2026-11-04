@@ -94,23 +94,50 @@ export function SessionDialog({
         <>
           <button
             type="button"
-            className={`button button-secondary ${tab === "sessions" ? "button-tab-active" : ""}`}
+            className={`button button-secondary button-icon ${tab === "sessions" ? "button-tab-active" : ""}`}
             onClick={() => setTab("sessions")}
+            aria-label="Sessions"
+            title="Sessions"
           >
-            Sessions
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" />
+            </svg>
           </button>
           <button
             type="button"
-            className={`button button-secondary ${tab === "tree" ? "button-tab-active" : ""}`}
+            className={`button button-secondary button-icon ${tab === "tree" ? "button-tab-active" : ""}`}
             onClick={() => setTab("tree")}
+            aria-label="Session tree"
+            title="Session tree"
           >
-            Tree
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M6 3v12" />
+              <circle cx="6" cy="18" r="3" />
+              <circle cx="18" cy="6" r="3" />
+              <path d="M18 9a9 9 0 0 1-9 9" />
+            </svg>
           </button>
-          <button type="button" className="button button-secondary" onClick={onRefresh}>
-            Refresh
+          <button
+            type="button"
+            className="button button-secondary button-icon"
+            onClick={onRefresh}
+            aria-label="Refresh"
+            title="Refresh"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4" />
+            </svg>
           </button>
-          <button type="button" className="button" onClick={onNewSession}>
-            New session
+          <button
+            type="button"
+            className="button button-icon"
+            onClick={onNewSession}
+            aria-label="New session"
+            title="New session"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
           </button>
         </>
       }

@@ -256,6 +256,24 @@ export function MessageList({
       element.querySelectorAll<HTMLElement>(".message-user[data-message-id]"),
       (message) => ({ id: message.dataset.messageId!, top: message.offsetTop }),
     );
+    // Stepping up lands on the closest user message the viewport top has already scrolled past,
+    // wherever the viewport currently is. If the top rests on (or above) a user message, fall
+    // through to the threshold walk below so the step still moves to the previous one.
+    if (direction < 0) {
+      let crossed: { id: string; top: number } | null = null;
+      for (const entry of offsets) {
+        if (element.scrollTop > entry.top + 1) crossed = entry;
+        else break;
+      }
+      const crossedMessage = crossed
+        ? userMessages.find(({ message }) => message.id === crossed!.id)
+        : undefined;
+      if (crossedMessage) {
+        stickToBottom.current = false;
+        jumpToMessage(crossedMessage.message.id, crossedMessage.index);
+        return;
+      }
+    }
     const threshold = element.scrollTop + 96;
     let currentId: string | null = null;
     for (const message of offsets) {

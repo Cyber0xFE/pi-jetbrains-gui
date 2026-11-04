@@ -256,6 +256,7 @@ export type Outbound =
   | { type: "new_session" }
   | { type: "switch_session"; path: string }
   | { type: "fork"; entryId: string; images?: PromptImage[] }
+  | { type: "copy_image"; images: PromptImage[] }
   | { type: "rename_session"; name: string; path?: string }
   | { type: "delete_session"; path: string }
   // M3: model / thinking

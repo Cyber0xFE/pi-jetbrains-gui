@@ -255,6 +255,8 @@ describe("App", () => {
     });
     await waitFor(() => expect(screen.getByTitle("question-2").getAttribute("aria-current")).toBe("location"));
 
+    // Rest the viewport on the newest user message (not below it) before stepping up.
+    top = 2400;
     deliver({ type: "scroll_to_user_message", direction: "previous" });
     await waitFor(() => expect(screen.getByTitle("question-1").getAttribute("aria-current")).toBe("location"));
 

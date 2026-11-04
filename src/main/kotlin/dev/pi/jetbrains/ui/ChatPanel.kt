@@ -53,6 +53,13 @@ import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Component
 import java.awt.Toolkit
+import java.awt.datatransfer.Clipboard
+import java.awt.datatransfer.ClipboardOwner
+import java.awt.datatransfer.DataFlavor
+import java.awt.datatransfer.Transferable
+import java.awt.image.BufferedImage
+import java.io.ByteArrayInputStream
+import java.util.Base64
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
@@ -361,6 +368,7 @@ class ChatPanel(
                 }
             }
             "open_url" -> message.url?.let { EditorNavigator.openUrl(it) }
+            "copy_image" -> message.images.firstOrNull()?.let { copyImageToClipboard(it) }
             "log" -> message.message?.let { text ->
                 val prefix = diagnosticPrefix()
                 LOG.info("$prefix [webview] $text")
@@ -470,6 +478,24 @@ class ChatPanel(
             "clear_context" -> service.clearEditorContext()
 
             else -> LOG.debug("unknown webview message: ${message.type}")
+        }
+    }
+
+    /** Decodes a base64 image payload from the webview and puts it on the system clipboard. */
+    private fun copyImageToClipboard(image: ClientImage) {
+        scope.launch {
+            val result = runCatching {
+                val bytes = Base64.getDecoder().decode(image.data)
+                val decoded = ByteArrayInputStream(bytes).use { stream -> javax.imageio.ImageIO.read(stream) }
+                    ?: error("unsupported image data")
+                val selection = ImageSelection(decoded)
+                // CopyPasteManager.setContents also demands a string flavor, which a pure image
+                // transferable cannot provide; the plain system clipboard only needs imageFlavor.
+                Toolkit.getDefaultToolkit().systemClipboard.setContents(selection, selection)
+            }
+            if (result.isFailure) {
+                bridge?.send(HostMessages.notice("failed to copy image: ${result.exceptionOrNull()?.message}"))
+            }
         }
     }
 
@@ -923,6 +949,20 @@ class ChatPanel(
         val depth: Int,
         val assign: (JsonElement) -> Unit,
     )
+
+    /** Exposes a [BufferedImage] to the clipboard under the standard image flavor. */
+    private class ImageSelection(private val image: BufferedImage) : Transferable, ClipboardOwner {
+        override fun getTransferDataFlavors(): Array<DataFlavor> = arrayOf(DataFlavor.imageFlavor)
+
+        override fun isDataFlavorSupported(flavor: DataFlavor): Boolean = flavor == DataFlavor.imageFlavor
+
+        override fun getTransferData(flavor: DataFlavor): Any {
+            if (!isDataFlavorSupported(flavor)) throw UnsupportedOperationException(flavor.mimeType)
+            return image
+        }
+
+        override fun lostOwnership(clipboard: Clipboard?, contents: Transferable?) {}
+    }
 
     private fun protectLargeHistoryMessage(message: JsonElement): JsonElement {
         val objectMessage = message as? JsonObject ?: return message

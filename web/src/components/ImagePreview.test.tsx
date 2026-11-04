@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ImagePreview } from "./ImagePreview";
 
 afterEach(cleanup);
@@ -94,5 +94,78 @@ describe("ImagePreview", () => {
     fireEvent.click(trigger);
     image = previewImage();
     expect(image.style.transform).toBe("translate(0px, 0px) scale(1)");
+  });
+
+  it("offers Copy image in a context menu on the preview and posts the payload to the host", () => {
+    const nativePost = vi.fn();
+    window.__piNativePost = nativePost as unknown as typeof window.__piNativePost;
+    try {
+      openPreview();
+      const image = previewImage();
+      expect(screen.queryByRole("menuitem", { name: "Copy image" })).toBeNull();
+
+      fireEvent.contextMenu(image, { clientX: 40, clientY: 30 });
+      const item = screen.getByRole("menuitem", { name: "Copy image" });
+      expect(item.closest(".image-context-menu")).not.toBeNull();
+
+      fireEvent.click(item);
+      expect(nativePost).toHaveBeenCalledWith({
+        type: "copy_image",
+        images: [{ data: "abc", mimeType: "image/png" }],
+      });
+      expect(screen.queryByRole("menuitem", { name: "Copy image" })).toBeNull();
+    } finally {
+      delete window.__piNativePost;
+    }
+  });
+
+  it("offers Copy image from the inline trigger thumbnail too", () => {
+    const nativePost = vi.fn();
+    window.__piNativePost = nativePost as unknown as typeof window.__piNativePost;
+    try {
+      render(<ImagePreview src="data:image/jpeg;base64,xyz" alt="Screenshot" />);
+      const triggerImage = screen.getByRole("button", { name: "Preview screenshot" }).querySelector("img")!;
+
+      fireEvent.contextMenu(triggerImage, { clientX: 10, clientY: 10 });
+      fireEvent.click(screen.getByRole("menuitem", { name: "Copy image" }));
+      expect(nativePost).toHaveBeenCalledWith({
+        type: "copy_image",
+        images: [{ data: "xyz", mimeType: "image/jpeg" }],
+      });
+      expect(screen.queryByRole("dialog", { name: "Image preview" })).toBeNull();
+    } finally {
+      delete window.__piNativePost;
+    }
+  });
+
+  it("closes the context menu on Escape before closing the preview", () => {
+    openPreview();
+    fireEvent.contextMenu(previewImage(), { clientX: 40, clientY: 30 });
+    expect(screen.getByRole("menuitem", { name: "Copy image" })).not.toBeNull();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("menuitem", { name: "Copy image" })).toBeNull();
+    expect(screen.getByRole("dialog", { name: "Image preview" })).not.toBeNull();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Image preview" })).toBeNull();
+  });
+
+  it("closes the context menu when clicking elsewhere", () => {
+    openPreview();
+    fireEvent.contextMenu(previewImage(), { clientX: 40, clientY: 30 });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Copy image" }).closest(".image-context-menu")!, { detail: 0 });
+    expect(screen.getByRole("menuitem", { name: "Copy image" })).not.toBeNull();
+
+    fireEvent.mouseDown(window);
+    expect(screen.queryByRole("menuitem", { name: "Copy image" })).toBeNull();
+  });
+
+  it("does not open a context menu for non-data URLs", () => {
+    render(<ImagePreview src="/assets/photo.png" alt="Screenshot" />);
+    const triggerImage = screen.getByRole("button", { name: "Preview screenshot" }).querySelector("img")!;
+
+    fireEvent.contextMenu(triggerImage, { clientX: 10, clientY: 10 });
+    expect(screen.queryByRole("menuitem", { name: "Copy image" })).toBeNull();
   });
 });

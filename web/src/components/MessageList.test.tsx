@@ -444,6 +444,67 @@ it("jumps to the previous and next user message on navigation requests", () => {
   expect(view.getByRole("button", { name: "Jump to user message 3: Question 2" }).getAttribute("aria-current")).toBe("location");
 });
 
+it("steps up to the closest user message the viewport has scrolled past", () => {
+  HTMLElement.prototype.scrollIntoView = vi.fn();
+  const message = (id: string, role: "user" | "assistant", text: string, timestamp: number): ChatMessage => ({
+    id, role, blocks: [{ kind: "text", text }], timestamp, streaming: false,
+  });
+  const messages: ChatMessage[] = [
+    message("user-0", "user", "Question 0", 0),
+    message("assistant-0", "assistant", "Answer 0", 1),
+    message("user-1", "user", "Question 1", 2),
+    message("assistant-1", "assistant", "Answer 1", 3),
+  ];
+  const props = { messages, tools: {}, loadingHistory: false, emptyHint: "", thinkingLabel: null, connecting: false };
+  const view = render(<MessageList {...props} previousUserMessageRequest={0} nextUserMessageRequest={0} />);
+  const log = view.getByRole("log");
+  Object.defineProperties(log, { scrollHeight: { configurable: true, value: 3000 }, clientHeight: { configurable: true, value: 400 } });
+  Array.from(log.querySelectorAll(".message-user")).forEach((element, index) => {
+    Object.defineProperty(element, "offsetTop", { configurable: true, value: index * 600 });
+  });
+  // The viewport rests at the bottom, past the newest user message.
+  log.scrollTop = 1200;
+
+  view.rerender(<MessageList {...props} previousUserMessageRequest={1} nextUserMessageRequest={0} />);
+  expect(view.getByRole("button", { name: "Jump to user message 2: Question 1" }).getAttribute("aria-current")).toBe("location");
+
+  // Standing on the newest user message, the next step goes to the previous one.
+  log.scrollTop = 600;
+  view.rerender(<MessageList {...props} previousUserMessageRequest={2} nextUserMessageRequest={0} />);
+  expect(view.getByRole("button", { name: "Jump to user message 1: Question 0" }).getAttribute("aria-current")).toBe("location");
+});
+
+it("steps up to the closest user message even from the middle of an assistant reply", () => {
+  HTMLElement.prototype.scrollIntoView = vi.fn();
+  const message = (id: string, role: "user" | "assistant", text: string, timestamp: number): ChatMessage => ({
+    id, role, blocks: [{ kind: "text", text }], timestamp, streaming: false,
+  });
+  const messages: ChatMessage[] = [
+    message("user-0", "user", "Question 0", 0),
+    message("assistant-0", "assistant", "Answer 0", 1),
+    message("user-1", "user", "Question 1", 2),
+    message("assistant-1", "assistant", "Answer 1", 3),
+    message("user-2", "user", "Question 2", 4),
+  ];
+  const props = { messages, tools: {}, loadingHistory: false, emptyHint: "", thinkingLabel: null, connecting: false };
+  const view = render(<MessageList {...props} previousUserMessageRequest={0} nextUserMessageRequest={0} />);
+  const log = view.getByRole("log");
+  Object.defineProperties(log, { scrollHeight: { configurable: true, value: 4000 }, clientHeight: { configurable: true, value: 400 } });
+  Array.from(log.querySelectorAll(".message-user")).forEach((element, index) => {
+    Object.defineProperty(element, "offsetTop", { configurable: true, value: index * 1200 });
+  });
+  // The viewport sits inside the second answer, past user-1's top but well above user-2.
+  log.scrollTop = 1800;
+
+  view.rerender(<MessageList {...props} previousUserMessageRequest={1} nextUserMessageRequest={0} />);
+  expect(view.getByRole("button", { name: "Jump to user message 2: Question 1" }).getAttribute("aria-current")).toBe("location");
+
+  // From user-1's top, the step walks back to user-0 instead of stalling.
+  log.scrollTop = 1200;
+  view.rerender(<MessageList {...props} previousUserMessageRequest={2} nextUserMessageRequest={0} />);
+  expect(view.getByRole("button", { name: "Jump to user message 1: Question 0" }).getAttribute("aria-current")).toBe("location");
+});
+
 it("does not move past the first or last user message", () => {
   HTMLElement.prototype.scrollIntoView = vi.fn();
   const messages: ChatMessage[] = [

@@ -320,7 +320,7 @@ data class ClientMessage(
     val entryId: String? = null,
     /** Session title for `set_session_name`. */
     val name: String? = null,
-    /** Clipboard/editor images sent with a prompt. */
+    /** Clipboard/editor images sent with a prompt; also used by `copy_image` requests. */
     val images: List<ClientImage> = emptyList(),
 )
 

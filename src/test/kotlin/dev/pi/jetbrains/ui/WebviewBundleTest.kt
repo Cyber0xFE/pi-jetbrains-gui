@@ -117,6 +117,19 @@ class WebviewBundleTest {
         assertEquals(42, message.line)
     }
 
+    @Test
+    fun `copy_image messages carry the image payload for the clipboard`() {
+        val message = PiJson.decodeFromString(
+            ClientMessage.serializer(),
+            """{"type":"copy_image","images":[{"data":"abc=","mimeType":"image/png"}]}""",
+        )
+
+        assertEquals("copy_image", message.type)
+        assertEquals(1, message.images.size)
+        assertEquals("abc=", message.images[0].data)
+        assertEquals("image/png", message.images[0].mimeType)
+    }
+
     private fun readBundle(): String {
         val html = javaClass.getResourceAsStream("/webview/index.html")?.use { stream ->
             stream.readBytes().toString(Charsets.UTF_8)
