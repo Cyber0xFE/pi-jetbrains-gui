@@ -457,7 +457,7 @@ function onMessageEnd(state: ChatState, message: WireMessage | undefined, record
   const rebuilt: ChatMessage = {
     id: existing?.id ?? id,
     role,
-    blocks: blocksFromMessage(message),
+    blocks: withImageData(blocksFromMessage(message), existing),
     timestamp: message.timestamp ?? existing?.timestamp ?? Date.now(),
     streaming: false,
     stopReason: message.stopReason,
@@ -801,6 +801,21 @@ export function blocksFromMessage(message: WireMessage): Block[] {
     return content.length > 0 ? normalizeTaggedBlocks([{ kind: "text", text: content }]) : [];
   }
   return normalizeTaggedBlocks(content.map(blockFromContent).filter((block): block is Block => block !== null));
+}
+
+/**
+ * The host strips image payloads from `message_end` (message_start already delivered them),
+ * so refill the empty data from the blocks that are currently rendered.
+ */
+function withImageData(blocks: Block[], existing: ChatMessage | undefined): Block[] {
+  if (!existing) return blocks;
+  return blocks.map((block, index) => {
+    if (block.kind !== "image" || block.data) return block;
+    const previous = existing.blocks[index];
+    return previous && previous.kind === "image" && previous.mimeType === block.mimeType
+      ? { ...block, data: previous.data }
+      : block;
+  });
 }
 
 function blockFromContent(content: WireContent): Block | null {

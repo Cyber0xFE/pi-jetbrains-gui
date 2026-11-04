@@ -41,6 +41,33 @@ describe("sessionReducer", () => {
     expect(state.streamingMessageId).toBeNull();
   });
 
+  it("keeps image data rendered by message_start when message_end omits it", () => {
+    const state = apply(
+      initialState,
+      records(
+        {
+          type: "message_start",
+          message: {
+            role: "assistant",
+            content: [{ type: "text", text: "screenshot" }, { type: "image", data: "QUJD", mimeType: "image/png" }],
+            timestamp: 1,
+          },
+        },
+        {
+          type: "message_end",
+          message: {
+            role: "assistant",
+            content: [{ type: "text", text: "screenshot" }, { type: "image", data: "", mimeType: "image/png" }],
+            timestamp: 2,
+            stopReason: "stop",
+          },
+        },
+      ),
+    );
+
+    expect(state.messages[0]?.blocks[1]).toEqual({ kind: "image", data: "QUJD", mimeType: "image/png" });
+  });
+
   it("recovers when a delta arrives before message_start", () => {
     const state = apply(
       initialState,

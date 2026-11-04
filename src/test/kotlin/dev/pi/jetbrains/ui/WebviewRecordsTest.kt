@@ -71,6 +71,77 @@ class WebviewRecordsTest {
     }
 
     @Test
+    fun `metadataOnly keeps scalars and drops container payloads`() {
+        val record = parse(
+            """{"type":"agent_end","reason":"end_turn","durationMs":42,"message":{"content":[{"type":"text","text":"x"}]},"stats":{"a":1}}""",
+        )
+        val reduced = WebviewRecords.metadataOnly(record) as JsonObject
+
+        assertEquals(
+            parse("""{"type":"agent_end","reason":"end_turn","durationMs":42}"""),
+            reduced,
+        )
+        assertEquals(record, parse(record.toString()))
+    }
+
+    @Test
+    fun `withoutImageData clears image payloads but keeps block structure`() {
+        val record = parse(
+            """{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"ok"},{"type":"image","data":"QUJD","mimeType":"image/png"}]}}""",
+        )
+        val reduced = WebviewRecords.withoutImageData(record) as JsonObject
+        val content = ((reduced["message"] as JsonObject)["content"] as JsonArray)
+
+        assertEquals(JsonPrimitive(""), ((content[1] as JsonObject)["data"] as JsonPrimitive))
+        assertEquals(JsonPrimitive("image/png"), (content[1] as JsonObject)["mimeType"])
+        assertEquals(JsonPrimitive("ok"), ((content[0] as JsonObject)["text"] as JsonPrimitive))
+        assertTrue(WebviewRecords.jsonBytes(reduced) < 200)
+    }
+
+    @Test
+    fun `image payloads lose their exemption past the runaway guard`() {
+        val record = JsonObject(linkedMapOf(
+            "type" to JsonPrimitive("message_start"),
+            "message" to JsonObject(linkedMapOf(
+                "role" to JsonPrimitive("user"),
+                "content" to JsonArray(listOf(JsonObject(linkedMapOf(
+                    "type" to JsonPrimitive("image"),
+                    "data" to JsonPrimitive("QUJD".repeat(200_000)),
+                    "mimeType" to JsonPrimitive("image/png"),
+                )))),
+            )),
+        ))
+        val logs = mutableListOf<String>()
+        val safe = WebviewRecords.protect(record, logs::add) as JsonObject
+        val content = ((safe["message"] as JsonObject)["content"] as JsonArray)
+
+        assertBounded(safe)
+        assertEquals(JsonPrimitive(""), ((content[0] as JsonObject)["data"] as JsonPrimitive))
+        assertEquals(JsonPrimitive("image/png"), (content[0] as JsonObject)["mimeType"])
+        assertTrue(logs.single().contains("totalLimit="))
+    }
+
+    @Test
+    fun `image payloads stay intact below the runaway guard`() {
+        val record = JsonObject(linkedMapOf(
+            "type" to JsonPrimitive("message_start"),
+            "message" to JsonObject(linkedMapOf(
+                "role" to JsonPrimitive("user"),
+                "content" to JsonArray(listOf(JsonObject(linkedMapOf(
+                    "type" to JsonPrimitive("image"),
+                    "data" to JsonPrimitive("QUJD".repeat(40_000)),
+                    "mimeType" to JsonPrimitive("image/png"),
+                )))),
+            )),
+        ))
+        val logs = mutableListOf<String>()
+        val safe = WebviewRecords.protect(record, logs::add)
+
+        assertEquals(record, safe)
+        assertTrue(logs.isEmpty())
+    }
+
+    @Test
     fun `streaming delta takes priority over redundant full snapshots`() {
         val delta = parse("""{"type":"text_delta","contentIndex":0,"delta":"latest text"}""")
         val record = JsonObject(linkedMapOf(
@@ -173,7 +244,7 @@ class WebviewRecordsTest {
     fun `large image is preserved while surrounding text is capped`() {
         val image = JsonObject(linkedMapOf(
             "type" to JsonPrimitive("image"),
-            "data" to JsonPrimitive("aGVsbG8=".repeat(60_000)),
+            "data" to JsonPrimitive("aGVsbG8=".repeat(10_000)),
             "mimeType" to JsonPrimitive("image/png"),
         ))
         val text = "x".repeat(200_000)

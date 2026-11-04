@@ -10,6 +10,9 @@ import kotlinx.serialization.json.contentOrNull
 /** Display-only protection. Never mutates the RPC data used by native consumers or pi's session. */
 internal object WebviewRecords {
     const val MAX_RECORD_BYTES = 128 * 1024
+
+    /** Runaway guard: even image payloads must not push a single record beyond this. */
+    const val MAX_TOTAL_RECORD_BYTES = 512 * 1024
     const val MAX_BATCH_BYTES = 256 * 1024
     const val MAX_BATCH_RECORDS = 16
     const val DIAGNOSTIC_BYTES = 64 * 1024
@@ -31,21 +34,46 @@ internal object WebviewRecords {
     fun protect(record: JsonElement, log: (String) -> Unit = {}): JsonElement {
         val totalBytes = jsonBytes(record, SOURCE_SIZE_LIMIT)
         if (totalBytes <= MAX_RECORD_BYTES && withinDepth(record)) return record
-        // Image payloads are exempt from the byte budget so they always render in the webview;
-        // only the remaining text content is capped.
         val stripped = stripImageData(record)
         val textBytes = jsonBytes(stripped, SOURCE_SIZE_LIMIT)
-        if (textBytes <= MAX_RECORD_BYTES && withinDepth(record)) return record
-        // Reserve space for the top-level diagnostic flag before projecting the payload.
+        // Image payloads are exempt from the byte budget so they always render in the webview,
+        // but only while the whole record stays below the runaway guard; oversized records are
+        // projected without restoring images, which the webview shows as omitted-image cards.
+        if (totalBytes <= MAX_TOTAL_RECORD_BYTES) {
+            if (textBytes <= MAX_RECORD_BYTES && withinDepth(record)) return record
+            val projected = project(stripped, MAX_RECORD_BYTES - 32, 0)
+            val safe = restoreImageData(record, projected)
+            log("[webview-records] capped event=${eventType(record)} sourceBytes=$totalBytes textBytes=$textBytes payloadBytes=${jsonBytes(safe, SOURCE_SIZE_LIMIT)}")
+            return flag(safe)
+        }
         val projected = project(stripped, MAX_RECORD_BYTES - 32, 0)
-        val safe = restoreImageData(record, projected)
-        val flagged = if (safe is JsonObject) {
-            JsonObject(safe.toMutableMap().apply { put("recordTruncated", JsonPrimitive(true)) })
-        } else safe
-        val sourceBytes = if (totalBytes > SOURCE_SIZE_LIMIT) ">$SOURCE_SIZE_LIMIT" else totalBytes.toString()
-        log("[webview-records] capped event=${eventType(record)} sourceBytes=$sourceBytes textBytes=$textBytes payloadBytes=${jsonBytes(flagged, SOURCE_SIZE_LIMIT)}")
-        return flagged
+        log("[webview-records] capped event=${eventType(record)} sourceBytes=$totalBytes textBytes=$textBytes payloadBytes=${jsonBytes(projected, SOURCE_SIZE_LIMIT)} totalLimit=$MAX_TOTAL_RECORD_BYTES")
+        return flag(projected)
     }
+
+    private fun flag(record: JsonElement): JsonElement = if (record is JsonObject) {
+        JsonObject(record.toMutableMap().apply { put("recordTruncated", JsonPrimitive(true)) })
+    } else record
+
+    /**
+     * Drops every non-scalar field from a record. Used for event types the webview reducer
+     * never reads (for example `agent_end` / `turn_end`): pi resends the full final message
+     * there, which would duplicate payloads the transcript already received.
+     */
+    fun metadataOnly(record: JsonElement): JsonElement {
+        val obj = record as? JsonObject ?: return record
+        val fields = LinkedHashMap<String, JsonElement>()
+        for ((key, value) in obj) {
+            if (value is JsonPrimitive) fields[key] = value
+        }
+        return JsonObject(fields)
+    }
+
+    /**
+     * Clears image payload data while keeping the block structure. Used for `message_end`,
+     * which repeats the message already delivered (and rendered) by `message_start`.
+     */
+    fun withoutImageData(record: JsonElement): JsonElement = stripImageData(record)
 
     /** Includes the records envelope and commas in the byte budget; preserves order and boundaries. */
     fun batches(records: List<JsonElement>): List<List<JsonElement>> {
@@ -172,10 +200,7 @@ internal object WebviewRecords {
     private fun isImagePayload(value: JsonObject): Boolean =
         (value["type"] as? JsonPrimitive)?.contentOrNull == "image" && value["data"] is JsonPrimitive
 
-    /**
-     * Replaces image payload data with an empty marker, iteratively, so text content keeps the
-     * byte budget during projection; the full payloads are restored afterwards.
-     */
+    /** Replaces image payload data with an empty marker, keeping the block structure. */
     private fun stripImageData(root: JsonElement): JsonElement {
         var result: JsonElement = JsonNull
         val tasks = ArrayDeque<StripTask>()

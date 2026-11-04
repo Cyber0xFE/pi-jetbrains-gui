@@ -895,7 +895,26 @@ class ChatPanel(
     }
 
     private fun toRecord(event: PiEvent): JsonElement? = when (event) {
-        is PiEvent.Session -> protectWebviewRecord(event.payload)
+        is PiEvent.Session -> {
+            val reduced = when (event.type) {
+                // message_end repeats the message message_start already delivered and rendered.
+                "message_end" -> WebviewRecords.withoutImageData(event.payload)
+                // The reducer has no branch for these lifecycle events; pi still resends the
+                // full final message inside them (hundreds of KB with pasted screenshots).
+                "agent_end", "turn_end" -> WebviewRecords.metadataOnly(event.payload)
+                else -> event.payload
+            }
+            if (reduced !== event.payload) {
+                val sourceBytes = WebviewRecords.jsonBytes(event.payload)
+                if (sourceBytes >= WebviewRecords.DIAGNOSTIC_BYTES) {
+                    service.logDiagnostic(
+                        "${diagnosticPrefix()} [webview-records] reduced event=${event.type} " +
+                            "sourceBytes=$sourceBytes payloadBytes=${WebviewRecords.jsonBytes(reduced)}",
+                    )
+                }
+            }
+            protectWebviewRecord(reduced)
+        }
         is PiEvent.ExtensionUiRequest -> protectWebviewRecord(event.payload)
         is PiEvent.Response -> protectWebviewRecord(HostMessages.response(event.response))
         is PiEvent.Unknown -> null
