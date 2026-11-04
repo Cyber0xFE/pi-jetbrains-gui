@@ -25,8 +25,9 @@ class PiChatTabsService(private val project: Project) : Disposable {
     private var nextTabNumber = 1
 
     private companion object {
-        /** Tabs show a short prefix; the full title goes to the tab tooltip. */
-        const val TAB_TITLE_MAX_LENGTH = 12
+        /** Tabs show a short prefix; the full title goes to the tab tooltip. Measured in pixels
+         *  with the actual tab font so titles of any script end up the same visual length. */
+        const val TAB_TITLE_MAX_WIDTH_PX = 90
     }
 
     fun initialize(toolWindow: ToolWindow) {
@@ -73,12 +74,14 @@ class PiChatTabsService(private val project: Project) : Disposable {
             onTitleChanged = { title ->
                 val currentContent = content ?: return@ChatPanel
                 val full = title ?: "任务 $number"
-                val label = if (full.length > TAB_TITLE_MAX_LENGTH) full.take(TAB_TITLE_MAX_LENGTH) + "…" else full
                 ApplicationManager.getApplication().invokeLater {
-                    if (currentContent.isValid) {
-                        currentContent.description = full
-                        if (currentContent.displayName != label) currentContent.displayName = label
-                    }
+                    if (!currentContent.isValid) return@invokeLater
+                    currentContent.description = full
+                    val component = currentContent.component
+                    val label = if (component != null) {
+                        truncateTabTitle(full, component.getFontMetrics(component.font))
+                    } else full
+                    if (currentContent.displayName != label) currentContent.displayName = label
                 }
             },
         )
@@ -94,6 +97,17 @@ class PiChatTabsService(private val project: Project) : Disposable {
         toolWindow.contentManager.setSelectedContent(createdContent)
         panel.requestComposerFocus()
         return panel
+    }
+
+    /** Truncates by pixel width of the real tab font so all tab labels look equally long. */
+    private fun truncateTabTitle(text: String, metrics: java.awt.FontMetrics): String {
+        if (metrics.stringWidth(text) <= TAB_TITLE_MAX_WIDTH_PX) return text
+        var width = metrics.stringWidth("…")
+        text.forEachIndexed { index, ch ->
+            width += metrics.charWidth(ch)
+            if (width > TAB_TITLE_MAX_WIDTH_PX) return text.take(index) + "…"
+        }
+        return text
     }
 
     private fun setTabIcon(content: Content, running: Boolean) {
