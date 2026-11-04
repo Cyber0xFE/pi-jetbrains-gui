@@ -128,3 +128,18 @@ export function searchMessages(messages: ChatMessage[], compiled: CompiledQuery)
   });
   return hits;
 }
+
+/**
+ * Returns the selected text as a Ctrl+F seed when it lies inside a rendered user/assistant
+ * message body. Selections inside collapsed thinking sections, the composer, dialogs or the
+ * search bar itself return null so the previous query is kept.
+ */
+export function selectedSearchSeed(selection: Selection | null): string | null {
+  const text = selection?.toString().trim() ?? "";
+  if (text.length === 0 || !selection) return null;
+  const node = selection.anchorNode;
+  const element = node instanceof Element ? node : (node?.parentElement ?? null);
+  if (!element?.closest(".message")) return null;
+  if (element.closest(".thinking")) return null;
+  return text;
+}

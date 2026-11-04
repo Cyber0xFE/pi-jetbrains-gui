@@ -10,7 +10,7 @@ import { StatusBar } from "./components/StatusBar";
 import { Toolbar } from "./components/Toolbar";
 import { formatTokens } from "./format";
 import { ChatStore } from "./store";
-import { EMPTY_SEARCH, type SearchState } from "./search";
+import { EMPTY_SEARCH, selectedSearchSeed, type SearchState } from "./search";
 import type { Block } from "./state/sessionReducer";
 
 type Dialog = "sessions" | "models" | "thinking" | null;
@@ -101,13 +101,17 @@ export function App(): JSX.Element {
   }, [store]);
 
   // Ctrl+F opens the in-transcript find bar. JCEF delivers the shortcut to the page, so this
-  // listener owns it instead of the IDE's Find action.
+  // listener owns it instead of the IDE's Find action. Text selected inside a user/assistant
+  // message (thinking excluded) seeds the query, like IDE find bars do.
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
       if (event.key.toLowerCase() !== "f") return;
       event.preventDefault();
-      setSearch((current) => (current.open ? current : { ...current, open: true }));
+      const seed = selectedSearchSeed(window.getSelection());
+      setSearch((current) =>
+        seed !== null ? { ...current, open: true, query: seed } : current.open ? current : { ...current, open: true },
+      );
       setSearchFocusRequest((current) => current + 1);
     };
     window.addEventListener("keydown", handleKeyDown);

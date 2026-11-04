@@ -591,3 +591,50 @@ describe("App", () => {
     expect(window.__piSent?.filter((message) => message.type === "compact")).toEqual([{ type: "compact" }]);
   });
 });
+
+describe("Ctrl+F search", () => {
+  it("seeds the search query from text selected inside a message", async () => {
+    render(<App />);
+    await waitFor(() => expect(window.__piDeliver).toBeDefined());
+
+    deliver(
+      { type: "status", status: { phase: "running", message: "ready", model: "m" } },
+      {
+        type: "history",
+        final: true,
+        messages: [
+          { role: "user", content: "explain the search feature of this repo", timestamp: 1 },
+          { role: "assistant", content: [{ type: "text", text: "It is a pi checkout." }], timestamp: 2 },
+        ],
+      },
+    );
+    await waitFor(() => expect(screen.getAllByText(/explain the search feature/).length).toBeGreaterThan(0));
+
+    // Select part of the user message body, then press Ctrl+F.
+    const paragraph = document.querySelector('[data-message-id] .markdown p');
+    expect(paragraph).not.toBeNull();
+    const range = document.createRange();
+    range.selectNodeContents(paragraph!);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+
+    fireEvent.keyDown(window, { key: "f", ctrlKey: true });
+
+    const input = screen.getByRole("textbox", { name: "搜索消息" }) as HTMLInputElement;
+    expect(input.value).toBe("explain the search feature of this repo");
+  });
+
+  it("opens an empty search bar without a message selection", async () => {
+    render(<App />);
+    await waitFor(() => expect(window.__piDeliver).toBeDefined());
+
+    deliver({ type: "status", status: { phase: "running", message: "ready", model: "m" } });
+    await waitFor(() => expect(screen.getByRole("log")).toBeDefined());
+
+    fireEvent.keyDown(window, { key: "f", ctrlKey: true });
+
+    const input = screen.getByRole("textbox", { name: "搜索消息" }) as HTMLInputElement;
+    expect(input.value).toBe("");
+  });
+});

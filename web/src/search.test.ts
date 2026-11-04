@@ -6,6 +6,7 @@ import {
   messageSearchText,
   messageTextBlocks,
   searchMessages,
+  selectedSearchSeed,
 } from "./search";
 
 const defaults = { caseSensitive: false, wholeWord: false, regex: false };
@@ -132,5 +133,35 @@ describe("searchMessages", () => {
     expect(hits).toHaveLength(2);
     expect(hits[0]?.matches).toHaveLength(1);
     expect(hits[1]?.matches).toHaveLength(1);
+  });
+});
+
+describe("selectedSearchSeed", () => {
+  function seedFor(anchor: Node | null, text: string): string | null {
+    const selection = { toString: () => text, anchorNode: anchor } as unknown as Selection;
+    return selectedSearchSeed(selection);
+  }
+
+  it("seeds from selections inside a rendered message", () => {
+    document.body.innerHTML = `<article class="message message-user"><div class="markdown"><p>选中这段文字</p></div></article>`;
+    const anchor = document.querySelector(".message .markdown p");
+    expect(seedFor(anchor, "  选中这段 ")).toBe("选中这段");
+  });
+
+  it("ignores selections inside collapsed thinking sections", () => {
+    document.body.innerHTML = `<article class="message"><details class="thinking"><pre>思考内容</pre></details></article>`;
+    expect(seedFor(document.querySelector(".thinking pre"), "思考内容")).toBeNull();
+  });
+
+  it("ignores selections outside messages (composer, dialogs, search bar)", () => {
+    document.body.innerHTML = `<div class="composer"><textarea>hi</textarea></div><div class="search-bar"><input /></div>`;
+    expect(seedFor(document.querySelector(".composer textarea"), "hi")).toBeNull();
+    expect(seedFor(document.querySelector(".search-bar input"), "hi")).toBeNull();
+  });
+
+  it("ignores empty or whitespace-only selections", () => {
+    document.body.innerHTML = `<article class="message"><p>text</p></article>`;
+    expect(seedFor(document.querySelector(".message p"), "   ")).toBeNull();
+    expect(selectedSearchSeed(null)).toBeNull();
   });
 });
