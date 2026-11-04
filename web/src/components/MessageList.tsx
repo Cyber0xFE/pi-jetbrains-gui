@@ -4,9 +4,19 @@ import { Markdown } from "./Markdown";
 import { CopyButton } from "./CopyButton";
 import { ToolCard } from "./tools/ToolCard";
 import { ImagePreview } from "./ImagePreview";
+import { SearchBar } from "./SearchBar";
+import type { SearchHighlighter } from "./Markdown";
 import { recordPerf } from "../perfLog";
 import { useSmoothWheelScroll } from "../scroll";
 import { post } from "../bridge";
+import {
+  compileQuery,
+  EMPTY_SEARCH,
+  findMatches,
+  searchMessages,
+  type SearchMatch,
+  type SearchState,
+} from "../search";
 
 /** Older messages stay out of the DOM until asked for, keeping long sessions cheap to render. */
 const VISIBLE_BATCH = 60;
@@ -28,6 +38,11 @@ interface Props {
   scrollToFirstRequest?: number;
   previousUserMessageRequest?: number;
   nextUserMessageRequest?: number;
+  /** Ctrl+F find bar state; omitted when the host does not use search. */
+  search?: SearchState;
+  onSearchChange?: (next: SearchState) => void;
+  onSearchClose?: () => void;
+  searchFocusRequest?: number;
 }
 
 export function MessageList({
@@ -42,6 +57,10 @@ export function MessageList({
   scrollToFirstRequest = 0,
   previousUserMessageRequest = 0,
   nextUserMessageRequest = 0,
+  search: searchState = EMPTY_SEARCH,
+  onSearchChange,
+  onSearchClose,
+  searchFocusRequest = 0,
 }: Props): JSX.Element {
   recordPerf("message_list_render", 0, { messages: messages.length, tools: Object.keys(tools).length });
   const scroller = useRef<HTMLDivElement>(null);
@@ -81,6 +100,39 @@ export function MessageList({
     ? Math.min(userMessages.length, outlineStart + Math.ceil(435 / OUTLINE_ITEM_STEP) + OUTLINE_OVERSCAN * 2)
     : userMessages.length;
   const visibleUserMessages = outlineVirtualized ? userMessages.slice(outlineStart, outlineEnd) : userMessages;
+
+  const search = searchState;
+  const compiled = useMemo(
+    () => compileQuery(search.query, search),
+    [search.open, search.query, search.caseSensitive, search.wholeWord, search.regex],
+  );
+  const searchHits = useMemo(
+    () => (search.open && compiled.regexp ? searchMessages(messages, compiled) : []),
+    [search.open, compiled, messages],
+  );
+  const flatMatches = useMemo<SearchMatchWithLocation[]>(
+    () =>
+      searchHits.flatMap((hit) =>
+        hit.matches.map((match, matchIndexInMessage) => ({
+          ...match,
+          messageId: hit.messageId,
+          messageIndex: hit.messageIndex,
+          matchIndexInMessage,
+        })),
+      ),
+    [searchHits],
+  );
+  const [searchCursor, setSearchCursor] = useState(0);
+  useEffect(() => {
+    setSearchCursor(0);
+  }, [compiled, search.open]);
+  const activeMatch = flatMatches.length > 0
+    ? flatMatches[Math.min(searchCursor, flatMatches.length - 1)]
+    : null;
+  const searchHighlight = useMemo<SearchHighlighter | null>(() => {
+    if (!search.open || !compiled.regexp) return null;
+    return (text: string) => findMatches(text, compiled);
+  }, [search.open, compiled]);
 
   const updateOutlineEdges = (): void => {
     const element = outlineScroller.current;
@@ -245,6 +297,46 @@ export function MessageList({
     setPendingMessageId(messageId);
     setActiveMessageId(messageId);
     setVisibleCount((current) => Math.max(current, messages.length - messageIndex));
+  };
+
+  // Scroll to the exact match whenever the cursor moves. `activeMatchRef` keeps the effect out
+  // of the streaming render path: a new token must not scroll the user away, only explicit
+  // cursor changes do.
+  const activeMatchRef = useRef(activeMatch);
+  activeMatchRef.current = activeMatch;
+  const messagesLengthRef = useRef(messages.length);
+  messagesLengthRef.current = messages.length;
+  useEffect(() => {
+    const match = activeMatchRef.current;
+    if (!match) return;
+    stickToBottom.current = false;
+    setActiveMessageId(match.messageId);
+    setVisibleCount((current) => Math.max(current, messagesLengthRef.current - match.messageIndex));
+    // Two frames: the first lets the (possibly expanded) transcript paint, then scroll the
+    // match's own mark into view — in a long message the hit is otherwise left below the fold.
+    let inner = 0;
+    const outer = window.requestAnimationFrame(() => {
+      inner = window.requestAnimationFrame(() => {
+        const article = scroller.current?.querySelector<HTMLElement>(
+          `[data-message-id="${match.messageId}"]`,
+        );
+        if (!article) return;
+        const marks = article.querySelectorAll("mark.search-hit");
+        const target = marks.length > 0
+          ? marks[Math.min(match.matchIndexInMessage, marks.length - 1)]
+          : article;
+        target?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(outer);
+      window.cancelAnimationFrame(inner);
+    };
+  }, [searchCursor, search.open]);
+
+  const stepSearch = (direction: -1 | 1): void => {
+    if (flatMatches.length === 0) return;
+    setSearchCursor((current) => (current + direction + flatMatches.length) % flatMatches.length);
   };
 
   // Picks the user message above/below the current viewport top and scrolls to it. Mirrors
@@ -422,6 +514,8 @@ export function MessageList({
             tools={tools}
             toolStates={toolStatesByMessage.get(message.id) ?? EMPTY_TOOL_STATES}
             thinkingLabel={thinkingLabel}
+            searchHighlight={searchHighlight}
+            searchActiveMessage={activeMatch?.messageId === message.id}
           />
         ))}
         {connecting && (
@@ -433,6 +527,23 @@ export function MessageList({
           </div>
         )}
       </div>
+      {search.open && (
+        <SearchBar
+          query={search.query}
+          caseSensitive={search.caseSensitive}
+          wholeWord={search.wholeWord}
+          regex={search.regex}
+          error={compiled.error}
+          count={flatMatches.length}
+          index={activeMatch ? Math.min(searchCursor, flatMatches.length - 1) + 1 : 0}
+          focusRequest={searchFocusRequest}
+          onChange={(query) => onSearchChange?.({ ...search, query })}
+          onToggle={(option) => onSearchChange?.({ ...search, [option]: !search[option] })}
+          onPrevious={() => stepSearch(-1)}
+          onNext={() => stepSearch(1)}
+          onClose={onSearchClose ?? (() => {})}
+        />
+      )}
       {showLatestButton && (
         <button
           type="button"
@@ -458,7 +569,18 @@ interface MessageViewProps {
   /** Stable references for the tool calls owned by this message. */
   toolStates: readonly (ToolState | undefined)[];
   thinkingLabel: string | null;
+  /** When set, matches are wrapped in `<mark class="search-hit">` inside rendered text. */
+  searchHighlight: SearchHighlighter | null;
+  /** True while the Ctrl+F cursor points at a match inside this message. */
+  searchActiveMessage: boolean;
 }
+
+type SearchMatchWithLocation = SearchMatch & {
+  messageId: string;
+  messageIndex: number;
+  /** Index of this match among the hits of its own message; drives scroll-to-mark. */
+  matchIndexInMessage: number;
+};
 
 interface ParsedSkillBlock {
   name: string;
@@ -489,7 +611,7 @@ function findSkillInvocation(blocks: Block[]): {
   return skill ? { block, skill } : null;
 }
 
-function MessageView({ message, fileReferences, previousAssistantModel, tools, thinkingLabel }: MessageViewProps): JSX.Element {
+function MessageView({ message, fileReferences, previousAssistantModel, tools, thinkingLabel, searchHighlight, searchActiveMessage }: MessageViewProps): JSX.Element {
   const showModel = message.role === "assistant" && message.model && message.model !== previousAssistantModel;
   const skillInvocation = message.role === "user" ? findSkillInvocation(message.blocks) : null;
   const contextualText = message.role === "user" && !skillInvocation ? findEditorContext(message.blocks) : null;
@@ -506,7 +628,10 @@ function MessageView({ message, fileReferences, previousAssistantModel, tools, t
     message.blocks.some((block) => block !== contextualText.block);
 
   return (
-    <article className={`message message-${message.role}${contextualText ? " message-user-with-context" : ""}`} data-message-id={message.id}>
+    <article
+      className={`message message-${message.role}${contextualText ? " message-user-with-context" : ""}${searchActiveMessage ? " message-search-active" : ""}`}
+      data-message-id={message.id}
+    >
       {contextualText && <EditorContextView context={contextualText.context} />}
       {showUserBody && <div className={message.role === "user"
         ? `message-user-content${contextualText ? " message-user-body" : ""}` : undefined}>
@@ -525,6 +650,7 @@ function MessageView({ message, fileReferences, previousAssistantModel, tools, t
                     thinkingLabel={thinkingLabel}
                     durationMs={message.durationMs}
                     userText
+                    searchHighlight={searchHighlight}
                   />
                 )}
               </Fragment>
@@ -542,6 +668,7 @@ function MessageView({ message, fileReferences, previousAssistantModel, tools, t
               thinkingLabel={thinkingLabel}
               durationMs={message.durationMs}
               userText={message.role === "user"}
+              searchHighlight={searchHighlight}
             />
           );
         })}
@@ -692,7 +819,9 @@ function areMessageViewPropsEqual(previous: MessageViewProps, next: MessageViewP
     previous.fileReferences !== next.fileReferences ||
     previous.previousAssistantModel !== next.previousAssistantModel ||
     previous.thinkingLabel !== next.thinkingLabel ||
-    previous.toolStates !== next.toolStates
+    previous.toolStates !== next.toolStates ||
+    previous.searchHighlight !== next.searchHighlight ||
+    previous.searchActiveMessage !== next.searchActiveMessage
   ) {
     return false;
   }
@@ -796,13 +925,14 @@ interface BlockProps {
   durationMs?: number;
   /** User-typed text renders backslashes literally instead of as Markdown escapes. */
   userText?: boolean;
+  searchHighlight?: SearchHighlighter | null;
 }
 
-function BlockView({ block, fileReferences, tools, streaming, thinkingLabel, durationMs, userText }: BlockProps): JSX.Element | null {
+function BlockView({ block, fileReferences, tools, streaming, thinkingLabel, durationMs, userText, searchHighlight = null }: BlockProps): JSX.Element | null {
   switch (block.kind) {
     case "text": {
       if (!/<\/?thinking\b/i.test(block.text)) {
-        return <Markdown text={block.text} streaming={streaming} fileReferences={fileReferences} userText={userText} />;
+        return <Markdown text={block.text} streaming={streaming} fileReferences={fileReferences} userText={userText} searchHighlight={searchHighlight} />;
       }
       return (
         <>
@@ -816,6 +946,7 @@ function BlockView({ block, fileReferences, tools, streaming, thinkingLabel, dur
               thinkingLabel={thinkingLabel}
               durationMs={durationMs}
               userText={userText}
+              searchHighlight={searchHighlight}
             />
           ))}
         </>

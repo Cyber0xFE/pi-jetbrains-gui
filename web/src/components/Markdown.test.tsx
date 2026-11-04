@@ -211,3 +211,39 @@ describe("Markdown", () => {
     expect(sent).toEqual([{ type: "open_url", url: "https://draw.io" }]);
   });
 });
+
+describe("Markdown search highlighting", () => {
+  const highlight = (text: string) => {
+    const matches: Array<{ start: number; end: number }> = [];
+    const lower = text.toLowerCase();
+    let index = lower.indexOf("build");
+    while (index !== -1) {
+      matches.push({ start: index, end: index + 5 });
+      index = lower.indexOf("build", index + 5);
+    }
+    return matches;
+  };
+
+  it("wraps matches in plain text with mark.search-hit", () => {
+    const { container } = render(<Markdown text="重新 build 一下" streaming={false} searchHighlight={highlight} />);
+    const mark = container.querySelector("mark.search-hit");
+    expect(mark?.textContent).toBe("build");
+    expect(container.textContent).toContain("重新 build 一下");
+  });
+
+  it("wraps matches inside inline code as well", () => {
+    const { container } = render(<Markdown text="运行 `npm run build`" streaming={false} searchHighlight={highlight} />);
+    expect(container.querySelector("code mark.search-hit")?.textContent).toBe("build");
+  });
+
+  it("keeps HTML escaping intact around highlighted runs", () => {
+    const { container } = render(<Markdown text="a <b> build" streaming={false} searchHighlight={highlight} />);
+    expect(container.innerHTML).not.toContain("<b> ");
+    expect(container.querySelector("mark.search-hit")?.textContent).toBe("build");
+  });
+
+  it("renders without marks when the highlighter matches nothing", () => {
+    const { container } = render(<Markdown text="nothing here" streaming={false} searchHighlight={highlight} />);
+    expect(container.querySelector("mark.search-hit")).toBeNull();
+  });
+});

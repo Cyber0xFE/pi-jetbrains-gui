@@ -559,3 +559,73 @@ it("does not move past the first or last user message", () => {
   view.rerender(<MessageList {...props} previousUserMessageRequest={1} nextUserMessageRequest={1} />);
   expect(view.getByRole("button", { name: "Jump to user message 1: Question 0" }).getAttribute("aria-current")).toBe("location");
 });
+
+const SEARCH_BASE = {
+  open: true,
+  query: "build",
+  caseSensitive: false,
+  wholeWord: false,
+  regex: false,
+};
+
+it("highlights search matches in user and assistant text and reports the counter", () => {
+  const messages: ChatMessage[] = [
+    { id: "u1", role: "user", blocks: [{ kind: "text", text: "帮我看看 Build 失败" }], timestamp: 1, streaming: false },
+    { id: "a1", role: "assistant", blocks: [{ kind: "text", text: "build 失败原因如下" }], timestamp: 2, streaming: false },
+  ];
+  const view = render(
+    <MessageList messages={messages} tools={{}} loadingHistory={false} emptyHint="" thinkingLabel={null}
+      connecting={false} search={SEARCH_BASE} onSearchChange={() => {}} onSearchClose={() => {}} />,
+  );
+  expect(view.container.querySelectorAll("mark.search-hit")).toHaveLength(2);
+  expect(view.getByText("1/2")).toBeDefined();
+  // The Ctrl+F cursor starts on the first match, in the user message.
+  expect(view.container.querySelector('[data-message-id="u1"]')?.classList.contains("message-search-active")).toBe(true);
+  expect(view.container.querySelector('[data-message-id="a1"]')?.classList.contains("message-search-active")).toBe(false);
+});
+
+it("steps through matches and updates the active message outline", () => {
+  const messages: ChatMessage[] = [
+    { id: "u1", role: "user", blocks: [{ kind: "text", text: "帮我看看 build 失败" }], timestamp: 1, streaming: false },
+    { id: "a1", role: "assistant", blocks: [{ kind: "text", text: "build 失败原因如下" }], timestamp: 2, streaming: false },
+  ];
+  const view = render(
+    <MessageList messages={messages} tools={{}} loadingHistory={false} emptyHint="" thinkingLabel={null}
+      connecting={false} search={SEARCH_BASE} onSearchChange={() => {}} onSearchClose={() => {}} />,
+  );
+  fireEvent.click(view.getByRole("button", { name: "下一个匹配" }));
+  expect(view.getByText("2/2")).toBeDefined();
+  expect(view.container.querySelector('[data-message-id="a1"]')?.classList.contains("message-search-active")).toBe(true);
+  // Wrap-around back to the first match.
+  fireEvent.click(view.getByRole("button", { name: "下一个匹配" }));
+  expect(view.getByText("1/2")).toBeDefined();
+});
+
+it("forwards option toggles and close to the host callbacks", () => {
+  const onSearchChange = vi.fn();
+  const onSearchClose = vi.fn();
+  const messages: ChatMessage[] = [
+    { id: "u1", role: "user", blocks: [{ kind: "text", text: "build" }], timestamp: 1, streaming: false },
+  ];
+  const view = render(
+    <MessageList messages={messages} tools={{}} loadingHistory={false} emptyHint="" thinkingLabel={null}
+      connecting={false} search={SEARCH_BASE} onSearchChange={onSearchChange} onSearchClose={onSearchClose} />,
+  );
+  fireEvent.click(view.getByRole("button", { name: "区分大小写" }));
+  expect(onSearchChange).toHaveBeenCalledWith({ ...SEARCH_BASE, caseSensitive: true });
+  fireEvent.click(view.getByRole("button", { name: "关闭搜索" }));
+  expect(onSearchClose).toHaveBeenCalledTimes(1);
+});
+
+it("shows 无结果 and no marks when the query matches nothing", () => {
+  const messages: ChatMessage[] = [
+    { id: "u1", role: "user", blocks: [{ kind: "text", text: "build" }], timestamp: 1, streaming: false },
+  ];
+  const view = render(
+    <MessageList messages={messages} tools={{}} loadingHistory={false} emptyHint="" thinkingLabel={null}
+      connecting={false} search={{ ...SEARCH_BASE, query: "missing" }} onSearchChange={() => {}} onSearchClose={() => {}} />,
+  );
+  expect(view.getByText("无结果")).toBeDefined();
+  expect(view.container.querySelectorAll("mark.search-hit")).toHaveLength(0);
+  expect(view.container.querySelector(".message-search-active")).toBeNull();
+});

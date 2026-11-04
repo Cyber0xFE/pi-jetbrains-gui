@@ -10,6 +10,7 @@ import { StatusBar } from "./components/StatusBar";
 import { Toolbar } from "./components/Toolbar";
 import { formatTokens } from "./format";
 import { ChatStore } from "./store";
+import { EMPTY_SEARCH, type SearchState } from "./search";
 import type { Block } from "./state/sessionReducer";
 
 type Dialog = "sessions" | "models" | "thinking" | null;
@@ -28,6 +29,8 @@ export function App(): JSX.Element {
   const [scrollToFirstRequest, setScrollToFirstRequest] = useState(0);
   const [previousUserMessageRequest, setPreviousUserMessageRequest] = useState(0);
   const [nextUserMessageRequest, setNextUserMessageRequest] = useState(0);
+  const [search, setSearch] = useState<SearchState>(EMPTY_SEARCH);
+  const [searchFocusRequest, setSearchFocusRequest] = useState(0);
   const pendingPromptStartedAt = useRef<number | null>(null);
   const pendingPromptTimer = useRef<number | null>(null);
 
@@ -96,6 +99,20 @@ export function App(): JSX.Element {
       if (pendingPromptTimer.current !== null) window.clearTimeout(pendingPromptTimer.current);
     };
   }, [store]);
+
+  // Ctrl+F opens the in-transcript find bar. JCEF delivers the shortcut to the page, so this
+  // listener owns it instead of the IDE's Find action.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+      if (event.key.toLowerCase() !== "f") return;
+      event.preventDefault();
+      setSearch((current) => (current.open ? current : { ...current, open: true }));
+      setSearchFocusRequest((current) => current + 1);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   useEffect(() => {
     const theme = state.theme;
@@ -286,6 +303,10 @@ export function App(): JSX.Element {
         scrollToFirstRequest={scrollToFirstRequest}
         previousUserMessageRequest={previousUserMessageRequest}
         nextUserMessageRequest={nextUserMessageRequest}
+        search={search}
+        onSearchChange={setSearch}
+        onSearchClose={() => setSearch((current) => ({ ...current, open: false }))}
+        searchFocusRequest={searchFocusRequest}
       />
       <Composer
         value={draft}

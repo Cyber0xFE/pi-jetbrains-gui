@@ -20,6 +20,10 @@ import yaml from "highlight.js/lib/languages/yaml";
 import { post } from "../bridge";
 import { recordPerf } from "../perfLog";
 import { copyText } from "./CopyButton";
+import type { SearchMatch } from "../search";
+
+/** Returns the matches to wrap in `<mark class="search-hit">` for a rendered text run. */
+export type SearchHighlighter = (text: string) => SearchMatch[];
 
 hljs.registerLanguage("bash", bash);
 hljs.registerLanguage("sh", bash);
@@ -87,6 +91,21 @@ function createRenderer(withHighlight: boolean, fileReferences: readonly string[
     const escaped = renderer.utils.escapeHtml(path);
     return `<button type="button" class="md-file-reference" data-file-path="${escaped}" title="Open ${escaped}">@${escaped}</button>`;
   };
+  // Matches are highlighted inside plain text and inline code via an env-aware rule wrapper:
+  // the renderer stays memoized on fileReferences/streaming while the highlighter travels
+  // through `env`, so keystrokes in the find bar do not rebuild the MarkdownIt instance.
+  const textFallback = renderer.renderer.rules.text;
+  const withSearchHighlight = (fallback: NonNullable<typeof textFallback>) =>
+    (tokens: any[], index: number, options: any, env: unknown, self: any): string => {
+      const highlighted = renderSearchHighlighted(tokens[index]?.content ?? "", env);
+      return highlighted ?? fallback(tokens, index, options, env, self);
+    };
+  if (textFallback) renderer.renderer.rules.text = withSearchHighlight(textFallback);
+  renderer.renderer.rules.code_inline = (tokens, index, _options, env, _self) => {
+    const content = tokens[index]?.content ?? "";
+    const highlighted = renderSearchHighlighted(content, env);
+    return `<code>${highlighted ?? escapeHtml(content)}</code>`;
+  };
   // Links must not navigate the JCEF page away from the chat; open them in the IDE instead.
   renderer.renderer.rules.link_open = (tokens, index, options, _env, self) => {
     const token = tokens[index];
@@ -148,7 +167,14 @@ export function Markdown({
   streaming,
   fileReferences = EMPTY_FILE_REFERENCES,
   userText = false,
-}: { text: string; streaming: boolean; fileReferences?: readonly string[]; userText?: boolean }): JSX.Element {
+  searchHighlight = null,
+}: {
+  text: string;
+  streaming: boolean;
+  fileReferences?: readonly string[];
+  userText?: boolean;
+  searchHighlight?: SearchHighlighter | null;
+}): JSX.Element {
   const shown = useThrottled(text, STREAM_THROTTLE_MS, streaming);
   const renderer = useMemo(() => createRenderer(!streaming, fileReferences), [fileReferences, streaming]);
   const html = useMemo(() => {
@@ -157,13 +183,14 @@ export function Markdown({
     // User input is literal text, not authored Markdown: CommonMark would eat the backslash of
     // `\` + punctuation (e.g. `Bebop\.pi` renders as `Bebop.pi`), so re-escape those pairs.
     const source = userText ? escapeBackslashEscapes(raw) : raw;
-    const rendered = addCodeCopyButtons(renderer.render(source));
+    const env = searchHighlight ? { searchHighlight } : undefined;
+    const rendered = addCodeCopyButtons(renderer.render(source, env));
     recordPerf("markdown_render", performance.now() - startedAt, {
       chars: source.length,
       streaming: streaming ? 1 : 0,
     });
     return rendered;
-  }, [renderer, shown, streaming, text]);
+  }, [renderer, shown, streaming, text, searchHighlight]);
 
   const handleClick = (event: MouseEvent<HTMLDivElement>): void => {
     const target = event.target as HTMLElement | null;
@@ -303,6 +330,34 @@ function codeCopyIcon(copied = false): string {
     ? '<path d="m5 12 4 4L19 6" />'
     : '<rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" />';
   return `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${shape}</svg>`;
+}
+
+const escapeHtml = new MarkdownIt().utils.escapeHtml;
+
+/**
+ * Wraps matches inside one rendered text run with `<mark>`; returns null when there is no
+ * highlighter in `env` (or nothing matched) so the default rule output is used unchanged.
+ */
+function renderSearchHighlighted(content: string, env: unknown): string | null {
+  const find = (env as { searchHighlight?: SearchHighlighter } | undefined)?.searchHighlight;
+  if (!find) return null;
+  let matches: SearchMatch[];
+  try {
+    matches = find(content);
+  } catch {
+    return null;
+  }
+  if (!matches || matches.length === 0) return null;
+  let html = "";
+  let position = 0;
+  for (const match of matches) {
+    if (match.start < position || match.end > content.length || match.start >= match.end) continue;
+    html += escapeHtml(content.slice(position, match.start));
+    html += `<mark class="search-hit">${escapeHtml(content.slice(match.start, match.end))}</mark>`;
+    position = match.end;
+  }
+  html += escapeHtml(content.slice(position));
+  return html;
 }
 
 function addCodeCopyButtons(html: string): string {

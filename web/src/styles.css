@@ -727,6 +727,118 @@ body {
   outline-offset: 2px;
 }
 
+/* Ctrl+F find bar overlaying the conversation. */
+.search-bar {
+  position: absolute;
+  top: 8px;
+  right: 16px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+}
+
+.search-input {
+  width: 180px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: calc(var(--fs) - 1px);
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.search-toggle {
+  min-width: 26px;
+  height: 24px;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg-dim);
+  font-family: ui-monospace, monospace;
+  font-size: calc(var(--fs) - 2px);
+  cursor: pointer;
+}
+
+.search-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.search-toggle[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.search-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.search-status {
+  min-width: 44px;
+  text-align: center;
+  font-size: calc(var(--fs) - 2px);
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+
+.search-status-error {
+  color: var(--error);
+}
+
+.search-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+
+.search-button:hover {
+  background: var(--bg-soft);
+  color: var(--fg);
+}
+
+.search-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Must stay distinct from the user bubble background (--accent-soft), so matches inside user
+   messages remain visible; a fixed yellow reads on both light and dark themes. */
+mark.search-hit {
+  background: rgba(255, 193, 7, 0.45);
+  color: inherit;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(224, 138, 0, 0.45);
+}
+
+.message-search-active {
+  outline: 1px solid var(--accent);
+  outline-offset: 6px;
+  border-radius: 4px;
+}
+
 .load-earlier {
   display: block;
   margin: 8px auto;
@@ -1844,8 +1956,9 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex: 0 1 auto;
   min-width: 0;
-  max-width: min(48ch, 72vw);
+  max-width: 100%;
   padding: 4px 10px 4px 8px;
   border-color: transparent;
   background: transparent;
