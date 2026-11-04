@@ -48,10 +48,11 @@ object EditorNavigator {
                 descriptor.navigate(true)
                 return@invokeLater
             }
-            // openEditor(OpenFileDescriptor, boolean) is deprecated since 2024.3; openTextEditor is the
-            // supported replacement and returns the text editor directly (null for non-text files).
-            val editor = FileEditorManager.getInstance(project)
-                .openTextEditor(descriptor, true) ?: return@invokeLater
+            // navigate() opens and focuses the target editor without relying on deprecated
+            // FileEditorManager.openTextEditor/openEditor APIs.
+            descriptor.navigate(true)
+            val editor = FileEditorManager.getInstance(project).selectedTextEditor
+                ?: return@invokeLater
             val document = editor.document
             val lastLine = (endLine - 1).coerceAtMost(document.lineCount - 1)
             val startOffset = document.getLineStartOffset((startLine - 1).coerceAtMost(document.lineCount - 1))
