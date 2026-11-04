@@ -1527,6 +1527,15 @@ mark.search-hit {
   border-radius: 4px;
 }
 
+/* Sent user-message images render as a small thumbnail; clicking opens the full preview. */
+.message-image-thumbnail {
+  display: block;
+  max-width: 96px;
+  max-height: 96px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
 .image-omitted {
   display: inline-flex;
   align-items: center;

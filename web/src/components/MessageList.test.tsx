@@ -31,6 +31,36 @@ it("opens sent images in a dismissible preview", () => {
   expect(view.queryByRole("dialog", { name: "Image preview" })).toBeNull();
 });
 
+it("renders sent user-message images as a thumbnail and previews the full image on click", () => {
+  const view = render(
+    <MessageList
+      messages={[{
+        id: "user-image-message",
+        role: "user",
+        blocks: [{ kind: "image", data: "aGVsbG8=", mimeType: "image/png" }],
+        timestamp: 1,
+        streaming: false,
+      }]}
+      tools={{}}
+      loadingHistory={false}
+      emptyHint=""
+      thinkingLabel={null}
+      connecting={false}
+    />,
+  );
+
+  const trigger = view.getByRole("button", { name: "Preview image" });
+  const thumbnail = trigger.querySelector("img");
+  expect(thumbnail).toBeDefined();
+  expect(thumbnail?.className).toContain("message-image-thumbnail");
+
+  fireEvent.click(trigger);
+  const preview = view.getByRole("dialog", { name: "Image preview" });
+  const fullImage = preview.querySelector("img");
+  expect(fullImage?.className).not.toContain("message-image-thumbnail");
+  expect(fullImage?.getAttribute("src")).toBe("data:image/png;base64,aGVsbG8=");
+});
+
 it("shows an omitted-image placeholder for empty image payloads", () => {
   const view = render(
     <MessageList

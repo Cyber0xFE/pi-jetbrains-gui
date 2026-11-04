@@ -979,7 +979,7 @@ function BlockView({ block, fileReferences, tools, streaming, thinkingLabel, dur
       }
       return (
         <ImagePreview
-          className="image"
+          className={userText ? "message-image-thumbnail" : "image"}
           alt="Image"
           src={`data:${block.mimeType};base64,${block.data}`}
         />
