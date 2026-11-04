@@ -5,6 +5,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
@@ -28,6 +29,7 @@ class PiChatTabsService(private val project: Project) : Disposable {
         /** Tabs show a short prefix; the full title goes to the tab tooltip. Measured in pixels
          *  with the actual tab font so titles of any script end up the same visual length. */
         const val TAB_TITLE_MAX_WIDTH_PX = 90
+        const val ICON_QUEUE_DIAGNOSTIC_MS = 100.0
     }
 
     fun initialize(toolWindow: ToolWindow) {
@@ -58,6 +60,7 @@ class PiChatTabsService(private val project: Project) : Disposable {
         Disposer.register(this, session)
         val number = nextTabNumber++
         var content: Content? = null
+        val iconUpdate = TabIconUpdate()
         val panel = ChatPanel(
             project,
             session,
@@ -67,8 +70,8 @@ class PiChatTabsService(private val project: Project) : Disposable {
                 val currentContent = content ?: return@ChatPanel
                 val running = status.isStreaming || status.isCompacting
                 when {
-                    running -> setTabIcon(currentContent, running = true)
-                    status.phase == PiChatService.Phase.RUNNING -> setTabIcon(currentContent, running = false)
+                    running -> setTabIcon(currentContent, running = true, iconUpdate = iconUpdate)
+                    status.phase == PiChatService.Phase.RUNNING -> setTabIcon(currentContent, running = false, iconUpdate = iconUpdate)
                 }
             },
             onTitleChanged = { title ->
@@ -110,11 +113,30 @@ class PiChatTabsService(private val project: Project) : Disposable {
         return text
     }
 
-    private fun setTabIcon(content: Content, running: Boolean) {
-        ApplicationManager.getApplication().invokeLater {
-            if (content.isValid) content.icon = if (running) AnimatedIcon.Default.INSTANCE else CompletedTabIcon
+    /** Coalesces repeated streaming-state updates into one EDT task per tab. */
+    private fun setTabIcon(content: Content, running: Boolean, iconUpdate: TabIconUpdate) {
+        synchronized(iconUpdate) {
+            iconUpdate.running = running
+            if (iconUpdate.queued) return
+            iconUpdate.queued = true
         }
+        ApplicationManager.getApplication().invokeLater({
+            val desiredRunning: Boolean
+            synchronized(iconUpdate) {
+                desiredRunning = iconUpdate.running
+                iconUpdate.queued = false
+            }
+            if (content.isValid) {
+                content.icon = if (desiredRunning) AnimatedIcon.Default.INSTANCE else CompletedTabIcon
+            }
+        }, ModalityState.any())
     }
+
+    private class TabIconUpdate {
+        var running = false
+        var queued = false
+    }
+
 
     private object CompletedTabIcon : javax.swing.Icon {
         override fun getIconWidth(): Int = 16
