@@ -22,6 +22,15 @@ class PiSettingsTest {
     }
 
     @Test
+    fun `accent color parses hex values and rejects blank or invalid input`() {
+        assertEquals(java.awt.Color(0x25, 0x63, 0xEB), PiSettings.parseAccentColor("#2563EB"))
+        assertEquals(java.awt.Color(0x25, 0x63, 0xEB), PiSettings.parseAccentColor("  #2563eb "))
+        assertEquals(null, PiSettings.parseAccentColor("not-a-color"))
+        assertEquals(null, PiSettings.parseAccentColor("   "))
+        assertEquals("", PiSettings.State().accentColor)
+    }
+
+    @Test
     fun `configured proxy sets both standard variables and trims whitespace`() {
         val settings = PiSettings()
         settings.getState().networkProxy = "  http://127.0.0.1:7890  "

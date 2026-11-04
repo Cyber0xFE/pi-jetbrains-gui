@@ -48,6 +48,8 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         var taskCompletionSoundEnabled: Boolean = true,
         /** Base font size in the Pi chat webview, in CSS pixels. */
         var chatFontSize: Int = DEFAULT_CHAT_FONT_SIZE,
+        /** Accent color override for the Pi chat webview as #RRGGBB; empty means follow the IDE. */
+        var accentColor: String = "",
         var logDirectory: String = "",
         var panelShortcut: String = DEFAULT_PANEL_SHORTCUT,
         var newTabShortcut: String = DEFAULT_NEW_TAB_SHORTCUT,
@@ -84,6 +86,10 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
 
     fun notifyChatFontSizeChanged() {
         ApplicationManager.getApplication().messageBus.syncPublisher(CHAT_FONT_SIZE_CHANGED).chatFontSizeChanged()
+    }
+
+    fun notifyAccentColorChanged() {
+        ApplicationManager.getApplication().messageBus.syncPublisher(ACCENT_COLOR_CHANGED).accentColorChanged()
     }
 
     /**
@@ -181,6 +187,7 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
     companion object {
         val NETWORK_PROXY_CHANGED = Topic.create("Pi network proxy changed", PiNetworkProxyListener::class.java)
         val CHAT_FONT_SIZE_CHANGED = Topic.create("Pi chat font size changed", PiChatFontSizeListener::class.java)
+        val ACCENT_COLOR_CHANGED = Topic.create("Pi accent color changed", PiAccentColorListener::class.java)
         const val SHOW_PI_TOOL_WINDOW_ACTION_ID = "dev.pi.jetbrains.ShowPiToolWindow"
         const val NEW_PI_TAB_ACTION_ID = "dev.pi.jetbrains.NewPiTab"
         const val CLOSE_PI_TAB_ACTION_ID = "dev.pi.jetbrains.ClosePiTab"
@@ -203,6 +210,11 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         const val MIN_CHAT_FONT_SIZE = 10
         const val MAX_CHAT_FONT_SIZE = 32
 
+        /** Parses a #RRGGBB accent color override; returns null for blank or invalid values. */
+        fun parseAccentColor(value: String): java.awt.Color? = value.trim()
+            .takeIf { it.isNotEmpty() }
+            ?.let { raw -> runCatching { java.awt.Color.decode(raw) }.getOrNull() }
+
         private fun piAgentSettingsPath(): Path = Paths.get(
             System.getProperty("user.home") ?: ".",
             ".pi",
@@ -218,4 +230,8 @@ private fun String.toKeyStroke(): javax.swing.KeyStroke? = takeIf { it.isNotBlan
 
 fun interface PiChatFontSizeListener {
     fun chatFontSizeChanged()
+}
+
+fun interface PiAccentColorListener {
+    fun accentColorChanged()
 }

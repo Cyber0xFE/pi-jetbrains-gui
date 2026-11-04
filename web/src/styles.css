@@ -7,7 +7,7 @@
   --bg-raised: #eef2f7;
   --border: #dfe3e9;
   --accent: #3978dc;
-  --accent-soft: #eaf1ff;
+  --accent-soft: color-mix(in srgb, var(--accent) 12%, var(--bg));
   --error: #b42318;
   --error-bg: #fdecea;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
@@ -27,7 +27,7 @@
     --bg-raised: #2d2f34;
     --border: #3a3d43;
     --accent: #5a9cf8;
-    --accent-soft: #203557;
+    --accent-soft: color-mix(in srgb, var(--accent) 20%, var(--bg));
     --error: #ff8f85;
     --error-bg: #3b2422;
   }

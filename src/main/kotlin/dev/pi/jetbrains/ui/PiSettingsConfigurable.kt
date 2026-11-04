@@ -2,6 +2,7 @@ package dev.pi.jetbrains.ui
 
 import com.intellij.openapi.keymap.KeymapUtil
 import com.intellij.openapi.options.Configurable
+import com.intellij.ui.ColorPanel
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import dev.pi.jetbrains.PiSettings
@@ -12,6 +13,8 @@ import java.awt.FlowLayout
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.awt.Insets
+import java.awt.event.ComponentAdapter
+import java.awt.event.ComponentEvent
 import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
 import javax.swing.Box
@@ -49,6 +52,16 @@ class PiSettingsConfigurable : Configurable {
     ).apply {
         toolTipText = "调整 Pi 聊天面板的基础字体大小"
         accessibleContext.accessibleName = "Pi 聊天字体大小"
+    }
+    private val accentColorPanel = ColorPanel().apply {
+        toolTipText = "覆盖 Pi 聊天界面的强调色；留空时跟随 IDE 主题"
+        // ColorPanel 的 peer 在加入组件层级前尚未创建，accessibleContext 为 null，
+        // 只能在首次显示时再设置无障碍名称。
+        addComponentListener(object : ComponentAdapter() {
+            override fun componentShown(event: ComponentEvent) {
+                event.component.accessibleContext?.accessibleName = "Pi 主题色"
+            }
+        })
     }
     private val panelShortcut = JTextField()
     private var panelShortcutValue = ""
@@ -292,6 +305,16 @@ class PiSettingsConfigurable : Configurable {
             add(chatFontSize)
         }
         addField("聊天字体大小（px）：", chatFontSizeRow, "调整 Pi 聊天面板的基础字体大小，范围为 10–32px。")
+        val accentColorRow = JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
+            isOpaque = false
+            add(accentColorPanel)
+            add(Box.createHorizontalStrut(8))
+            add(JButton("恢复默认").apply {
+                accessibleContext.accessibleName = "恢复默认 Pi 主题色"
+                addActionListener { accentColorPanel.selectedColor = null }
+            })
+        }
+        addField("主题色（可选）：", accentColorRow, "自定义 Pi 聊天界面的强调色，点击色块选择颜色；留空时跟随 IDE 主题。")
         form.add(taskCompletionSound.apply {
             isOpaque = false
             accessibleContext.accessibleName = "任务完成时播放声音"
@@ -325,6 +348,7 @@ class PiSettingsConfigurable : Configurable {
             networkProxy.text.trim() != state.networkProxy ||
             logDirectory.text != state.logDirectory ||
             chatFontSizeValue() != state.chatFontSize ||
+            accentColorHex() != state.accentColor ||
             taskCompletionSound.isSelected != state.taskCompletionSoundEnabled ||
             panelShortcutValue != state.panelShortcut ||
             newTabShortcutValue != state.newTabShortcut ||
@@ -341,6 +365,7 @@ class PiSettingsConfigurable : Configurable {
         val settings = PiSettings.get()
         val state = settings.getState()
         val fontSizeChanged = chatFontSizeValue() != state.chatFontSize
+        val accentColorChanged = accentColorHex() != state.accentColor
         val proxyEnabled = networkProxyEnabled.isSelected
         val proxy = networkProxy.text.trim()
         val proxyChanged = proxyEnabled != state.networkProxyEnabled || proxy != state.networkProxy
@@ -349,6 +374,7 @@ class PiSettingsConfigurable : Configurable {
         state.nodePath = nodePath.text.trim()
         state.logDirectory = logDirectory.text.trim()
         state.chatFontSize = chatFontSizeValue()
+        state.accentColor = accentColorHex()
         state.taskCompletionSoundEnabled = taskCompletionSound.isSelected
         state.panelShortcut = panelShortcutValue
         state.newTabShortcut = newTabShortcutValue
@@ -362,6 +388,7 @@ class PiSettingsConfigurable : Configurable {
         settings.applyShortcuts()
         if (proxyChanged) settings.notifyNetworkProxyChanged()
         if (fontSizeChanged) settings.notifyChatFontSizeChanged()
+        if (accentColorChanged) settings.notifyAccentColorChanged()
     }
 
     override fun reset() {
@@ -372,6 +399,7 @@ class PiSettingsConfigurable : Configurable {
         networkProxy.isEnabled = state.networkProxyEnabled
         logDirectory.text = state.logDirectory
         chatFontSize.value = state.chatFontSize.coerceIn(PiSettings.MIN_CHAT_FONT_SIZE, PiSettings.MAX_CHAT_FONT_SIZE)
+        accentColorPanel.selectedColor = PiSettings.parseAccentColor(state.accentColor)
         taskCompletionSound.isSelected = state.taskCompletionSoundEnabled
         panelShortcutValue = state.panelShortcut
         val keyStroke = panelShortcutValue.takeIf { it.isNotBlank() }?.let { KeyStroke.getKeyStroke(it) }
@@ -409,4 +437,8 @@ class PiSettingsConfigurable : Configurable {
     private fun chatFontSizeValue(): Int = (chatFontSize.value as? Number)?.toInt()
         ?.coerceIn(PiSettings.MIN_CHAT_FONT_SIZE, PiSettings.MAX_CHAT_FONT_SIZE)
         ?: PiSettings.DEFAULT_CHAT_FONT_SIZE
+
+    private fun accentColorHex(): String = accentColorPanel.selectedColor
+        ?.let { "#%02x%02x%02x".format(it.red, it.green, it.blue) }
+        ?: ""
 }

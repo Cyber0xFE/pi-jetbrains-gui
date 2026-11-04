@@ -17,6 +17,7 @@ import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
 import dev.pi.jetbrains.PiChatService
+import dev.pi.jetbrains.PiAccentColorListener
 import dev.pi.jetbrains.PiChatFontSizeListener
 import dev.pi.jetbrains.PiSettings
 import dev.pi.jetbrains.editor.EditorNavigator
@@ -149,6 +150,10 @@ class ChatPanel(
         ApplicationManager.getApplication().messageBus.connect(this).subscribe(
             PiSettings.CHAT_FONT_SIZE_CHANGED,
             PiChatFontSizeListener { bridge?.send(themeMessage()) },
+        )
+        ApplicationManager.getApplication().messageBus.connect(this).subscribe(
+            PiSettings.ACCENT_COLOR_CHANGED,
+            PiAccentColorListener { bridge?.send(themeMessage()) },
         )
         project.messageBus.connect(this).subscribe(
             VirtualFileManager.VFS_CHANGES,
@@ -1053,7 +1058,9 @@ class ChatPanel(
         val raised = blend(background, foreground, if (EditorColorsManager.getInstance().isDarkEditor) 0.12f else 0.06f)
         // Some headless/startup LAFs expose these UI colors as null. Theme delivery must never
         // prevent the tool window from being created, so use stable IDE-like fallbacks.
-        val accent = runCatching { UIUtil.getActiveTextColor() }.getOrNull() ?: Color(0x2563EB)
+        val accent = PiSettings.parseAccentColor(PiSettings.get().getState().accentColor)
+            ?: runCatching { UIUtil.getActiveTextColor() }.getOrNull()
+            ?: Color(0x2563EB)
         val error = runCatching { UIUtil.getErrorForeground() }.getOrNull() ?: Color(0xB42318)
         return HostMessages.theme(
             HostTheme(
