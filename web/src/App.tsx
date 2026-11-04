@@ -347,8 +347,8 @@ export function App(): JSX.Element {
             post({ type: "list_sessions" });
             post({ type: "get_tree" });
           }}
-          onSwitch={(path) => {
-            post({ type: "switch_session", path });
+          onSwitch={(path, sessionId) => {
+            post({ type: "switch_session", path, sessionId });
             closeDialog();
           }}
           onDelete={(path) => {

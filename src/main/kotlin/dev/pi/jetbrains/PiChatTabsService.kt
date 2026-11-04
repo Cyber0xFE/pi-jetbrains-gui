@@ -133,16 +133,33 @@ class PiChatTabsService(private val project: Project) : Disposable {
         }
     }
 
-    /** Reuse an already open session instead of loading the same JSONL in two processes. */
-    private fun activateSession(path: String): Boolean {
+    /** Reuse an already open session instead of loading the same JSONL in two processes.
+     *  Matches by session id when the webview provides it, falling back to a canonical path
+     *  comparison so separator or case differences between pi and the session index still hit. */
+    private fun activateSession(path: String, sessionId: String? = null): Boolean {
         val window = ToolWindowManager.getInstance(project).getToolWindow("Pi") ?: return false
         val content = window.contentManager.contents.firstOrNull {
-            (it.component as? ChatPanel)?.sessionFile == path
+            val panel = it.component as? ChatPanel ?: return@firstOrNull false
+            panel.matchesSession(path, sessionId)
         } ?: return false
-        window.contentManager.setSelectedContent(content)
-        (content.component as? ChatPanel)?.requestComposerFocus()
+        window.activate {
+            if (content.isValid) {
+                window.contentManager.setSelectedContent(content)
+                (content.component as? ChatPanel)?.requestComposerFocus()
+            }
+        }
         return true
     }
+
+    private fun ChatPanel.matchesSession(path: String, sessionId: String?): Boolean {
+        if (sessionId != null && sessionId == this.sessionId) return true
+        val file = sessionFile ?: return false
+        return isSameSessionFile(file, path)
+    }
+
+    private fun isSameSessionFile(a: String, b: String): Boolean = runCatching {
+        java.io.File(a).canonicalPath == java.io.File(b).canonicalPath
+    }.getOrDefault(a == b)
 
     fun showToolWindow(prefill: String? = null) {
         ApplicationManager.getApplication().invokeLater {

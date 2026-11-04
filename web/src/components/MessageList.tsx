@@ -257,8 +257,9 @@ export function MessageList({
       (message) => ({ id: message.dataset.messageId!, top: message.offsetTop }),
     );
     // Stepping up lands on the closest user message the viewport top has already scrolled past,
-    // wherever the viewport currently is. If the top rests on (or above) a user message, fall
-    // through to the threshold walk below so the step still moves to the previous one.
+    // and stepping down on the closest one still below the viewport top — wherever the viewport
+    // currently is. If no such message exists (the top rests on/above the first one when going
+    // up, or the last one has been crossed when going down), there is nothing to move to.
     if (direction < 0) {
       let crossed: { id: string; top: number } | null = null;
       for (const entry of offsets) {
@@ -273,6 +274,16 @@ export function MessageList({
         jumpToMessage(crossedMessage.message.id, crossedMessage.index);
         return;
       }
+    } else {
+      const next = offsets.find((entry) => entry.top > element.scrollTop + 1);
+      const nextMessage = next
+        ? userMessages.find(({ message }) => message.id === next.id)
+        : undefined;
+      if (nextMessage) {
+        stickToBottom.current = false;
+        jumpToMessage(nextMessage.message.id, nextMessage.index);
+      }
+      return;
     }
     const threshold = element.scrollTop + 96;
     let currentId: string | null = null;

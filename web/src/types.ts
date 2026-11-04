@@ -254,7 +254,7 @@ export type Outbound =
   | { type: "list_sessions" }
   | { type: "get_tree" }
   | { type: "new_session" }
-  | { type: "switch_session"; path: string }
+  | { type: "switch_session"; path: string; sessionId?: string }
   | { type: "fork"; entryId: string; images?: PromptImage[] }
   | { type: "copy_image"; images: PromptImage[] }
   | { type: "rename_session"; name: string; path?: string }

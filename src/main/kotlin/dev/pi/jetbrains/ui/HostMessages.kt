@@ -318,6 +318,8 @@ data class ClientMessage(
     val level: String? = null,
     val enabled: Boolean? = null,
     val entryId: String? = null,
+    /** Session id for `switch_session`; lets the host find a tab that already opened it. */
+    val sessionId: String? = null,
     /** Session title for `set_session_name`. */
     val name: String? = null,
     /** Clipboard/editor images sent with a prompt; also used by `copy_image` requests. */

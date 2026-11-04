@@ -130,6 +130,23 @@ class WebviewBundleTest {
         assertEquals("image/png", message.images[0].mimeType)
     }
 
+    @Test
+    fun `switch_session messages carry the path and optional session id`() {
+        val message = PiJson.decodeFromString(
+            ClientMessage.serializer(),
+            """{"type":"switch_session","path":"C:/x/s.jsonl","sessionId":"abc"}""",
+        )
+
+        assertEquals("switch_session", message.type)
+        assertEquals("C:/x/s.jsonl", message.path)
+        assertEquals("abc", message.sessionId)
+        val withoutId = PiJson.decodeFromString(
+            ClientMessage.serializer(),
+            """{"type":"switch_session","path":"C:/x/s.jsonl"}""",
+        )
+        assertEquals(null, withoutId.sessionId)
+    }
+
     private fun readBundle(): String {
         val html = javaClass.getResourceAsStream("/webview/index.html")?.use { stream ->
             stream.readBytes().toString(Charsets.UTF_8)

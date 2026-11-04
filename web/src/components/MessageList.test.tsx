@@ -505,6 +505,41 @@ it("steps up to the closest user message even from the middle of an assistant re
   expect(view.getByRole("button", { name: "Jump to user message 1: Question 0" }).getAttribute("aria-current")).toBe("location");
 });
 
+it("steps down to the closest user message below the viewport", () => {
+  HTMLElement.prototype.scrollIntoView = vi.fn();
+  const message = (id: string, role: "user" | "assistant", text: string, timestamp: number): ChatMessage => ({
+    id, role, blocks: [{ kind: "text", text }], timestamp, streaming: false,
+  });
+  const messages: ChatMessage[] = [
+    message("user-0", "user", "Question 0", 0),
+    message("assistant-0", "assistant", "Answer 0", 1),
+    message("user-1", "user", "Question 1", 2),
+    message("assistant-1", "assistant", "Answer 1", 3),
+    message("user-2", "user", "Question 2", 4),
+  ];
+  const props = { messages, tools: {}, loadingHistory: false, emptyHint: "", thinkingLabel: null, connecting: false };
+  const view = render(<MessageList {...props} previousUserMessageRequest={0} nextUserMessageRequest={0} />);
+  const log = view.getByRole("log");
+  Object.defineProperties(log, { scrollHeight: { configurable: true, value: 4000 }, clientHeight: { configurable: true, value: 400 } });
+  Array.from(log.querySelectorAll(".message-user")).forEach((element, index) => {
+    Object.defineProperty(element, "offsetTop", { configurable: true, value: index * 1200 });
+  });
+  log.scrollTop = 600;
+
+  view.rerender(<MessageList {...props} previousUserMessageRequest={0} nextUserMessageRequest={1} />);
+  expect(view.getByRole("button", { name: "Jump to user message 2: Question 1" }).getAttribute("aria-current")).toBe("location");
+
+  // The viewport top rests just above user-2; the step lands on it.
+  log.scrollTop = 2350;
+  view.rerender(<MessageList {...props} previousUserMessageRequest={0} nextUserMessageRequest={2} />);
+  expect(view.getByRole("button", { name: "Jump to user message 3: Question 2" }).getAttribute("aria-current")).toBe("location");
+
+  // Past the last user message there is nowhere further to go.
+  log.scrollTop = 2500;
+  view.rerender(<MessageList {...props} previousUserMessageRequest={0} nextUserMessageRequest={3} />);
+  expect(view.getByRole("button", { name: "Jump to user message 3: Question 2" }).getAttribute("aria-current")).toBe("location");
+});
+
 it("does not move past the first or last user message", () => {
   HTMLElement.prototype.scrollIntoView = vi.fn();
   const messages: ChatMessage[] = [

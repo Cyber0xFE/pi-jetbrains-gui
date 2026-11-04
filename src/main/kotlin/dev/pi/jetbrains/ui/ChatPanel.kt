@@ -83,12 +83,13 @@ import javax.swing.JOptionPane
 class ChatPanel(
     private val project: Project,
     private val service: PiChatService,
-    private val activateSession: (String) -> Boolean,
+    private val activateSession: (String, String?) -> Boolean,
     private val diagnosticName: String = "chat",
     private val onStatusChanged: (PiChatService.Status) -> Unit = {},
     private val onTitleChanged: (String?) -> Unit = {},
 ) : JPanel(BorderLayout()), Disposable {
     val sessionFile: String? get() = service.status.value.sessionFile
+    val sessionId: String? get() = service.status.value.sessionId
 
     fun isTaskRunning(): Boolean = service.status.value.let { it.isStreaming || it.isCompacting }
 
@@ -383,7 +384,7 @@ class ChatPanel(
             }
             "switch_session" -> {
                 val path = message.path ?: return
-                if (!activateSession(path)) {
+                if (!activateSession(path, message.sessionId)) {
                     scope.launch { changeSession("switch") { service.switchSession(path) } }
                 }
             }

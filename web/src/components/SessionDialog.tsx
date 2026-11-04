@@ -13,7 +13,7 @@ interface Props {
   onNewSession: () => void;
   onRename: (name: string, path?: string) => void;
   onRefresh: () => void;
-  onSwitch: (path: string) => void;
+  onSwitch: (path: string, sessionId?: string) => void;
   onDelete: (path: string) => void;
   onFork: (entryId: string, images: TreeEntry["images"]) => void;
 }
@@ -142,8 +142,10 @@ export function SessionDialog({
         </>
       }
       onSelect={(item) => {
-        if (tab === "sessions") onSwitch(item.key);
-        else {
+        if (tab === "sessions") {
+          const session = sessions.find((candidate) => candidate.path === item.key);
+          onSwitch(item.key, session?.id);
+        } else {
           const entry = tree.find((candidate) => candidate.id === item.key);
           onFork(item.key, entry?.images);
         }

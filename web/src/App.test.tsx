@@ -175,7 +175,7 @@ describe("App", () => {
     fireEvent.click(screen.getByText("older session"));
     await waitFor(() =>
       expect(window.__piSent?.filter((message) => message.type === "switch_session")).toEqual([
-        { type: "switch_session", path: "/p/s2.jsonl" },
+        { type: "switch_session", path: "/p/s2.jsonl", sessionId: "s2" },
       ]),
     );
   });
