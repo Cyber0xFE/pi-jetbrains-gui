@@ -90,21 +90,17 @@ intellijPlatform {
         """.trimIndent()
 
         changeNotes = """
-            <h2>What's New in 0.2.2</h2>
+            <h2>What's New in 0.2.3</h2>
             <h3>Features</h3>
             <ul>
-              <li>Search conversation messages with Ctrl+F, including case-sensitive, whole-word, and regular-expression matching.</li>
-              <li>Reuse sessions already open in another tab instead of loading duplicate session views.</li>
-              <li>Display user-message images as thumbnails and open the original image in a preview; previews support zoom, panning, and copying to the clipboard.</li>
-              <li>Configure a custom Pi chat theme color from the plugin settings.</li>
-              <li>Show session names or the first user message in task tab titles and improve navigation between user messages.</li>
+              <li>Add custom models from the model picker: the new Add model form appends a provider or model to <code>~/.pi/agent/models.json</code> without overwriting existing fields, rejects duplicate model ids, and restarts pi to load the new model.</li>
             </ul>
             <h3>Fixes</h3>
             <ul>
-              <li>Prevent duplicated pasted-image messages and cap retained WebView records to protect memory usage.</li>
-              <li>Improve rendering of escaped backslashes and bold text containing CJK punctuation.</li>
-              <li>Keep conversation navigation and tree-view scrolling positioned at the expected message.</li>
-              <li>Replace deprecated IntelliJ APIs and improve compatibility with newer platform versions.</li>
+              <li>Fix the JBCefApp class loading failure on IntelliJ Platform 2025.3.1 and later, so one plugin build works from 2024.2 through 2026.2+.</li>
+              <li>Clicking anywhere on a diff line now opens the referenced code, not just the line number.</li>
+              <li>Keep the chat view responsive by merging queued tab icon updates and by avoiding editor APIs that are deprecated on newer platforms.</li>
+              <li>Record WebView operations that block the EDT for more than 100 ms in the diagnostic log.</li>
             </ul>
 
         """.trimIndent()
