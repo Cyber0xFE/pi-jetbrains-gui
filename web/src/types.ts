@@ -263,6 +263,19 @@ export type Outbound =
   | { type: "get_models" }
   | { type: "set_model"; provider: string; modelId: string }
   | { type: "set_default_model"; provider: string; modelId: string }
+  | {
+      type: "save_custom_model";
+      provider: string;
+      api: string;
+      baseUrl: string;
+      apiKey?: string;
+      modelId: string;
+      name?: string;
+      contextWindow?: number;
+      maxTokens?: number;
+      reasoning: boolean;
+      input: string[];
+    }
   | { type: "get_thinking_levels" }
   | { type: "set_thinking_level"; level: string }
   // M3: compaction / retry / slash commands

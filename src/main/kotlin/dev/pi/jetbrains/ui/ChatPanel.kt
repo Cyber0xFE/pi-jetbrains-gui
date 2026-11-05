@@ -19,6 +19,7 @@ import com.intellij.ui.jcef.JBCefBrowser
 import dev.pi.jetbrains.PiChatService
 import dev.pi.jetbrains.PiAccentColorListener
 import dev.pi.jetbrains.PiChatFontSizeListener
+import dev.pi.jetbrains.PiModelsJson
 import dev.pi.jetbrains.PiSettings
 import dev.pi.jetbrains.editor.EditorNavigator
 import dev.pi.jetbrains.rpc.PiEvent
@@ -460,6 +461,45 @@ class ChatPanel(
                                 level = "error",
                             ),
                         )
+                    }
+                }
+            }
+            "save_custom_model" -> {
+                val provider = message.provider?.trim().orEmpty()
+                val modelId = message.modelId?.trim().orEmpty()
+                if (provider.isEmpty() || modelId.isEmpty()) return
+                scope.launch {
+                    val error = PiModelsJson.addModel(
+                        provider = provider,
+                        api = message.api.orEmpty(),
+                        baseUrl = message.baseUrl.orEmpty(),
+                        apiKey = message.apiKey.orEmpty(),
+                        modelId = modelId,
+                        name = message.name.orEmpty(),
+                        contextWindow = message.contextWindow ?: 0,
+                        maxTokens = message.maxTokens ?: 0,
+                        reasoning = message.reasoning ?: false,
+                        input = message.input,
+                    )
+                    if (error != null) {
+                        bridge?.send(HostMessages.notice(error))
+                    } else {
+                        bridge?.send(
+                            HostMessages.notice(
+                                "saved $provider/$modelId to ~/.pi/agent/models.json",
+                                level = "info",
+                            ),
+                        )
+                        if (service.status.value.isStreaming) {
+                            bridge?.send(
+                                HostMessages.notice(
+                                    "pi is streaming; the new model loads after the next restart",
+                                    level = "info",
+                                ),
+                            )
+                        } else {
+                            service.restartToApplyModelConfig()
+                        }
                     }
                 }
             }

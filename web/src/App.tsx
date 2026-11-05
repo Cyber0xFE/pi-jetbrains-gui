@@ -5,6 +5,7 @@ import { recordPerf } from "./perfLog";
 import { Composer } from "./components/Composer";
 import { MessageList } from "./components/MessageList";
 import { Picker, type PickerItem } from "./components/Picker";
+import { AddModelDialog } from "./components/AddModelDialog";
 import { SessionDialog } from "./components/SessionDialog";
 import { StatusBar } from "./components/StatusBar";
 import { Toolbar } from "./components/Toolbar";
@@ -22,6 +23,7 @@ export function App(): JSX.Element {
   const [draft, setDraft] = useState("");
   const [focusDraftRequest, setFocusDraftRequest] = useState(0);
   const [dialog, setDialog] = useState<Dialog>(null);
+  const [addModelOpen, setAddModelOpen] = useState(false);
   const [sessionDialogTab, setSessionDialogTab] = useState<SessionDialogTab>("sessions");
   const [images, setImages] = useState<PromptImage[]>([]);
   const [pendingPrompt, setPendingPrompt] = useState(false);
@@ -391,12 +393,49 @@ export function App(): JSX.Element {
           items={modelItems}
           placeholder="Filter models by name or provider…"
           emptyText={ready ? "loading models…" : "pi is not running"}
+          actions={
+            <button
+              type="button"
+              className="button button-icon"
+              onClick={() => setAddModelOpen(true)}
+              aria-label="Add model"
+              title="Add model"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
+          }
           onClose={closeDialog}
           onSelect={(item) => {
             const model = state.models.find((candidate) => `${candidate.provider ?? ""}/${candidate.id}` === item.key);
             if (!model) return;
             post({ type: "set_model", provider: model.provider ?? "", modelId: model.id });
             closeDialog();
+          }}
+        />
+      )}
+      {addModelOpen && (
+        <AddModelDialog
+          knownProviders={
+            Array.from(new Set(state.models.map((model) => model.provider).filter((p): p is string => Boolean(p))))
+          }
+          onClose={() => setAddModelOpen(false)}
+          onSave={(draft) => {
+            setAddModelOpen(false);
+            post({
+              type: "save_custom_model",
+              provider: draft.provider,
+              api: draft.api,
+              baseUrl: draft.baseUrl,
+              apiKey: draft.apiKey || undefined,
+              modelId: draft.modelId,
+              name: draft.name || undefined,
+              contextWindow: draft.contextWindow || undefined,
+              maxTokens: draft.maxTokens || undefined,
+              reasoning: draft.reasoning,
+              input: draft.input,
+            });
           }}
         />
       )}

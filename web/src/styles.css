@@ -2460,6 +2460,71 @@ mark.search-hit {
   font-size: 0.82em;
 }
 
+/* Add-model form shown on top of the Models picker. */
+.add-model-dialog {
+  width: min(600px, 94vw);
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.add-model-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  padding: 10px 14px 0;
+}
+
+.add-model-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  font-size: 0.85em;
+  color: var(--fg-dim);
+}
+
+.add-model-field-wide {
+  grid-column: 1 / -1;
+}
+
+.add-model-field input,
+.add-model-field select {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-raised);
+  color: var(--fg);
+  font: inherit;
+}
+
+.add-model-field input:focus,
+.add-model-field select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.add-model-checks {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 10px 14px 0;
+  font-size: 0.85em;
+}
+
+.add-model-check {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--fg-dim);
+}
+
+.add-model-check label {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
 /* Keep the dense footer usable in a narrow tool window. */
 @media (max-width: 760px) {
   .messages {

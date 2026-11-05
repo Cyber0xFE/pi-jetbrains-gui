@@ -265,13 +265,22 @@ class PiChatService(private val project: Project) : Disposable {
 
     /** Restarts active tabs off the EDT, closing the old writer before restoring its session. */
     private fun restartForNetworkProxy() {
+        restart("applying network proxy; restarting pi…")
+    }
+
+    /** Restarts pi so a freshly written `~/.pi/agent/models.json` is picked up. */
+    fun restartToApplyModelConfig() {
+        restart("applying new model configuration; restarting pi…")
+    }
+
+    private fun restart(message: String) {
         if (_status.value.phase != Phase.STARTING && _status.value.phase != Phase.RUNNING) return
         val sessionPath = pendingRecoverySession ?: _status.value.sessionFile
         val previousStart = startJob
         val previousRestart = proxyRestartJob
         val active = detachClient()
         pendingRecoverySession = sessionPath
-        _status.update { it.copy(phase = Phase.STARTING, message = "applying network proxy; restarting pi…") }
+        _status.update { it.copy(phase = Phase.STARTING, message = message) }
         proxyRestartJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             // Even if stopped or reconfigured again, release the detached process off the EDT.
             withContext(Dispatchers.IO + NonCancellable) {

@@ -315,6 +315,14 @@ data class ClientMessage(
     /** M3 model / thinking / session selectors. */
     val provider: String? = null,
     val modelId: String? = null,
+    /** `save_custom_model` payload (new model appended to ~/.pi/agent/models.json). */
+    val api: String? = null,
+    val baseUrl: String? = null,
+    val apiKey: String? = null,
+    val contextWindow: Long? = null,
+    val maxTokens: Long? = null,
+    val reasoning: Boolean? = null,
+    val input: List<String> = emptyList(),
     val level: String? = null,
     val enabled: Boolean? = null,
     val entryId: String? = null,
