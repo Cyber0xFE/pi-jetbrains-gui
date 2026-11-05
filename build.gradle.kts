@@ -1,8 +1,3 @@
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.StandardCopyOption
-import java.net.URLClassLoader
-
 plugins {
     kotlin("jvm") version "2.0.21"
     kotlin("plugin.serialization") version "2.0.21"
@@ -201,6 +196,18 @@ tasks.named("check") {
     dependsOn(dumpRpcSchema)
 }
 
+// Compiles the helper that queues local plugin updates. It runs inside each target IDE's
+// bundled JBR because IDE classes may target a newer JVM than the one running Gradle
+// (e.g. 2026.3 ships a JBR 25 whose classes a Java 21 Gradle JVM cannot load).
+val queueToolClasses = layout.buildDirectory.dir("queue-plugin-update-tool")
+val compileQueuePluginUpdateTool = tasks.register<JavaCompile>("compileQueuePluginUpdateTool") {
+    description = "Compiles QueuePluginUpdateTool used by buildPlugin to queue local IDE updates."
+    source = fileTree(layout.projectDirectory.dir("tools/plugin-update"))
+    destinationDirectory.set(queueToolClasses)
+    classpath = files()
+    options.release.set(21)
+}
+
 // Local development: deploy only after the ZIP was built successfully (including UP-TO-DATE builds).
 tasks.named<Zip>("buildPlugin") {
     doLast {
@@ -222,49 +229,46 @@ tasks.named<Zip>("buildPlugin") {
                 logger.lifecycle("No local IDEA/PyCharm profiles found; skipping plugin installation.")
             }
             pluginDirs.distinctBy { it.canonicalPath }.forEach { pluginsDir ->
-                // Use the target IDE's own startup commands and class definitions. Loaded JARs
-                // stay untouched; IDEA applies the same commands it uses for Install from Disk.
+                // Queue the update through the target IDE's own bundled JBR (see
+                // QueuePluginUpdateTool): loading its classes into the Gradle JVM breaks when
+                // the IDE targets a newer JVM than the one running Gradle.
                 val localAppData = System.getenv("LOCALAPPDATA")
                     ?: throw GradleException("LOCALAPPDATA is required for local IDE installation.")
                 val systemDir = file("$localAppData/JetBrains/${pluginsDir.parentFile.name}")
                 val homeFile = systemDir.resolve(".home")
                 check(homeFile.isFile) { "Cannot locate IDE home: $homeFile. Launch this IDE once first." }
-                val ideLib = file(homeFile.readText().trim()).resolve("lib")
+                val ideHome = file(homeFile.readText().trim())
+                val ideLib = ideHome.resolve("lib")
                 val jars = ideLib.listFiles().orEmpty().filter { it.extension == "jar" }
                 check(jars.isNotEmpty()) { "Cannot locate IDE libraries: $ideLib" }
-                URLClassLoader(jars.map { it.toURI().toURL() }.toTypedArray(), ClassLoader.getPlatformClassLoader()).use { loader ->
-                    val managerName = "com.intellij.ide.startup.StartupActionScriptManager"
-                    val manager = loader.loadClass(managerName)
-                    val pathType = Path::class.java
-                    val deleteCommand = loader.loadClass("$managerName\$DeleteCommand").getConstructor(pathType)
-                    val unzipCommand = loader.loadClass("$managerName\$UnzipCommand").getConstructor(pathType, pathType)
-                    val startupDir = systemDir.resolve("plugins").toPath()
-                    Files.createDirectories(startupDir)
-                    val script = startupDir.resolve("action.script")
-                    val previousBytes = if (Files.exists(script)) Files.readAllBytes(script) else null
-                    val commands = (manager.getMethod("loadActionScript", pathType).invoke(null, script) as List<*>).toMutableList()
-                    val stagedZip = Files.createTempFile(startupDir, "pi-local-update-", ".zip")
-                    val stagedScript = Files.createTempFile(startupDir, "pi-local-script-", ".tmp")
-                    try {
-                        Files.copy(archiveFile.get().asFile.toPath(), stagedZip, StandardCopyOption.REPLACE_EXISTING)
-                        commands.add(deleteCommand.newInstance(pluginsDir.resolve(project.name).toPath()))
-                        commands.add(unzipCommand.newInstance(stagedZip, pluginsDir.toPath()))
-                        commands.add(deleteCommand.newInstance(stagedZip))
-                        manager.getMethod("saveActionScript", List::class.java, pathType).invoke(null, commands, stagedScript)
-                        val currentBytes = if (Files.exists(script)) Files.readAllBytes(script) else null
-                        check(previousBytes.contentEquals(currentBytes)) { "IDE changed the update queue during installation. Run buildPlugin again." }
-                        Files.move(stagedScript, script, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-                    } catch (failure: Exception) {
-                        Files.deleteIfExists(stagedZip)
-                        throw GradleException("Could not queue plugin update for $pluginsDir", failure)
-                    } finally {
-                        Files.deleteIfExists(stagedScript)
-                    }
-                    logger.lifecycle("Queued plugin update for $pluginsDir. Restart this IDE to apply it.")
+                val jbrJava = listOf("jbr/bin/java.exe", "jbr/bin/java")
+                    .map { ideHome.resolve(it) }
+                    .firstOrNull { it.isFile }
+                    ?: throw GradleException(
+                        "Cannot locate the bundled JBR under $ideHome: neither jbr/bin/java.exe nor jbr/bin/java exists.",
+                    )
+                val command = listOf(
+                    jbrJava.absolutePath,
+                    "-cp",
+                    queueToolClasses.get().asFile.absolutePath,
+                    "QueuePluginUpdateTool",
+                    ideLib.absolutePath,
+                    systemDir.absolutePath,
+                    pluginsDir.absolutePath,
+                    archiveFile.get().asFile.absolutePath,
+                    project.name,
+                )
+                val process = ProcessBuilder(command).redirectErrorStream(true).start()
+                val output = String(process.getInputStream().readBytes(), Charsets.UTF_8)
+                val exitCode = process.waitFor()
+                if (exitCode != 0) {
+                    throw GradleException("Could not queue plugin update for $pluginsDir:\n$output")
                 }
+                output.trim().lines().forEach { line: String -> if (line.isNotBlank()) logger.lifecycle(line) }
             }
         }
     }
     // Deployment must run even when the archive itself hasn't changed.
     outputs.upToDateWhen { false }
+    dependsOn(compileQueuePluginUpdateTool)
 }
