@@ -1,0 +1,4 @@
+<!-- Loaded only when the com.intellij.modules.jcef dependency (2025.3.1+) is present.
+     Intentionally empty: declaring the optional dependency already adds the JCEF module
+     to the plugin classloader, no extra extensions are needed here. -->
+<idea-plugin/>

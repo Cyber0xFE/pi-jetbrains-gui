@@ -22,6 +22,10 @@ repositories {
 dependencies {
     intellijPlatform {
         intellijIdeaCommunity(providers.gradleProperty("platformVersion"))
+        // Note: when bumping platformVersion to 2025.3.1+, add
+        // bundledPlugin("com.intellij.modules.jcef") here: JCEF moved to the bundled
+        // Web Browser (JCEF) plugin and out of the platform core. On 243 the
+        // com.intellij.ui.jcef.* classes are still inside the core jars.
     }
 
     // The IDE ships kotlin-stdlib; keep it out of the plugin distribution.

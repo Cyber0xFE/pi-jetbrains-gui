@@ -29,6 +29,11 @@
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
+    <!-- Optional: the com.intellij.modules.jcef alias exists only since 2025.3.1 (JCEF moved to the
+         bundled Web Browser plugin in 2026.2). As an optional dependency it is resolved on 2025.3.1+
+         to make com.intellij.ui.jcef.* visible to the plugin classloader, and silently skipped on
+         older versions where the classes still live in the platform core. -->
+    <depends optional="true" config-file="jcef-support.xml">com.intellij.modules.jcef</depends>
 
     <actions>
         <action id="dev.pi.jetbrains.ShowPiToolWindow" class="dev.pi.jetbrains.ui.ShowPiToolWindowAction">
