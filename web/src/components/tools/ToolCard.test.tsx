@@ -78,7 +78,7 @@ describe("ToolCard", () => {
     expect(screen.getByText("new")).toBeDefined();
     expect(screen.queryByText("preview")).toBeNull();
 
-    fireEvent.click(screen.getAllByTitle("Open src/a.ts:3")[0]!);
+    fireEvent.click(screen.getByText("new"));
     expect(window.__piSent).toEqual([{ type: "open_path", path: "src/a.ts", line: 3 }]);
   });
 

@@ -1481,6 +1481,19 @@ mark.search-hit {
   text-decoration: underline;
 }
 
+.diff-row-link {
+  cursor: pointer;
+}
+
+.diff-row-link:hover {
+  filter: brightness(1.08);
+}
+
+.diff-row-link:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
 .diff-sign {
   flex: 0 0 auto;
   width: 1ch;

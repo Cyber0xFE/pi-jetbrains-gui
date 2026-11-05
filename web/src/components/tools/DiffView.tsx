@@ -11,35 +11,48 @@ interface Props {
 export function DiffView({ rows, path }: Props): JSX.Element {
   return (
     <div className="diff">
-      {rows.map((row, index) => (
-        <div key={index} className={`diff-row diff-${row.kind}`}>
-          <LineNumber path={path} line={row.line} />
-          <span className="diff-sign">{sign(row.kind)}</span>
-          <span className="diff-text">{row.text}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
+      {rows.map((row, index) => {
+        const canOpen = path !== undefined && row.line !== undefined;
+        const content = (
+          <>
+            <span className={`diff-line${canOpen ? " diff-line-link" : ""}`}>
+              {row.line ?? ""}
+            </span>
+            <span className="diff-sign">{sign(row.kind)}</span>
+            <span className="diff-text">{row.text}</span>
+          </>
+        );
+        if (path === undefined || row.line === undefined) {
+          return (
+            <div key={index} className={`diff-row diff-${row.kind}`}>
+              {content}
+            </div>
+          );
+        }
 
-function LineNumber({ path, line }: { path?: string; line?: number }): JSX.Element {
-  if (line === undefined) return <span className="diff-line" />;
-  if (path === undefined) {
-    return <span className="diff-line">{line}</span>;
-  }
-  return (
-    <button
-      type="button"
-      className="diff-line diff-line-link"
-      title={`Open ${path}:${line}`}
-      onClick={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        post({ type: "open_path", path, line });
-      }}
-    >
-      {line}
-    </button>
+        const targetPath = path;
+        const targetLine = row.line;
+        const open = (): void => post({ type: "open_path", path: targetPath, line: targetLine });
+        return (
+          <div
+            key={index}
+            className={`diff-row diff-${row.kind} diff-row-link`}
+            role="button"
+            tabIndex={0}
+            title={`Open ${targetPath}:${targetLine}`}
+            onClick={open}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                open();
+              }
+            }}
+          >
+            {content}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
