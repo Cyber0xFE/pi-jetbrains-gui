@@ -245,10 +245,24 @@ class ChatPanel(
     }
 
     fun requestComposerFocus() {
+        val startedAt = System.nanoTime()
         val browser = browser ?: return
         IdeFocusManager.getInstance(project).requestFocus(browser.component, true)
         browser.cefBrowser.setFocus(true)
         bridge?.send(HostMessages.focusComposer())
+        logEdtDuration("composer_focus", startedAt)
+    }
+
+    fun logEdtSource(operation: String, queuedAt: Long) {
+        val delayMs = (System.nanoTime() - queuedAt) / 1_000_000.0
+        if (delayMs < EDT_DIAGNOSTIC_THRESHOLD_MS) return
+        scope.launch { service.logDiagnostic("${diagnosticPrefix()} [edt-source] operation=$operation queueMs=${"%.1f".format(delayMs)}") }
+    }
+
+    private fun logEdtDuration(operation: String, startedAt: Long) {
+        val durationMs = (System.nanoTime() - startedAt) / 1_000_000.0
+        if (durationMs < EDT_DIAGNOSTIC_THRESHOLD_MS) return
+        scope.launch { service.logDiagnostic("${diagnosticPrefix()} [edt-source] operation=$operation durationMs=${"%.1f".format(durationMs)}") }
     }
 
     fun scrollToLatest() {
@@ -1115,6 +1129,7 @@ class ChatPanel(
         private const val COMPACT_TIMEOUT_NOTICE = "compaction did not finish in time"
         private const val MAX_TOOL_RESULT_BYTES = 512 * 1024
         private const val MAX_JSON_DEPTH = 64
+        private const val EDT_DIAGNOSTIC_THRESHOLD_MS = 100.0
         private const val DIAGNOSTIC_INTERVAL_NS = 1_000_000_000L
     }
 }

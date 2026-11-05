@@ -29,7 +29,7 @@ class PiChatTabsService(private val project: Project) : Disposable {
         /** Tabs show a short prefix; the full title goes to the tab tooltip. Measured in pixels
          *  with the actual tab font so titles of any script end up the same visual length. */
         const val TAB_TITLE_MAX_WIDTH_PX = 90
-        const val ICON_QUEUE_DIAGNOSTIC_MS = 100.0
+        const val EDT_DIAGNOSTIC_THRESHOLD_MS = 100.0
     }
 
     fun initialize(toolWindow: ToolWindow) {
@@ -70,14 +70,16 @@ class PiChatTabsService(private val project: Project) : Disposable {
                 val currentContent = content ?: return@ChatPanel
                 val running = status.isStreaming || status.isCompacting
                 when {
-                    running -> setTabIcon(currentContent, running = true, iconUpdate = iconUpdate)
-                    status.phase == PiChatService.Phase.RUNNING -> setTabIcon(currentContent, running = false, iconUpdate = iconUpdate)
+                    running -> setTabIcon(currentContent, running = true, iconUpdate = iconUpdate, session = session, tabName = "Chat $number")
+                    status.phase == PiChatService.Phase.RUNNING -> setTabIcon(currentContent, running = false, iconUpdate = iconUpdate, session = session, tabName = "Chat $number")
                 }
             },
             onTitleChanged = { title ->
                 val currentContent = content ?: return@ChatPanel
                 val full = title ?: "任务 $number"
-                ApplicationManager.getApplication().invokeLater {
+                val queuedAt = System.nanoTime()
+                ApplicationManager.getApplication().invokeLater({
+                    logEdtDelay(session, "Chat $number", "tab_title", queuedAt)
                     if (!currentContent.isValid) return@invokeLater
                     currentContent.description = full
                     val component = currentContent.component
@@ -85,7 +87,7 @@ class PiChatTabsService(private val project: Project) : Disposable {
                         truncateTabTitle(full, component.getFontMetrics(component.font))
                     } else full
                     if (currentContent.displayName != label) currentContent.displayName = label
-                }
+                }, ModalityState.any())
             },
         )
         val createdContent = ContentFactory.getInstance().createContent(panel, "任务 $number", false)
@@ -114,13 +116,22 @@ class PiChatTabsService(private val project: Project) : Disposable {
     }
 
     /** Coalesces repeated streaming-state updates into one EDT task per tab. */
-    private fun setTabIcon(content: Content, running: Boolean, iconUpdate: TabIconUpdate) {
+    private fun setTabIcon(
+        content: Content,
+        running: Boolean,
+        iconUpdate: TabIconUpdate,
+        session: PiChatService,
+        tabName: String,
+    ) {
+        val queuedAt: Long
         synchronized(iconUpdate) {
             iconUpdate.running = running
             if (iconUpdate.queued) return
             iconUpdate.queued = true
+            queuedAt = System.nanoTime()
         }
         ApplicationManager.getApplication().invokeLater({
+            logEdtDelay(session, tabName, "tab_icon", queuedAt)
             val desiredRunning: Boolean
             synchronized(iconUpdate) {
                 desiredRunning = iconUpdate.running
@@ -137,6 +148,13 @@ class PiChatTabsService(private val project: Project) : Disposable {
         var queued = false
     }
 
+    private fun logEdtDelay(session: PiChatService, tabName: String, operation: String, queuedAt: Long) {
+        val delayMs = (System.nanoTime() - queuedAt) / 1_000_000.0
+        if (delayMs < EDT_DIAGNOSTIC_THRESHOLD_MS) return
+        ApplicationManager.getApplication().executeOnPooledThread {
+            session.logDiagnostic("[tab=$tabName] [edt-source] operation=$operation queueMs=${"%.1f".format(delayMs)}")
+        }
+    }
 
     private object CompletedTabIcon : javax.swing.Icon {
         override fun getIconWidth(): Int = 16
@@ -164,10 +182,13 @@ class PiChatTabsService(private val project: Project) : Disposable {
             val panel = it.component as? ChatPanel ?: return@firstOrNull false
             panel.matchesSession(path, sessionId)
         } ?: return false
+        val panel = content.component as? ChatPanel ?: return false
+        val queuedAt = System.nanoTime()
         window.activate {
+            panel.logEdtSource("activate_session", queuedAt)
             if (content.isValid) {
                 window.contentManager.setSelectedContent(content)
-                (content.component as? ChatPanel)?.requestComposerFocus()
+                panel.requestComposerFocus()
             }
         }
         return true
