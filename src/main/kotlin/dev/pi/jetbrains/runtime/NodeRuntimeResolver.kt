@@ -31,19 +31,23 @@ sealed interface NodeResolution {
 /**
  * Locates a Node.js binary that satisfies pi's `engines` requirement (plan 7.1).
  *
- * Order: every `node`/`node.exe` on `PATH`, then the optional binary bundled with the plugin.
+ * Order: the configured path, every `node`/`node.exe` on `PATH`, the standalone Node
+ * installed by the pi.dev curl installer, then the optional binary bundled with the plugin.
  */
 class NodeRuntimeResolver(
     private val minVersion: SemanticVersion = SemanticVersion(22, 19, 0),
     private val pathEnv: String? = System.getenv("PATH"),
     private val configuredNode: Path? = null,
+    private val piStandaloneNode: Path? = defaultPiStandaloneNode(),
     private val bundledNode: Path? = null,
     private val runner: CommandRunner = CommandRunner.Default,
 ) {
     fun resolve(): NodeResolution {
         val attempts = mutableListOf<String>()
         val candidates = listOfNotNull(configuredNode?.let { Candidate(it, "configured") }) +
-            pathCandidates() + listOfNotNull(bundledNode?.let { Candidate(it, "bundled") })
+            pathCandidates() +
+            listOfNotNull(piStandaloneNode?.let { Candidate(it, "pi standalone") }) +
+            listOfNotNull(bundledNode?.let { Candidate(it, "bundled") })
 
         for (candidate in candidates.distinctBy { it.executable.toAbsolutePath().normalize() }) {
             val raw = runner.run(listOf(candidate.executable.toString(), "-v"))
@@ -77,4 +81,26 @@ class NodeRuntimeResolver(
     }
 
     private data class Candidate(val executable: Path, val origin: String)
+
+    companion object {
+        /**
+         * Standalone Node installed by the pi.dev curl installer when the machine has
+         * no Node.js: `$XDG_DATA_HOME/pi-node/current/bin/node`, usually
+         * `~/.local/share/pi-node/current/bin/node`.
+         */
+        fun defaultPiStandaloneNode(): Path? {
+            val xdg = System.getenv("XDG_DATA_HOME")?.trim().orEmpty()
+            val home = System.getProperty("user.home").orEmpty()
+            val base: Path = when {
+                xdg.isNotEmpty() -> Paths.get(xdg)
+                home.isNotBlank() -> Paths.get(home, ".local", "share")
+                else -> return null
+            }
+            val binary = if (isWindows()) "node.exe" else "node"
+            return base.resolve("pi-node").resolve("current").resolve("bin").resolve(binary)
+        }
+
+        private fun isWindows(): Boolean =
+            System.getProperty("os.name").lowercase().contains("win")
+    }
 }

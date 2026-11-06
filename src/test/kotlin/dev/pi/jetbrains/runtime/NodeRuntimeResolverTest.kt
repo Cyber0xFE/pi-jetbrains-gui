@@ -39,11 +39,46 @@ class NodeRuntimeResolverTest {
     }
 
     @Test
+    fun `falls back to the standalone node from the pi installer`() {
+        val standalone = executableIn(tempDir.resolve("pi-node/current/bin"), "node")
+        val resolver = NodeRuntimeResolver(
+            pathEnv = tempDir.resolve("empty").toString(),
+            piStandaloneNode = standalone,
+            runner = fakeRunner(mapOf(standalone to "v24.3.0")),
+        )
+
+        val result = resolver.resolve()
+
+        assertTrue(result is NodeResolution.Found, "expected a found runtime, got $result")
+        result as NodeResolution.Found
+        assertEquals(standalone, result.executable)
+        assertEquals("pi standalone", result.origin)
+    }
+
+    @Test
+    fun `prefers a PATH node over the standalone node`() {
+        val pathNode = executableIn(tempDir.resolve("path-node"), "node")
+        val standalone = executableIn(tempDir.resolve("pi-node/current/bin"), "node")
+        val resolver = NodeRuntimeResolver(
+            pathEnv = tempDir.resolve("path-node").toString(),
+            piStandaloneNode = standalone,
+            runner = fakeRunner(mapOf(pathNode to "v22.19.0", standalone to "v24.3.0")),
+        )
+
+        val result = resolver.resolve()
+
+        result as NodeResolution.Found
+        assertEquals(pathNode, result.executable)
+        assertEquals("PATH", result.origin)
+    }
+
+    @Test
     fun `falls back to the bundled node`() {
         val pathNode = executableIn(tempDir.resolve("path-node"), "node")
         val bundled = executableIn(tempDir.resolve("bundled-node"), "node")
         val resolver = NodeRuntimeResolver(
             pathEnv = tempDir.resolve("path-node").toString(),
+            piStandaloneNode = tempDir.resolve("missing").resolve("node"),
             bundledNode = bundled,
             runner = fakeRunner(mapOf(pathNode to "v18.0.0", bundled to "v24.1.0")),
         )
@@ -60,6 +95,7 @@ class NodeRuntimeResolverTest {
     fun `reports when nothing usable exists`() {
         val result = NodeRuntimeResolver(
             pathEnv = tempDir.resolve("empty").toString(),
+            piStandaloneNode = tempDir.resolve("missing").resolve("node"),
             runner = fakeRunner(emptyMap()),
         ).resolve()
 

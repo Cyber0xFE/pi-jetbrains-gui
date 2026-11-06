@@ -19,6 +19,7 @@ class PiPackageResolverTest {
         val result = PiPackageResolver(
             configuredEntry = configured,
             bundledPackageDir = bundled,
+            managedAgentDir = tempDir.resolve("managed"),
             runner = { null },
         ).resolve()
 
@@ -36,6 +37,7 @@ class PiPackageResolverTest {
         val result = PiPackageResolver(
             configuredEntry = tempDir.resolve("missing.js"),
             bundledPackageDir = bundledDir,
+            managedAgentDir = tempDir.resolve("managed"),
             runner = { null },
         ).resolve()
 
@@ -52,6 +54,7 @@ class PiPackageResolverTest {
         val packageDir = fakePackage(npmRoot.resolve(PiPackageResolver.PACKAGE_PATH), "1.2.3")
 
         val result = PiPackageResolver(
+            managedAgentDir = tempDir.resolve("managed"),
             runner = { command ->
                 require(command.contains("root")) { "unexpected command $command" }
                 npmRoot.toString()
@@ -71,10 +74,100 @@ class PiPackageResolverTest {
         Files.writeString(packageDir.resolve("dist/cli.js"), "")
         Files.writeString(packageDir.resolve("package.json"), """{"version":"1.0.0"}""")
 
-        val result = PiPackageResolver(bundledPackageDir = packageDir, runner = { null }).resolve()
+        val result = PiPackageResolver(
+            bundledPackageDir = packageDir,
+            managedAgentDir = tempDir.resolve("managed"),
+            runner = { null },
+        ).resolve()
 
         assertTrue(result is PiResolution.Found, "expected found, got $result")
         assertEquals(packageDir.resolve("dist/cli.js"), (result as PiResolution.Found).cliEntry)
+    }
+
+    @Test
+    fun `falls back to the managed install from the curl installer`() {
+        val agentDir = tempDir.resolve("agent")
+        val packageDir = fakePackage(
+            agentDir.resolve("install/releases/1.5.0/node_modules").resolve(PiPackageResolver.PACKAGE_PATH),
+            "1.5.0",
+        )
+        Files.writeString(agentDir.resolve("install/current-version"), "1.5.0\n")
+
+        val result = PiPackageResolver(
+            managedAgentDir = agentDir,
+            runner = { null },
+        ).resolve()
+
+        assertTrue(result is PiResolution.Found, "expected found, got $result")
+        result as PiResolution.Found
+        assertEquals(packageDir.resolve("dist/bundle/cli.js"), result.cliEntry)
+        assertEquals("pi managed install", result.origin)
+        assertEquals("1.5.0", result.version)
+    }
+
+    @Test
+    fun `prefers the current-version release over other managed releases`() {
+        val agentDir = tempDir.resolve("agent")
+        fakePackage(
+            agentDir.resolve("install/releases/1.4.0/node_modules").resolve(PiPackageResolver.PACKAGE_PATH),
+            "1.4.0",
+        )
+        val current = fakePackage(
+            agentDir.resolve("install/releases/1.5.0/node_modules").resolve(PiPackageResolver.PACKAGE_PATH),
+            "1.5.0",
+        )
+        Files.writeString(agentDir.resolve("install/current-version"), "1.5.0\n")
+
+        val result = PiPackageResolver(
+            managedAgentDir = agentDir,
+            runner = { null },
+        ).resolve()
+
+        result as PiResolution.Found
+        assertEquals(current.resolve("dist/bundle/cli.js"), result.cliEntry)
+    }
+
+    @Test
+    fun `managed install falls back to the highest release without current-version`() {
+        val agentDir = tempDir.resolve("agent")
+        fakePackage(
+            agentDir.resolve("install/releases/1.4.0/node_modules").resolve(PiPackageResolver.PACKAGE_PATH),
+            "1.4.0",
+        )
+        val newest = fakePackage(
+            agentDir.resolve("install/releases/1.10.0/node_modules").resolve(PiPackageResolver.PACKAGE_PATH),
+            "1.10.0",
+        )
+
+        val result = PiPackageResolver(
+            managedAgentDir = agentDir,
+            runner = { null },
+        ).resolve()
+
+        result as PiResolution.Found
+        assertEquals(newest.resolve("dist/bundle/cli.js"), result.cliEntry)
+    }
+
+    @Test
+    fun `prefers the managed install over the npm global root`() {
+        val agentDir = tempDir.resolve("agent")
+        val managed = fakePackage(
+            agentDir.resolve("install/releases/1.5.0/node_modules").resolve(PiPackageResolver.PACKAGE_PATH),
+            "1.5.0",
+        )
+        Files.writeString(agentDir.resolve("install/current-version"), "1.5.0\n")
+
+        val result = PiPackageResolver(
+            managedAgentDir = agentDir,
+            runner = { command ->
+                require(command.contains("root")) { "unexpected command $command" }
+                tempDir.resolve("npm-root").toString()
+            },
+        ).resolve()
+
+        result as PiResolution.Found
+        assertEquals(managed.resolve("dist/bundle/cli.js"), result.cliEntry)
+        assertEquals("pi managed install", result.origin)
     }
 
     @Test
@@ -87,6 +180,7 @@ class PiPackageResolverTest {
         assertTrue(result is PiResolution.NotFound, "expected not-found, got $result")
         val attempts = (result as PiResolution.NotFound).attempts
         assertTrue(attempts.any { it.contains("configured entry") }, attempts.toString())
+        assertTrue(attempts.any { it.contains("managed install") }, attempts.toString())
         assertTrue(attempts.any { it.contains("npm root -g") }, attempts.toString())
     }
 

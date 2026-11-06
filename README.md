@@ -26,14 +26,18 @@
 - IntelliJ IDEA 2024.2 或更高版本（插件最低构建号 `242`）
 - Java 21（构建插件时使用）
 - Node.js `22.19.0` 或更高版本
-- 已安装 pi coding agent：
+- 已安装 pi coding agent，以下任一方式均可：
 
   ```bash
+  # 官方安装脚本（macOS/Linux）
+  curl -fsSL https://pi.dev/install.sh | sh
+
+  # 或 npm 全局安装
   npm install -g @earendil-works/pi-coding-agent
   ```
 
-插件会按以下顺序查找 pi：设置中配置的入口、插件内置副本、npm 全局安装目录。
-Node.js 会优先从设置指定路径和系统 `PATH` 中查找。若启动失败，先在设置中填写可执行的 Node.js 路径，并检查 pi CLI 已按上面的命令安装。
+插件会按以下顺序查找 pi：设置中配置的入口、插件内置副本、pi 安装脚本的托管目录（`~/.pi/agent/install`）、npm 全局安装目录。
+Node.js 会优先从设置指定路径和系统 `PATH` 中查找，找不到时回退到 pi 安装脚本自带的独立 Node（`~/.local/share/pi-node`）。若启动失败，先在设置中填写可执行的 Node.js 路径，并检查 pi CLI 已正确安装。
 
 ## 构建和运行
 
@@ -90,7 +94,7 @@ Windows 本机构建成功后，还会自动为 `%APPDATA%/JetBrains/` 下已有
 
 ### 故障排查
 
-- Pi 无法启动：确认 Node.js 为 `22.19.0` 或更高版本，并在设置中检查 Node.js 路径；必要时重新执行 pi CLI 全局安装命令。
+- Pi 无法启动：确认 Node.js 为 `22.19.0` 或更高版本，并在设置中检查 Node.js 路径；若通过 npm 安装 pi，必要时重新执行 `npm install -g @earendil-works/pi-coding-agent`。注意 nvm 用户需在 IDE 实际使用的 Node 版本下安装 pi，并完全重启 IDE 使 PATH 生效。
 - 消息或工具输出异常：在设置中指定诊断日志目录，复现问题后附上相关日志和 IDE 版本。
 - 修改代理或 Node.js 设置后：已经启动的标签页会重启 Pi 进程并恢复会话，正在执行的任务会中断。
 - WebView 空白：使用 `./gradlew buildPlugin`（Windows 使用 `gradlew.bat buildPlugin`）重新生成内置前端资源，并确认目标 IDE 支持 JCEF。
