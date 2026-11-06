@@ -233,6 +233,7 @@ export type Inbound =
   | { type: "files"; files: string[] }
   | { type: "reset"; reason: string }
   | { type: "prefill"; text: string; images?: PromptImage[] }
+  | { type: "btw"; state: "answer" | "error"; question: string; answer?: string | null; error?: string | null }
   | { type: "focus_composer" }
   | { type: "scroll_to_latest" }
   | { type: "scroll_to_first" }
@@ -245,6 +246,7 @@ export type Outbound =
   | { type: "ready" }
   | { type: "start" }
   | { type: "prompt"; message: string; images?: PromptImage[] }
+  | { type: "btw"; question: string }
   | { type: "abort" }
   | { type: "request_state" }
   | { type: "open_path"; path: string; line?: number; endLine?: number }

@@ -28,6 +28,7 @@ import dev.pi.jetbrains.runtime.NodeResolution
 import dev.pi.jetbrains.runtime.NodeRuntimeResolver
 import dev.pi.jetbrains.runtime.PiPackageResolver
 import dev.pi.jetbrains.runtime.PiResolution
+import dev.pi.jetbrains.runtime.SideQuestionRunner
 import dev.pi.jetbrains.session.SessionIndex
 import dev.pi.jetbrains.session.SessionSummary
 import kotlinx.coroutines.CancellationException
@@ -62,6 +63,8 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 import java.time.Duration
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 
 /** Owns one tab's pi child process. All tabs use the project root as their working directory. */
@@ -139,6 +142,17 @@ class PiChatService(private val project: Project) : Disposable {
     @Volatile
     private var client: PiClient? = null
 
+    /** Node + pi resolved by the last successful [start]; reused for `/btw` print-mode runs. */
+    private val resolvedRuntime = AtomicReference<ResolvedRuntime?>(null)
+
+    /** Only one `/btw` side question runs per tab at a time. */
+    private val btwRunning = AtomicBoolean(false)
+
+    private data class ResolvedRuntime(
+        val nodeExecutable: Path,
+        val cliEntry: Path,
+    )
+
     @Volatile
     private var recoveryInProgress = false
 
@@ -189,6 +203,12 @@ class PiChatService(private val project: Project) : Disposable {
             }
 
             val workDir = projectWorkDir() ?: return@launch fail("project has no base directory")
+            resolvedRuntime.set(
+                ResolvedRuntime(
+                    nodeExecutable = nodeRuntime.executable,
+                    cliEntry = installation.cliEntry,
+                ),
+            )
             // Keep GUI behavior consistent with pi TUI: tool calls are not intercepted by an
             // approval extension. pi itself has no built-in approval gate.
             val command = listOf(
@@ -555,6 +575,43 @@ class PiChatService(private val project: Project) : Disposable {
 
     suspend fun slashCommands(): RpcResponse =
         requireClient().send(RpcCommand(type = "get_commands")).await()
+
+    /**
+     * `/btw`: answers one side question from a throwaway copy of the active session file, so the
+     * main conversation history stays untouched. Only one question may run at a time.
+     */
+    suspend fun sideQuestion(question: String): SideQuestionRunner.Result = withContext(Dispatchers.IO) {
+        val runtime = resolvedRuntime.get()
+            ?: return@withContext SideQuestionRunner.Result(answer = null, error = "pi runtime is not resolved yet")
+        val sessionFile = _status.value.sessionFile
+        val error = when {
+            _status.value.phase != Phase.RUNNING -> "pi is not running"
+            sessionFile == null -> "no active session"
+            !Files.isRegularFile(Paths.get(sessionFile)) -> "session file is missing on disk"
+            !btwRunning.compareAndSet(false, true) -> "another /btw question is still running"
+            else -> null
+        }
+        if (error != null) return@withContext SideQuestionRunner.Result(answer = null, error = error)
+
+        try {
+            val runner = SideQuestionRunner(
+                nodeExecutable = runtime.nodeExecutable,
+                cliEntry = runtime.cliEntry,
+                workDir = projectWorkDir() ?: Paths.get("."),
+                environment = PiSettings.get().processEnvironment(),
+                log = { diagnosticLog("[${project.name}] $it") },
+            )
+            val status = _status.value
+            runner.ask(
+                sessionFile = Paths.get(sessionFile!!),
+                provider = status.provider,
+                model = status.model,
+                question = question,
+            )
+        } finally {
+            btwRunning.set(false)
+        }
+    }
 
     override fun dispose() {
         stop()

@@ -85,6 +85,14 @@ export interface Notice {
   message: string;
 }
 
+/** One `/btw` side question; never enters the main transcript. */
+export interface BtwState {
+  question: string;
+  answer: string | null;
+  error: string | null;
+  pending: boolean;
+}
+
 export interface ChatState {
   messages: ChatMessage[];
   tools: Record<string, ToolState>;
@@ -116,6 +124,8 @@ export interface ChatState {
   thinkingLevels: string[];
   commands: SlashCommand[];
   files: string[];
+  /** Most recent `/btw` side question; null until one is asked. */
+  btw: BtwState | null;
 }
 
 export const initialState: ChatState = {
@@ -144,11 +154,13 @@ export const initialState: ChatState = {
   thinkingLevels: [],
   commands: [],
   files: [],
+  btw: null,
 };
 
 export type Action =
   | { kind: "submit" }
   | { kind: "inbound"; message: Inbound }
+  | { kind: "btwSend"; question: string }
   | { kind: "dismissNotice"; id: string };
 
 /**
@@ -162,6 +174,9 @@ export function reduce(state: ChatState, action: Action): ChatState {
   switch (action.kind) {
     case "submit":
       return { ...state, sending: true };
+    case "btwSend":
+      // Optimistic pending state while the host runs the print-mode side question.
+      return { ...state, btw: { question: action.question, answer: null, error: null, pending: true } };
     case "dismissNotice":
       return { ...state, notices: state.notices.filter((notice) => notice.id !== action.id) };
     case "inbound":
@@ -198,6 +213,17 @@ function applyInbound(state: ChatState, message: Inbound): ChatState {
       return { ...state, commands: message.commands };
     case "files":
       return { ...state, files: message.files };
+    case "btw":
+      if (message.state === "answer") {
+        return {
+          ...state,
+          btw: { question: message.question, answer: message.answer ?? null, error: null, pending: false },
+        };
+      }
+      return {
+        ...state,
+        btw: { question: message.question, answer: null, error: message.error ?? "/btw failed", pending: false },
+      };
     case "reset":
       return resetTranscript(state);
     case "prefill":

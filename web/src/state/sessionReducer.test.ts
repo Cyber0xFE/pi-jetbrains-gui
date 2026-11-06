@@ -465,4 +465,43 @@ describe("sessionReducer", () => {
     expect(state.notices[0]?.level).toBe("info");
     expect(state.notices[0]?.message).toContain("150k → 32k");
   });
+
+  it("tracks /btw side questions without touching the transcript", () => {
+    const asked = apply(
+      initialState,
+      records(assistantStart(), update({ type: "text_delta", contentIndex: 0, delta: "main" })),
+      { kind: "btwSend", question: "what config file was that?" },
+    );
+
+    expect(asked.btw).toEqual({ question: "what config file was that?", answer: null, error: null, pending: true });
+    expect(asked.messages).toHaveLength(1);
+    expect(asked.sending).toBe(false);
+
+    const answered = apply(asked, {
+      kind: "inbound",
+      message: { type: "btw", state: "answer", question: "what config file was that?", answer: "**app.json**" },
+    });
+    expect(answered.btw).toEqual({ question: "what config file was that?", answer: "**app.json**", error: null, pending: false });
+    expect(answered.messages).toEqual(asked.messages);
+  });
+
+  it("reports /btw errors and keeps the last question visible", () => {
+    const state = apply(
+      initialState,
+      { kind: "btwSend", question: "why?" },
+      { kind: "inbound", message: { type: "btw", state: "error", question: "why?", error: "pi is not running" } },
+    );
+
+    expect(state.btw).toEqual({ question: "why?", answer: null, error: "pi is not running", pending: false });
+  });
+
+  it("fills a missing /btw answer with null and keeps pending until the host replies", () => {
+    const state = apply(
+      initialState,
+      { kind: "btwSend", question: "hm?" },
+      { kind: "inbound", message: { type: "btw", state: "answer", question: "hm?" } },
+    );
+
+    expect(state.btw).toEqual({ question: "hm?", answer: null, error: null, pending: false });
+  });
 });

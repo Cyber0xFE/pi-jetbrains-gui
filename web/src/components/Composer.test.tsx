@@ -35,3 +35,30 @@ it("opens pending images in a dismissible preview without removing them", () => 
   expect(view.queryByRole("dialog", { name: "Image preview" })).toBeNull();
   expect(onRemoveImage).not.toHaveBeenCalled();
 });
+
+it("offers /btw as a built-in command when the composer starts with /", () => {
+  const view = render(
+    <Composer
+      value="/"
+      onChange={() => undefined}
+      focusRequest={0}
+      onSend={() => undefined}
+      disabled={false}
+      busy={false}
+      commands={[]}
+      files={[]}
+      onCompact={() => undefined}
+      onOpenTree={() => undefined}
+      pendingContext={null}
+      onClearContext={() => undefined}
+      images={[]}
+      onAddImage={() => undefined}
+      onRemoveImage={() => undefined}
+      onAbort={() => undefined}
+    />,
+  );
+
+  const menu = view.getByRole("listbox", { name: "Slash commands" });
+  expect(menu.textContent).toContain("/btw");
+  expect(menu.textContent).toContain("Ask a side question without adding it to the session");
+});

@@ -34,6 +34,7 @@ import dev.pi.jetbrains.rpc.RpcSwitchResult
 import dev.pi.jetbrains.rpc.RpcThinkingLevelsData
 import dev.pi.jetbrains.rpc.RpcTreeData
 import dev.pi.jetbrains.rpc.decodeDataAs
+import dev.pi.jetbrains.runtime.SideQuestionRunner
 import dev.pi.jetbrains.session.SessionTree
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -536,6 +537,28 @@ class ChatPanel(
             "get_commands" -> scope.launch { sendCommands() }
             "list_files" -> refreshProjectFiles()
             "clear_context" -> service.clearEditorContext()
+
+            // ---- /btw side questions ---------------------------------------------------------
+            "btw" -> {
+                val question = message.question?.trim().orEmpty()
+                if (question.isEmpty()) {
+                    LOG.debug("btw message without question")
+                    return
+                }
+                scope.launch {
+                    val activeBridge = bridge ?: return@launch
+                    val result = try {
+                        service.sideQuestion(question)
+                    } catch (t: Throwable) {
+                        SideQuestionRunner.Result(answer = null, error = t.message ?: t.javaClass.simpleName)
+                    }
+                    if (result.error != null) {
+                        activeBridge.send(HostMessages.btw("error", question, error = result.error))
+                    } else {
+                        activeBridge.send(HostMessages.btw("answer", question, answer = result.answer))
+                    }
+                }
+            }
 
             else -> LOG.debug("unknown webview message: ${message.type}")
         }

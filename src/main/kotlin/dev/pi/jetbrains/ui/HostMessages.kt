@@ -286,6 +286,16 @@ data class HostPrefillMessage(
     val images: List<ClientImage> = emptyList(),
 )
 
+/** `/btw` side-question outcome: `answer` or `error` for a previously posted question. */
+@Serializable
+data class HostBtwMessage(
+    val type: String = "btw",
+    val state: String,
+    val question: String,
+    val answer: String? = null,
+    val error: String? = null,
+)
+
 @Serializable
 data class HostFocusComposerMessage(val type: String = "focus_composer")
 
@@ -330,6 +340,8 @@ data class ClientMessage(
     val sessionId: String? = null,
     /** Session title for `set_session_name`. */
     val name: String? = null,
+    /** `/btw` side question text. */
+    val question: String? = null,
     /** Clipboard/editor images sent with a prompt; also used by `copy_image` requests. */
     val images: List<ClientImage> = emptyList(),
 )
@@ -435,6 +447,12 @@ object HostMessages {
         PiJson.encodeToJsonElement(
             HostPrefillMessage.serializer(),
             HostPrefillMessage(text = text, images = images),
+        )
+
+    fun btw(state: String, question: String, answer: String? = null, error: String? = null): JsonElement =
+        PiJson.encodeToJsonElement(
+            HostBtwMessage.serializer(),
+            HostBtwMessage(state = state, question = question, answer = answer, error = error),
         )
 
     fun focusComposer(): JsonElement =

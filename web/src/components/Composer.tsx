@@ -30,6 +30,7 @@ const MAX_SUGGESTIONS = 8;
 const BUILTIN_COMMANDS: SlashCommand[] = [
   { name: "compact", description: "Compact the session context", source: "built-in" },
   { name: "tree", description: "Open the current session tree", source: "built-in" },
+  { name: "btw", description: "Ask a side question without adding it to the session", source: "built-in" },
 ];
 
 /** The textarea, its corner send/stop button and the `/` command menu; sending is triggered by Enter or the corner button. */

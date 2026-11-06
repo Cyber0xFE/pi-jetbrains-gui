@@ -6,6 +6,7 @@ import { Composer } from "./components/Composer";
 import { MessageList } from "./components/MessageList";
 import { Picker, type PickerItem } from "./components/Picker";
 import { AddModelDialog } from "./components/AddModelDialog";
+import { BtwOverlay } from "./components/BtwOverlay";
 import { SessionDialog } from "./components/SessionDialog";
 import { StatusBar } from "./components/StatusBar";
 import { Toolbar } from "./components/Toolbar";
@@ -33,6 +34,7 @@ export function App(): JSX.Element {
   const [nextUserMessageRequest, setNextUserMessageRequest] = useState(0);
   const [search, setSearch] = useState<SearchState>(EMPTY_SEARCH);
   const [searchFocusRequest, setSearchFocusRequest] = useState(0);
+  const [btwOpen, setBtwOpen] = useState(false);
   const pendingPromptStartedAt = useRef<number | null>(null);
   const pendingPromptTimer = useRef<number | null>(null);
 
@@ -93,6 +95,9 @@ export function App(): JSX.Element {
         if (message.direction === "previous") setPreviousUserMessageRequest((current) => current + 1);
         else setNextUserMessageRequest((current) => current + 1);
         return;
+      }
+      if (message.type === "btw") {
+        setBtwOpen(true);
       }
       store.dispatch({ kind: "inbound", message });
     });
@@ -157,6 +162,23 @@ export function App(): JSX.Element {
   const send = useCallback(() => {
     const text = draft.trim();
     if (text.length === 0 && images.length === 0 && !state.status.pendingContext) return;
+    // `/btw` keeps the main transcript untouched: bare `/btw` re-opens the last side question,
+    // otherwise the question goes to the host's print-mode runner, never to the session.
+    if (text === "/btw") {
+      setDraft("");
+      setBtwOpen(true);
+      return;
+    }
+    if (text.startsWith("/btw ")) {
+      const question = text.slice("/btw ".length).trim();
+      setDraft("");
+      if (question.length > 0) {
+        store.dispatch({ kind: "btwSend", question });
+        setBtwOpen(true);
+        post({ type: "btw", question });
+      }
+      return;
+    }
     if (pendingPromptTimer.current !== null) window.clearTimeout(pendingPromptTimer.current);
     pendingPromptStartedAt.current = Date.now();
     setPendingPrompt(true);
@@ -355,6 +377,7 @@ export function App(): JSX.Element {
         }
       />
 
+      {btwOpen && <BtwOverlay btw={state.btw} onClose={() => setBtwOpen(false)} />}
       {dialog === "sessions" && (
         <SessionDialog
           sessions={state.sessions}
