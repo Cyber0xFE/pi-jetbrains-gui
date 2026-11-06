@@ -90,17 +90,12 @@ intellijPlatform {
         """.trimIndent()
 
         changeNotes = """
-            <h2>What's New in 0.2.3</h2>
+            <h2>What's New in 0.3.0</h2>
             <h3>Features</h3>
             <ul>
-              <li>Add custom models from the model picker: the new Add model form appends a provider or model to <code>~/.pi/agent/models.json</code> without overwriting existing fields, rejects duplicate model ids, and restarts pi to load the new model.</li>
-            </ul>
-            <h3>Fixes</h3>
-            <ul>
-              <li>Fix the JBCefApp class loading failure on IntelliJ Platform 2025.3.1 and later, so one plugin build works from 2024.2 through 2026.2+.</li>
-              <li>Clicking anywhere on a diff line now opens the referenced code, not just the line number.</li>
-              <li>Keep the chat view responsive by merging queued tab icon updates and by avoiding editor APIs that are deprecated on newer platforms.</li>
-              <li>Record WebView operations that block the EDT for more than 100 ms in the diagnostic log.</li>
+              <li>New <code>/btw</code> side questions: type <code>/btw &lt;question&gt;</code> any time, even while the main task is running. The question runs as a one-off, tool-free answer against a temporary copy of the current session, so the main session history stays untouched. The answer shows in a closable overlay and does not enter the main transcript; typing <code>/btw</code> alone reopens the last side question.</li>
+              <li>Streaming answers in the <code>/btw</code> overlay: answers stream in live with the same thinking indicator as the main chat. The overlay slides in from the right edge and can be collapsed to a slim <code>/btw</code> handle on the edge; incoming answers auto-expand it, and Esc first expands, then closes it.</li>
+              <li>Support pi.dev managed installs: pi installed by the pi.dev curl script (under <code>~/.pi/agent/install/releases/</code>) is now detected, including the installer's bundled standalone Node when no Node is available on the PATH.</li>
             </ul>
 
         """.trimIndent()
