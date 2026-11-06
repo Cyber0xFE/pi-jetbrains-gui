@@ -233,7 +233,7 @@ export type Inbound =
   | { type: "files"; files: string[] }
   | { type: "reset"; reason: string }
   | { type: "prefill"; text: string; images?: PromptImage[] }
-  | { type: "btw"; state: "answer" | "error"; question: string; answer?: string | null; error?: string | null }
+  | { type: "btw"; state: "delta" | "answer" | "error"; question: string; delta?: string | null; answer?: string | null; error?: string | null }
   | { type: "focus_composer" }
   | { type: "scroll_to_latest" }
   | { type: "scroll_to_first" }

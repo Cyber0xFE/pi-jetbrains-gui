@@ -547,11 +547,31 @@ class ChatPanel(
                 }
                 scope.launch {
                     val activeBridge = bridge ?: return@launch
+                    // Coalesce text deltas into ~one bridge send per flush interval, like the
+                    // transcript's record batching; the final `answer` is the authoritative text.
+                    val deltaBuffer = StringBuilder()
+                    var lastFlushAt = 0L
+                    fun flushDelta() {
+                        val delta = synchronized(deltaBuffer) {
+                            if (deltaBuffer.isEmpty()) return
+                            val text = deltaBuffer.toString()
+                            deltaBuffer.setLength(0)
+                            text
+                        }
+                        activeBridge.send(HostMessages.btw("delta", question, delta = delta))
+                        lastFlushAt = System.nanoTime()
+                    }
                     val result = try {
-                        service.sideQuestion(question)
+                        service.sideQuestion(question) { delta ->
+                            synchronized(deltaBuffer) { deltaBuffer.append(delta) }
+                            if (System.nanoTime() - lastFlushAt >= BTW_DELTA_FLUSH_INTERVAL_NS) {
+                                flushDelta()
+                            }
+                        }
                     } catch (t: Throwable) {
                         SideQuestionRunner.Result(answer = null, error = t.message ?: t.javaClass.simpleName)
                     }
+                    flushDelta()
                     if (result.error != null) {
                         activeBridge.send(HostMessages.btw("error", question, error = result.error))
                     } else {
@@ -1194,5 +1214,6 @@ class ChatPanel(
         private const val MAX_JSON_DEPTH = 64
         private const val EDT_DIAGNOSTIC_THRESHOLD_MS = 100.0
         private const val DIAGNOSTIC_INTERVAL_NS = 1_000_000_000L
+        private const val BTW_DELTA_FLUSH_INTERVAL_NS = 50_000_000L
     }
 }

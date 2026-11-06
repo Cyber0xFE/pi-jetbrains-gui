@@ -35,6 +35,7 @@ export function App(): JSX.Element {
   const [search, setSearch] = useState<SearchState>(EMPTY_SEARCH);
   const [searchFocusRequest, setSearchFocusRequest] = useState(0);
   const [btwOpen, setBtwOpen] = useState(false);
+  const [btwCollapsed, setBtwCollapsed] = useState(false);
   const pendingPromptStartedAt = useRef<number | null>(null);
   const pendingPromptTimer = useRef<number | null>(null);
 
@@ -98,6 +99,7 @@ export function App(): JSX.Element {
       }
       if (message.type === "btw") {
         setBtwOpen(true);
+        setBtwCollapsed(false);
       }
       store.dispatch({ kind: "inbound", message });
     });
@@ -175,6 +177,7 @@ export function App(): JSX.Element {
       if (question.length > 0) {
         store.dispatch({ kind: "btwSend", question });
         setBtwOpen(true);
+        setBtwCollapsed(false);
         post({ type: "btw", question });
       }
       return;
@@ -377,7 +380,18 @@ export function App(): JSX.Element {
         }
       />
 
-      {btwOpen && <BtwOverlay btw={state.btw} onClose={() => setBtwOpen(false)} />}
+      {btwOpen && (
+        <BtwOverlay
+          btw={state.btw}
+          collapsed={btwCollapsed}
+          onCollapse={() => setBtwCollapsed(true)}
+          onExpand={() => setBtwCollapsed(false)}
+          onClose={() => {
+            setBtwOpen(false);
+            setBtwCollapsed(false);
+          }}
+        />
+      )}
       {dialog === "sessions" && (
         <SessionDialog
           sessions={state.sessions}

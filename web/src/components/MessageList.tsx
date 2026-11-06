@@ -901,7 +901,7 @@ function sameToolStates(
   return true;
 }
 
-function AnimatedEllipsis({ className }: { className: string }): JSX.Element {
+export function AnimatedEllipsis({ className }: { className: string }): JSX.Element {
   const [count, setCount] = useState(1);
 
   useEffect(() => {
@@ -989,7 +989,7 @@ function BlockView({ block, fileReferences, tools, streaming, thinkingLabel, dur
   }
 }
 
-function ThinkingIcon({ spinning = false }: { spinning?: boolean }): JSX.Element {
+export function ThinkingIcon({ spinning = false }: { spinning?: boolean }): JSX.Element {
   const radius = 8.5;
   const circumference = 2 * Math.PI * radius;
   const arc = circumference * 0.25;

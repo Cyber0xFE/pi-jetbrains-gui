@@ -580,7 +580,10 @@ class PiChatService(private val project: Project) : Disposable {
      * `/btw`: answers one side question from a throwaway copy of the active session file, so the
      * main conversation history stays untouched. Only one question may run at a time.
      */
-    suspend fun sideQuestion(question: String): SideQuestionRunner.Result = withContext(Dispatchers.IO) {
+    suspend fun sideQuestion(
+        question: String,
+        onDelta: (String) -> Unit = {},
+    ): SideQuestionRunner.Result = withContext(Dispatchers.IO) {
         val runtime = resolvedRuntime.get()
             ?: return@withContext SideQuestionRunner.Result(answer = null, error = "pi runtime is not resolved yet")
         val sessionFile = _status.value.sessionFile
@@ -607,6 +610,7 @@ class PiChatService(private val project: Project) : Disposable {
                 provider = status.provider,
                 model = status.model,
                 question = question,
+                onDelta = onDelta,
             )
         } finally {
             btwRunning.set(false)

@@ -58,7 +58,7 @@ class SideQuestionRunnerTest {
         val command = runner.buildCommand(copy, provider = "p", model = "m", question = "why?")
 
         assertEquals(
-            listOf("node", "pi.mjs", "--session", copy.toString(), "--no-tools", "--provider", "p", "--model", "m", "--print", "why?"),
+            listOf("node", "pi.mjs", "--session", copy.toString(), "--no-tools", "--provider", "p", "--model", "m", "--mode", "json", "--print", "why?"),
             command,
         )
     }
@@ -77,26 +77,86 @@ class SideQuestionRunnerTest {
     }
 
     @Test
-    fun `ask returns the stdout answer and deletes the session copy`() {
+    fun `ask streams text deltas and returns the final answer`() {
+        val cli = script(
+            "stream.mjs",
+            """
+            // Mirror pi's readPipedStdin: block until stdin EOF, then emit a JSON event stream.
+            await new Promise((resolve) => { process.stdin.resume(); process.stdin.on("end", resolve); });
+            const events = [
+            { type: "message_update", assistantMessageEvent: { type: "thinking_delta", delta: "hmm" } },
+            { type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "he" } },
+            { type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "llo" } },
+            { type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "hello world" }] } },
+            "not json at all",
+            ];
+            for (const event of events) process.stdout.write(JSON.stringify(event) + "\n");
+            """.trimIndent(),
+        )
+        val deltas = mutableListOf<String>()
+        val before = btwCopiesInTempDir()
+
+        val result = runner(cli).ask(
+            sessionFile(), provider = null, model = null, question = "why?",
+            onDelta = { deltas.add(it) },
+        )
+
+        assertNull(result.error)
+        assertEquals("hello world", result.answer)
+        assertEquals(listOf("he", "llo"), deltas)
+        assertEquals(before, btwCopiesInTempDir(), "session copy must be cleaned up")
+    }
+
+    @Test
+    fun `ask falls back to accumulated deltas when no assistant message_end arrives`() {
+        val cli = script(
+            "deltas-only.mjs",
+            """
+            await new Promise((resolve) => { process.stdin.resume(); process.stdin.on("end", resolve); });
+            process.stdout.write(JSON.stringify({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "partial" } }) + "\n");
+            """.trimIndent(),
+        )
+
+        val result = runner(cli).ask(sessionFile(), provider = null, model = null, question = "why?", onDelta = {})
+
+        assertNull(result.error)
+        assertEquals("partial", result.answer)
+    }
+
+    @Test
+    fun `ask reports an errored assistant stop reason`() {
+        val cli = script(
+            "error-end.mjs",
+            """
+            await new Promise((resolve) => { process.stdin.resume(); process.stdin.on("end", resolve); });
+            process.stdout.write(JSON.stringify({ type: "message_end", message: { role: "assistant", content: [], stopReason: "error", errorMessage: "quota exceeded" } }) + "\n");
+            """.trimIndent(),
+        )
+
+        val result = runner(cli).ask(sessionFile(), provider = null, model = null, question = "why?", onDelta = {})
+
+        assertNull(result.answer)
+        assertNotNull(result.error)
+        assertTrue(result.error!!.contains("quota exceeded"), "unexpected error: ${result.error}")
+    }
+
+    @Test
+    fun `ask treats non-JSON stdout as no answer`() {
         val cli = script(
             "echo.mjs",
             """
             // Mirror pi's readPipedStdin: block until stdin EOF, then answer.
-            const stdinText = await new Promise((resolve) => {
-            	let data = "";
-            	process.stdin.on("data", (chunk) => (data += chunk));
-            	process.stdin.on("end", () => resolve(data));
-            });
-            const index = process.argv.indexOf("--print");
-            process.stdout.write(`answer: ${'$'}{process.argv[index + 1]}` + "\n");
+            await new Promise((resolve) => { process.stdin.resume(); process.stdin.on("end", resolve); });
+            process.stdout.write("plain text answer" + "\n");
             """.trimIndent(),
         )
         val before = btwCopiesInTempDir()
 
         val result = runner(cli).ask(sessionFile(), provider = null, model = null, question = "why?")
 
-        assertNull(result.error)
-        assertEquals("answer: why?", result.answer)
+        assertNull(result.answer)
+        assertNotNull(result.error)
+        assertTrue(result.error!!.contains("no answer"), "unexpected error: ${result.error}")
         assertEquals(before, btwCopiesInTempDir(), "session copy must be cleaned up")
     }
 

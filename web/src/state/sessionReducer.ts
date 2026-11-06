@@ -214,6 +214,17 @@ function applyInbound(state: ChatState, message: Inbound): ChatState {
     case "files":
       return { ...state, files: message.files };
     case "btw":
+      if (message.state === "delta") {
+        const current = state.btw;
+        if (current?.question !== message.question) {
+          // Deltas for a question we did not seed locally (host restarted, etc.): start fresh.
+          return { ...state, btw: { question: message.question, answer: message.delta ?? "", error: null, pending: true } };
+        }
+        return {
+          ...state,
+          btw: { question: message.question, answer: (current.answer ?? "") + (message.delta ?? ""), error: null, pending: true },
+        };
+      }
       if (message.state === "answer") {
         return {
           ...state,
@@ -222,7 +233,12 @@ function applyInbound(state: ChatState, message: Inbound): ChatState {
       }
       return {
         ...state,
-        btw: { question: message.question, answer: null, error: message.error ?? "/btw failed", pending: false },
+        btw: {
+          question: message.question,
+          answer: state.btw?.question === message.question ? state.btw.answer : null,
+          error: message.error ?? "/btw failed",
+          pending: false,
+        },
       };
     case "reset":
       return resetTranscript(state);

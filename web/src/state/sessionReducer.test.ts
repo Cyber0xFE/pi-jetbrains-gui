@@ -477,7 +477,14 @@ describe("sessionReducer", () => {
     expect(asked.messages).toHaveLength(1);
     expect(asked.sending).toBe(false);
 
-    const answered = apply(asked, {
+    // Streaming deltas accumulate while pending stays true.
+    const streaming = apply(asked, {
+      kind: "inbound",
+      message: { type: "btw", state: "delta", question: "what config file was that?", delta: "it is " },
+    });
+    expect(streaming.btw).toEqual({ question: "what config file was that?", answer: "it is ", error: null, pending: true });
+
+    const answered = apply(streaming, {
       kind: "inbound",
       message: { type: "btw", state: "answer", question: "what config file was that?", answer: "**app.json**" },
     });
@@ -485,14 +492,24 @@ describe("sessionReducer", () => {
     expect(answered.messages).toEqual(asked.messages);
   });
 
-  it("reports /btw errors and keeps the last question visible", () => {
+  it("reports /btw errors and keeps the partial streamed answer visible", () => {
     const state = apply(
       initialState,
       { kind: "btwSend", question: "why?" },
-      { kind: "inbound", message: { type: "btw", state: "error", question: "why?", error: "pi is not running" } },
+      { kind: "inbound", message: { type: "btw", state: "delta", question: "why?", delta: "partial" } },
+      { kind: "inbound", message: { type: "btw", state: "error", question: "why?", error: "quota exceeded" } },
     );
 
-    expect(state.btw).toEqual({ question: "why?", answer: null, error: "pi is not running", pending: false });
+    expect(state.btw).toEqual({ question: "why?", answer: "partial", error: "quota exceeded", pending: false });
+  });
+
+  it("accepts /btw deltas for a question it did not seed locally", () => {
+    const state = apply(
+      initialState,
+      { kind: "inbound", message: { type: "btw", state: "delta", question: "external", delta: "hi" } },
+    );
+
+    expect(state.btw).toEqual({ question: "external", answer: "hi", error: null, pending: true });
   });
 
   it("fills a missing /btw answer with null and keeps pending until the host replies", () => {
