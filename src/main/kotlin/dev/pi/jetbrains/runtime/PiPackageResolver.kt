@@ -20,12 +20,15 @@ sealed interface PiResolution {
  *
  * Order: explicit configuration, a copy bundled with the plugin, the managed
  * install created by the pi.dev curl installer, then the global npm root.
+ * When `npm` is not reachable through PATH (for example a stale IDE process
+ * environment), it is retried from the directory of the resolved node binary.
  * The CLI entry is `dist/bundle/cli.js` with a fallback to the unbundled `dist/cli.js`.
  */
 class PiPackageResolver(
     private val configuredEntry: Path? = null,
     private val bundledPackageDir: Path? = null,
     private val managedAgentDir: Path? = defaultManagedAgentDir(),
+    private val nodeExecutable: Path? = null,
     private val runner: CommandRunner = CommandRunner.Default,
 ) {
     fun resolve(): PiResolution {
@@ -46,7 +49,11 @@ class PiPackageResolver(
             attempts += "pi managed install $agentDir has no usable release"
         }
 
-        val npmRoot = runner.run(npmRootCommand())
+        var npmRoot: String? = null
+        for (command in npmRootCommands()) {
+            npmRoot = runner.run(command)
+            if (npmRoot != null) break
+        }
         if (npmRoot == null) {
             attempts += "'npm root -g' failed"
         } else {
@@ -58,12 +65,15 @@ class PiPackageResolver(
         return PiResolution.NotFound(attempts)
     }
 
-    private fun npmRootCommand(): List<String> =
-        if (System.getProperty("os.name").lowercase().contains("win")) {
-            listOf("npm.cmd", "root", "-g")
-        } else {
-            listOf("npm", "root", "-g")
+    private fun npmRootCommands(): List<List<String>> {
+        val windows = System.getProperty("os.name").lowercase().contains("win")
+        val npmBinary = if (windows) "npm.cmd" else "npm"
+        val commands = mutableListOf(listOf(npmBinary, "root", "-g"))
+        nodeExecutable?.parent?.let { nodeDir ->
+            commands += listOf(nodeDir.resolve(npmBinary).toString(), "root", "-g")
         }
+        return commands.distinct()
+    }
 
     private fun fromEntry(entry: Path, origin: String): PiResolution.Found? {
         if (!Files.isRegularFile(entry)) return null

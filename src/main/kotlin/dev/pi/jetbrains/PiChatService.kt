@@ -195,7 +195,7 @@ class PiChatService(private val project: Project) : Disposable {
                 is NodeResolution.Found -> node
             }
 
-            val installation = when (val pi = PiPackageResolver().resolve()) {
+            val installation = when (val pi = PiPackageResolver(nodeExecutable = nodeRuntime.executable).resolve()) {
                 is PiResolution.NotFound -> return@launch fail(
                     "pi coding agent not found: ${pi.attempts.joinToString("; ")}",
                 )

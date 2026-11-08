@@ -171,6 +171,46 @@ class PiPackageResolverTest {
     }
 
     @Test
+    fun `falls back to the npm next to the resolved node when PATH npm fails`() {
+        val npmRoot = tempDir.resolve("npm-root")
+        val packageDir = fakePackage(npmRoot.resolve(PiPackageResolver.PACKAGE_PATH), "1.2.3")
+        val nodeDir = tempDir.resolve("nodejs")
+        Files.createDirectories(nodeDir)
+        val nodeBinary = nodeDir.resolve("node.exe")
+
+        val result = PiPackageResolver(
+            managedAgentDir = tempDir.resolve("managed"),
+            nodeExecutable = nodeBinary,
+            runner = { command ->
+                // PATH-based npm (no parent directory) is unreachable; the node-sibling
+                // npm is invoked by absolute path.
+                if (command.first().contains("nodejs")) npmRoot.toString() else null
+            },
+        ).resolve()
+
+        assertTrue(result is PiResolution.Found, "expected found, got $result")
+        result as PiResolution.Found
+        assertEquals(packageDir.resolve("dist/bundle/cli.js"), result.cliEntry)
+        assertEquals("npm global", result.origin)
+    }
+
+    @Test
+    fun `reports failure when both PATH npm and node-sibling npm fail`() {
+        val nodeDir = tempDir.resolve("nodejs")
+        Files.createDirectories(nodeDir)
+
+        val result = PiPackageResolver(
+            managedAgentDir = tempDir.resolve("managed"),
+            nodeExecutable = nodeDir.resolve("node.exe"),
+            runner = { null },
+        ).resolve()
+
+        assertTrue(result is PiResolution.NotFound, "expected not-found, got $result")
+        val attempts = (result as PiResolution.NotFound).attempts
+        assertTrue(attempts.any { it.contains("npm root -g") }, attempts.toString())
+    }
+
+    @Test
     fun `reports every failed lookup`() {
         val result = PiPackageResolver(
             configuredEntry = tempDir.resolve("missing.js"),
