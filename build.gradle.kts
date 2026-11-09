@@ -90,12 +90,26 @@ intellijPlatform {
         """.trimIndent()
 
         changeNotes = """
-            <h2>What's New in 0.3.0</h2>
+            <h2>What's New in 0.4.0</h2>
             <h3>Features</h3>
             <ul>
-              <li>New <code>/btw</code> side questions: type <code>/btw &lt;question&gt;</code> any time, even while the main task is running. The question runs as a one-off, tool-free answer against a temporary copy of the current session, so the main session history stays untouched. The answer shows in a closable overlay and does not enter the main transcript; typing <code>/btw</code> alone reopens the last side question.</li>
-              <li>Streaming answers in the <code>/btw</code> overlay: answers stream in live with the same thinking indicator as the main chat. The overlay slides in from the right edge and can be collapsed to a slim <code>/btw</code> handle on the edge; incoming answers auto-expand it, and Esc first expands, then closes it.</li>
-              <li>Support pi.dev managed installs: pi installed by the pi.dev curl script (under <code>~/.pi/agent/install/releases/</code>) is now detected, including the installer's bundled standalone Node when no Node is available on the PATH.</li>
+              <li><b>Steering and follow-up messages while streaming:</b> the composer no longer locks up while pi is answering a prompt. <code>Enter</code> queues the message as <b>steering</b> (pi receives it after the current tool call, before the next model call) and <code>Alt+Enter</code> queues it as a <b>follow-up</b> (pi processes it after the current run), matching the pi TUI. Pending messages are listed above the composer and disappear as pi delivers them.</li>
+              <li><b>Edit queued messages:</b> click <b>Edit</b> on the queue bar or press <code>Alt+Up</code> in the composer to pull pending steering and follow-up messages back in, like the pi TUI <code>dequeue</code> action. Each message gets its own inline editor with its steering/follow-up label, can be removed individually, re-queued with <b>Send all</b>, or restored untouched with <b>Cancel</b>.</li>
+              <li>The user-message navigation outline now shows a slim scrollbar when you hover or focus it, so long conversations are visibly scrollable.</li>
+            </ul>
+            <h3>Fixes</h3>
+            <ul>
+              <li>Stopping a run now clears the pending queue before aborting, matching the pi TUI <code>Esc</code> behavior: queued steering and follow-up messages are handed back to the editor instead of being silently drained after the abort.</li>
+              <li><b>Send all</b> re-queues messages one at a time: the first message starts a run and the rest return to their own steering/follow-up queues once pi starts streaming, instead of being merged into a single prompt.</li>
+              <li>User messages queued within the same millisecond no longer vanish from the WebView after re-queueing.</li>
+              <li>Renaming a session that is not the active one no longer breaks its message chain, which previously left the history empty when the session was opened.</li>
+              <li>The session tree no longer stays empty when a very long session is opened for the first time.</li>
+              <li>Literal <code>&lt;thinking&gt;</code> tags inside Markdown code are shown as written instead of being parsed as reasoning blocks.</li>
+              <li>pi installed through npm is detected even when <code>npm root -g</code> fails on the IDE's stale <code>PATH</code>, by falling back to the npm next to the resolved Node.js binary.</li>
+            </ul>
+            <h3>Maintenance</h3>
+            <ul>
+              <li>RPC protocol snapshot refreshed against pi v0.80.2.</li>
             </ul>
 
         """.trimIndent()
