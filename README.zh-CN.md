@@ -1,5 +1,7 @@
 # Pi JetBrains GUI
 
+> 🌏 本文档同时提供 [English (英文)](./README.md) 版本。
+
 在 JetBrains 系列 IDE（IntelliJ IDEA、PyCharm 等）中使用 [pi](https://github.com/badlogic/pi-mono) coding agent 的图形界面插件。
 插件通过 `pi --mode rpc` 启动本地子进程，并在 IDE 的 Pi 工具窗口中显示对话、工具调用和 diff。
 
@@ -77,6 +79,8 @@ Windows 本机构建成功后，还会自动为 `%APPDATA%/JetBrains/` 下已有
 会话列表支持新建、切换、重命名、删除和 fork；切换一个已在其他标签页打开的会话时，会直接跳转到那个标签页，而不会重复加载。删除当前会话前，插件会先切换到新的会话，避免 pi 继续写入待删除的文件。模型选择器会把选中的默认模型同步到 pi 的用户设置；会话级切换仍由当前会话控制。模型选择器右下角的 **＋** 可以打开“新增模型”表单，把自定义 provider / 模型追加到 `~/.pi/agent/models.json`：已有 provider 只会在其 `models` 列表后面追加新模型，不会改写 `apiKey`、`baseUrl` 等原有字段，重复的模型 id 会被拒绝。保存后 pi 会自动重启以加载新模型。
 
 在会话区域按 `Ctrl+F` 可打开消息搜索栏，支持在用户消息和助手回复的文本中查找关键字，并可切换区分大小写、全字匹配和正则表达式三种匹配模式；`Enter` / `Shift+Enter` 跳转上/下一个匹配，`Esc` 或关闭按钮退出搜索，当前匹配所在的消息会高亮显示。
+
+pi 正在流式回复时，你仍可在输入框继续输入：`Enter` 会把消息作为 **steering** 入队（pi 在当前工具调用结束、下一次模型调用之前收到），`Alt+Enter` 则作为 **follow-up** 入队（pi 在本次运行结束后处理）——与 pi TUI 的行为一致。待发送的 steering 与 follow-up 消息会列在输入框上方，直到 pi 取出为止。点击该列表上的 **Edit**（或在输入框中按 `Alt+Up`）即可像 pi TUI 的 dequeue 那样逐条编辑队列中的消息：每条消息各自打开一个编辑器并可单独删除，**Send all** 会重新入队这些消息——首条启动一次运行，其余在 pi 进入流式状态后按原有的 steering/follow-up 类型回到各自队列，因此不会被合并进同一次运行。**Cancel** 恢复未修改的队列。停止运行等同于 pi TUI 的 `Esc`：待发送的 steering/follow-up 消息会先被清空并交回编辑列表，然后才发送中止请求，因此停止不会静默丢弃这些消息（否则 pi 会在 abort 之后继续 drain 队列）。
 
 ### 设置和快捷键
 
