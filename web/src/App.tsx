@@ -363,26 +363,28 @@ export function App(): JSX.Element {
       />
       {(state.steeringQueue.length > 0 || state.followUpQueue.length > 0) && (
         <div className="message-queue" role="status" aria-label="Queued messages">
+          <div className="message-queue-items">
+            {state.steeringQueue.map((text, index) => (
+              <div className="message-queue-row" key={`steering:${index}`}>
+                <span className="message-queue-label">steering</span>
+                <span className="message-queue-text">{text}</span>
+              </div>
+            ))}
+            {state.followUpQueue.map((text, index) => (
+              <div className="message-queue-row" key={`follow-up:${index}`}>
+                <span className="message-queue-label">follow-up</span>
+                <span className="message-queue-text">{text}</span>
+              </div>
+            ))}
+          </div>
           <button
             type="button"
             className="message-queue-edit"
             onClick={editQueued}
             title="Restore queued messages to the composer for editing (Alt+Up)"
           >
-            Edit
+            ✎ Edit
           </button>
-          {state.steeringQueue.map((text, index) => (
-            <div className="message-queue-row" key={`steering:${index}`}>
-              <span className="message-queue-label">steering</span>
-              <span className="message-queue-text">{text}</span>
-            </div>
-          ))}
-          {state.followUpQueue.map((text, index) => (
-            <div className="message-queue-row" key={`follow-up:${index}`}>
-              <span className="message-queue-label">follow-up</span>
-              <span className="message-queue-text">{text}</span>
-            </div>
-          ))}
         </div>
       )}
       <Composer

@@ -552,8 +552,8 @@ describe("App", () => {
     const input = (await screen.findByRole("textbox", { name: "Message to pi" })) as HTMLTextAreaElement;
     expect(await screen.findByRole("status", { name: "Queued messages" })).toBeDefined();
 
-    // The Edit button on the queue bar clears pi's queues.
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    // The Edit action on the queue bar clears pi's queues.
+    fireEvent.click(screen.getByRole("button", { name: "✎ Edit" }));
     await waitFor(() =>
       expect(window.__piSent?.filter((message) => message.type === "clear_queue")).toEqual([
         { type: "clear_queue" },

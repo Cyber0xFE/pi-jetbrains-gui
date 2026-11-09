@@ -2111,19 +2111,26 @@ mark.search-hit {
 .message-queue {
   flex: 0 0 auto;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 8px;
   padding: 5px 10px;
   border-top: 1px solid var(--border);
   font-size: 0.86em;
 }
 
+.message-queue-items {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .message-queue-edit {
-  align-self: flex-end;
-  padding: 1px 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg-raised);
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  background: transparent;
   color: var(--fg-dim);
   font-size: 0.9em;
   cursor: pointer;
@@ -2131,8 +2138,7 @@ mark.search-hit {
 
 .message-queue-edit:hover,
 .message-queue-edit:focus-visible {
-  color: var(--fg);
-  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .message-queue-row {
