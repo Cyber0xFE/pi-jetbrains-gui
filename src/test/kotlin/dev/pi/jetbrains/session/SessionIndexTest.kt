@@ -98,6 +98,89 @@ class SessionIndexTest {
         assertTrue(listed.isEmpty(), "expected the headerless file to be skipped: $listed")
     }
 
+    @Test
+    fun `recovers the latest name from the tail when the scan budget cuts a file short`() {
+        val project = Files.createDirectories(tempDir.resolve("project"))
+        val agentDir = Files.createDirectories(tempDir.resolve("agent"))
+        val sessions = Files.createDirectories(
+            agentDir.resolve("sessions").resolve(SessionIndex.safeDirName(project)),
+        )
+        val big = sessions.resolve("big.jsonl")
+        val filler = "x".repeat(400)
+        writeSession(
+            big,
+            id = "big",
+            cwd = project.toString(),
+            messages = listOf(
+                userLine("m1", ts = 1_000, "first question $filler"),
+                assistantLine("m2", ts = 2_000, "answer $filler"),
+                sessionInfoLine("m3", ts = 3_000, "early name"),
+                userLine("m4", ts = 4_000, "second question $filler"),
+            ),
+        )
+        // Appended after the budget cutoff, like an out-of-band rename does.
+        Files.writeString(
+            big,
+            sessionInfoLine("m5", ts = 5_000, "renamed after the fact") + "\n",
+            java.nio.file.StandardOpenOption.APPEND,
+        )
+
+        val summary = SessionIndex.read(big, maxBytesPerFile = 1_000)
+
+        assertEquals("renamed after the fact", summary?.name)
+        assertEquals("big", summary?.id)
+    }
+
+    @Test
+    fun `leafEntryId returns the last entry id`() {
+        val file = tempDir.resolve("chained.jsonl")
+        Files.writeString(
+            file,
+            listOf(
+                "{\"type\":\"session\",\"version\":3,\"id\":\"s1\",\"timestamp\":\"2025-10-30T00:00:00.000Z\",\"cwd\":\"D:\\\\workspace\\\\demo\"}",
+                "{\"type\":\"message\",\"id\":\"e1\",\"parentId\":null,\"timestamp\":\"2025-10-30T00:00:01.000Z\",\"message\":{\"role\":\"user\",\"content\":\"hi\"}}",
+                "{\"type\":\"message\",\"id\":\"e2\",\"parentId\":\"e1\",\"timestamp\":\"2025-10-30T00:00:02.000Z\",\"message\":{\"role\":\"assistant\",\"content\":\"hello\"}}",
+            ).joinToString("\n", postfix = "\n"),
+        )
+
+        assertEquals("e2", SessionIndex.leafEntryId(file))
+    }
+
+    @Test
+    fun `leafEntryId skips broken rename roots written with a null parent`() {
+        val file = tempDir.resolve("damaged.jsonl")
+        Files.writeString(
+            file,
+            listOf(
+                "{\"type\":\"session\",\"version\":3,\"id\":\"s1\",\"timestamp\":\"2025-10-30T00:00:00.000Z\",\"cwd\":\"D:\\\\workspace\\\\demo\"}",
+                "{\"type\":\"message\",\"id\":\"e1\",\"parentId\":null,\"timestamp\":\"2025-10-30T00:00:01.000Z\",\"message\":{\"role\":\"user\",\"content\":\"hi\"}}",
+                "{\"type\":\"message\",\"id\":\"e2\",\"parentId\":\"e1\",\"timestamp\":\"2025-10-30T00:00:02.000Z\",\"message\":{\"role\":\"assistant\",\"content\":\"hello\"}}",
+                // Records appended by the pre-fix rename implementation.
+                "{\"type\":\"session_info\",\"id\":\"uuid-1\",\"parentId\":null,\"timestamp\":\"2025-10-30T00:00:03.000Z\",\"name\":\"broken\"}",
+                "{\"type\":\"session_info\",\"id\":\"uuid-2\",\"parentId\":null,\"timestamp\":\"2025-10-30T00:00:04.000Z\",\"name\":\"broken again\"}",
+            ).joinToString("\n", postfix = "\n"),
+        )
+
+        assertEquals("e2", SessionIndex.leafEntryId(file))
+    }
+
+    @Test
+    fun `leafEntryId keeps the first root entry and follows later branches`() {
+        val file = tempDir.resolve("reedit.jsonl")
+        Files.writeString(
+            file,
+            listOf(
+                "{\"type\":\"session\",\"version\":3,\"id\":\"s1\",\"timestamp\":\"2025-10-30T00:00:00.000Z\",\"cwd\":\"D:\\\\workspace\\\\demo\"}",
+                "{\"type\":\"message\",\"id\":\"e1\",\"parentId\":null,\"timestamp\":\"2025-10-30T00:00:01.000Z\",\"message\":{\"role\":\"user\",\"content\":\"hi\"}}",
+                "{\"type\":\"message\",\"id\":\"e2\",\"parentId\":\"e1\",\"timestamp\":\"2025-10-30T00:00:02.000Z\",\"message\":{\"role\":\"assistant\",\"content\":\"hello\"}}",
+                // pi creates a new root when the user re-edits the first message.
+                "{\"type\":\"message\",\"id\":\"e3\",\"parentId\":null,\"timestamp\":\"2025-10-30T00:00:03.000Z\",\"message\":{\"role\":\"user\",\"content\":\"hi again\"}}",
+            ).joinToString("\n", postfix = "\n"),
+        )
+
+        assertEquals("e3", SessionIndex.leafEntryId(file))
+    }
+
     private fun writeSession(file: Path, id: String, cwd: String, messages: List<String>) {
         val header =
             "{\"type\":\"session\",\"version\":3,\"id\":\"$id\",\"timestamp\":\"2025-10-30T00:00:00.000Z\",\"cwd\":\"${cwd.replace("\\", "\\\\")}\"}"

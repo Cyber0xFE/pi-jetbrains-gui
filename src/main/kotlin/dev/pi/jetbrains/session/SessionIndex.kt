@@ -1,6 +1,7 @@
 package dev.pi.jetbrains.session
 
 import dev.pi.jetbrains.rpc.PiJson
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -35,6 +36,9 @@ data class SessionSummary(
 object SessionIndex {
     /** pi's header scan limit; we use a larger budget because the name/message count need more lines. */
     const val MAX_SCAN_BYTES_PER_FILE: Long = 4L * 1024 * 1024
+
+    /** Tail window re-read when the scan budget cuts a file short; `session_info` appends land here. */
+    private const val TAIL_SCAN_BYTES: Long = 256L * 1024
 
     private const val ENV_AGENT_DIR = "PI_CODING_AGENT_DIR"
     private const val ENV_SESSION_DIR = "PI_CODING_AGENT_SESSION_DIR"
@@ -154,7 +158,12 @@ object SessionIndex {
                 if (entryTime != null && (previous == null || entryTime > previous)) {
                     lastActivity = entryTime
                 }
-                if (consumed >= maxBytesPerFile) break
+                if (consumed >= maxBytesPerFile) {
+                    // Rename records are always appended at the end of the file, so a truncated
+                    // scan can miss the latest name; recover it from the tail (last wins).
+                    runCatching { tailName(file) }.getOrNull()?.let { name = it }
+                    break
+                }
             }
         }
 
@@ -172,6 +181,57 @@ object SessionIndex {
         )
         synchronized(cacheLock) { cache[absoluteFile] = CachedSummary(stamp, summary) }
         return summary
+    }
+
+    /**
+     * Returns the id of the entry pi treats as the session's leaf when the file is loaded;
+     * session-manager's `_buildIndex` picks the last entry in the file.
+     *
+     * Older plugin versions appended rename records with `parentId: null`, which starts a new root
+     * and truncates the parent chain pi walks to rebuild the transcript (an empty history on open).
+     * Those entries are skipped so callers can chain onto the last intact entry and repair the file.
+     */
+    fun leafEntryId(file: Path): String? {
+        var firstEntry = true
+        var leaf: String? = null
+        Files.newBufferedReader(file, Charsets.UTF_8).use { reader ->
+            while (true) {
+                val line = reader.readLine() ?: break
+                if (line.isBlank()) continue
+                val entry = try {
+                    PiJson.parseToJsonElement(line) as? JsonObject
+                } catch (_: Throwable) {
+                    null
+                } ?: continue
+                val type = entry.string("type") ?: continue
+                if (type == "session") continue
+                val entryId = entry.string("id")?.takeIf { it.isNotBlank() } ?: continue
+                val brokenRenameRoot = type == "session_info" && !firstEntry && entry["parentId"] is JsonNull
+                if (!brokenRenameRoot) leaf = entryId
+                firstEntry = false
+            }
+        }
+        return leaf
+    }
+
+    /** Latest `session_info` name in the last [TAIL_SCAN_BYTES] of [file], or null when absent. */
+    private fun tailName(file: Path): String? {
+        val size = Files.size(file)
+        val start = (size - TAIL_SCAN_BYTES).coerceAtLeast(0)
+        java.io.RandomAccessFile(file.toFile(), "r").use { raf ->
+            raf.seek(start)
+            val bytes = ByteArray((size - start).toInt())
+            raf.readFully(bytes)
+            var name: String? = null
+            for (line in String(bytes, Charsets.UTF_8).lineSequence()) {
+                if (line.isBlank()) continue
+                val entry = PiJson.parseToJsonElement(line) as? JsonObject ?: continue
+                if (entry.string("type") == "session_info") {
+                    name = entry.string("name")?.trim()
+                }
+            }
+            return name
+        }
     }
 
     private fun userText(entry: JsonObject): String? {

@@ -527,18 +527,23 @@ class PiChatService(private val project: Project) : Disposable {
     /**
      * Renames a session that is not currently loaded by pi. The RPC command only targets the
      * active session, so inactive sessions receive the same append-only `session_info` record that
-     * pi writes for an active rename.
+     * pi writes for an active rename. The record must chain onto the session's current leaf: pi
+     * rebuilds the transcript by walking parents from the last entry of the file, so a `null`
+     * parent would hide the whole history on the next load.
      */
     fun renameSessionFile(sessionPath: String, name: String): Boolean {
         val file = runCatching { Paths.get(sessionPath) }.getOrNull() ?: return false
         if (!Files.isRegularFile(file)) return false
+        val sanitizedName = name.replace(Regex("[\\r\\n]+"), " ").trim()
+        if (sanitizedName.isEmpty()) return false
+        val parentId = runCatching { SessionIndex.leafEntryId(file) }.getOrNull()
         val record = JsonObject(
             mapOf(
                 "type" to JsonPrimitive("session_info"),
                 "id" to JsonPrimitive(java.util.UUID.randomUUID().toString()),
-                "parentId" to kotlinx.serialization.json.JsonNull,
+                "parentId" to (parentId?.let(::JsonPrimitive) ?: kotlinx.serialization.json.JsonNull),
                 "timestamp" to JsonPrimitive(java.time.Instant.now().toString()),
-                "name" to JsonPrimitive(name),
+                "name" to JsonPrimitive(sanitizedName),
             ),
         )
         return runCatching {
