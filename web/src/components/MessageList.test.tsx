@@ -230,6 +230,29 @@ it("shows the thinking status icon, streaming ellipsis and completed duration", 
   expect(view.container.querySelectorAll(".thinking-ellipsis")).toHaveLength(1);
 });
 
+it("renders a text block quoting `<thinking>` in inline code without recursing", () => {
+  const view = render(
+    <MessageList
+      messages={[{
+        id: "quoted-tag-message",
+        role: "assistant",
+        blocks: [{ kind: "text", text: "把 provider 输出的 `<thinking>` 标签文本拆成块。" }],
+        timestamp: 1,
+        streaming: false,
+      }]}
+      tools={{}}
+      loadingHistory={false}
+      emptyHint=""
+      thinkingLabel={null}
+      connecting={false}
+    />,
+  );
+
+  // Must not blow up or hang; the literal tag stays visible as inline code.
+  expect(view.container.textContent).toContain("把 provider 输出的");
+  expect(view.container.querySelectorAll("details.thinking")).toHaveLength(0);
+});
+
 it.each([
   {
     name: "tagged thinking with a closing tag split across chunks",

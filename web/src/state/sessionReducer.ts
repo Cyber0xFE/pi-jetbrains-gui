@@ -824,8 +824,58 @@ function toRole(role: string): ChatMessage["role"] {
   return "system";
 }
 
+/**
+ * Ranges of the text that are markdown code (fenced blocks or inline code spans).
+ * A literal `<thinking>` tag inside code is quoted content, not a block boundary.
+ */
+function codeRanges(text: string): Array<[number, number]> {
+  const ranges: Array<[number, number]> = [];
+  // Fenced code blocks; an unterminated fence runs to the end of the text.
+  const fencePattern = /(?:^|\n)[ \t]*(?:```|~~~)/g;
+  let open: RegExpExecArray | null = null;
+  let match: RegExpExecArray | null;
+  while ((match = fencePattern.exec(text)) !== null) {
+    if (open === null) {
+      open = match;
+    } else {
+      ranges.push([open.index, match.index + match[0].length]);
+      open = null;
+    }
+  }
+  if (open !== null) ranges.push([open.index, text.length]);
+
+  // Inline code spans outside fences.
+  const inlinePattern = /`[^`\n]*`/g;
+  while ((match = inlinePattern.exec(text)) !== null) {
+    const found = match;
+    if (!ranges.some(([start, end]) => found.index >= start && found.index < end)) {
+      ranges.push([found.index, found.index + found[0].length]);
+    }
+  }
+  return ranges;
+}
+
+function inCodeRange(ranges: Array<[number, number]>, index: number): boolean {
+  return ranges.some(([start, end]) => index >= start && index < end);
+}
+
+/** Removes thinking tags outside markdown code regions, keeping quoted literal tags intact. */
+function removeThinkingTags(text: string): string {
+  const tagPattern = /<\/?thinking\b[^>]*>/gi;
+  const code = codeRanges(text);
+  let result = "";
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+  while ((match = tagPattern.exec(text)) !== null) {
+    if (inCodeRange(code, match.index)) continue;
+    result += text.slice(cursor, match.index);
+    cursor = match.index + match[0].length;
+  }
+  return result + text.slice(cursor);
+}
+
 export function stripThinkingTags(text: string): string {
-  return text.replace(/<\/?thinking\b[^>]*>/gi, "");
+  return removeThinkingTags(text);
 }
 
 /** Converts provider-emitted XML thinking tags into the same blocks as native reasoning output. */
@@ -838,12 +888,14 @@ export function normalizeTaggedBlocks(blocks: Block[]): Block[] {
 
 function splitTaggedText(text: string): Block[] {
   const tagPattern = /<thinking\b[^>]*>|<\/thinking\s*>/gi;
+  const code = codeRanges(text);
   const blocks: Block[] = [];
   let cursor = 0;
   let thinking = false;
   let match: RegExpExecArray | null;
 
   while ((match = tagPattern.exec(text)) !== null) {
+    if (inCodeRange(code, match.index)) continue;
     const segment = text.slice(cursor, match.index);
     if (segment.length > 0) {
       blocks.push(thinking ? { kind: "thinking", text: segment, completed: true } : { kind: "text", text: segment });

@@ -276,6 +276,83 @@ describe("sessionReducer", () => {
     ]);
   });
 
+  it("keeps literal thinking tags quoted in inline code as plain text", () => {
+    const state = apply(initialState, {
+      kind: "inbound",
+      message: {
+        type: "history",
+        final: true,
+        messages: [
+          {
+            role: "assistant",
+            timestamp: 2,
+            content: [{ type: "text", text: "把 provider 输出的 `<thinking>` 标签文本拆成块。" }],
+          },
+        ],
+      },
+    });
+
+    expect(state.messages[0]?.blocks).toEqual([
+      { kind: "text", text: "把 provider 输出的 `<thinking>` 标签文本拆成块。" },
+    ]);
+  });
+
+  it("keeps literal thinking tags inside fenced code as plain text", () => {
+    const state = apply(initialState, {
+      kind: "inbound",
+      message: {
+        type: "history",
+        final: true,
+        messages: [
+          {
+            role: "assistant",
+            timestamp: 2,
+            content: [{ type: "text", text: "Example:\n\n```xml\n<thinking>reasoning</thinking>\n```\n\nDone" }],
+          },
+        ],
+      },
+    });
+
+    expect(state.messages[0]?.blocks).toEqual([
+      { kind: "text", text: "Example:\n\n```xml\n<thinking>reasoning</thinking>\n```\n\nDone" },
+    ]);
+  });
+
+  it("still splits real thinking tags when quoted tags appear later in the answer", () => {
+    const state = apply(initialState, {
+      kind: "inbound",
+      message: {
+        type: "history",
+        final: true,
+        messages: [
+          {
+            role: "assistant",
+            timestamp: 2,
+            content: [{ type: "text", text: "<thinking>Reasoning</thinking>\n\nAnswer with `<thinking>` quote." }],
+          },
+        ],
+      },
+    });
+
+    expect(state.messages[0]?.blocks).toEqual([
+      { kind: "thinking", text: "Reasoning", completed: true },
+      { kind: "text", text: "\n\nAnswer with `<thinking>` quote." },
+    ]);
+  });
+
+  it("preserves thinking tags quoted in inline code within thinking content", () => {
+    const state = apply(
+      initialState,
+      records(
+        assistantStart(),
+        update({ type: "thinking_start", contentIndex: 0 }),
+        update({ type: "thinking_delta", contentIndex: 0, delta: "Use `<thinking>` wrapper" }),
+      ),
+    );
+
+    expect(state.messages[0]?.blocks).toEqual([{ kind: "thinking", text: "Use `<thinking>` wrapper" }]);
+  });
+
   it("keeps tool details and the full-output path from the result", () => {
     const state = apply(
       initialState,

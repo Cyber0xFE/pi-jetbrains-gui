@@ -934,9 +934,16 @@ function BlockView({ block, fileReferences, tools, streaming, thinkingLabel, dur
       if (!/<\/?thinking\b/i.test(block.text)) {
         return <Markdown text={block.text} streaming={streaming} fileReferences={fileReferences} userText={userText} searchHighlight={searchHighlight} />;
       }
+      const nested = normalizeTaggedBlocks([block]);
+      // Literal tags inside markdown code are preserved by the splitter; if nothing was
+      // actually split, render as markdown to avoid recursing on the same text forever.
+      const [first] = nested;
+      if (nested.length === 1 && first && first.kind === "text" && first.text === block.text) {
+        return <Markdown text={block.text} streaming={streaming} fileReferences={fileReferences} userText={userText} searchHighlight={searchHighlight} />;
+      }
       return (
         <>
-          {normalizeTaggedBlocks([block]).map((nestedBlock, index) => (
+          {nested.map((nestedBlock, index) => (
             <BlockView
               key={index}
               block={nestedBlock}
