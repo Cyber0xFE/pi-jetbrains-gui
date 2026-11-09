@@ -604,14 +604,14 @@ describe("App", () => {
 
     // The host returns the cleared queues: one editor per message, no merging into the draft.
     deliver({ type: "dequeue", steering: ["first", "second"], followUp: ["third"] });
-    const editors = await screen.findAllByRole("textbox", { name: /Queued (steering|followUp) message/ });
+    const editors = await screen.findAllByRole("textbox", { name: /Queued (steering|follow-up) message/ });
     expect(editors.map((editor) => (editor as HTMLTextAreaElement).value)).toEqual(["first", "second", "third"]);
     expect(input.value).toBe("");
 
     // Editing one message keeps the others intact.
     fireEvent.change(editors[1] as HTMLTextAreaElement, { target: { value: "second (edited)" } });
-    fireEvent.click(screen.getByRole("button", { name: "Remove queued followUp message 3" }));
-    expect(screen.getAllByRole("textbox", { name: /Queued (steering|followUp) message/ })).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "Remove queued follow-up message 3" }));
+    expect(screen.getAllByRole("textbox", { name: /Queued (steering|follow-up) message/ })).toHaveLength(2);
 
     // Send all hands the messages to the host, which posts them one by one so the first starts a
     // run and the rest are queued instead of being merged into it.

@@ -28,6 +28,11 @@ interface QueuedEntry {
  * Re-posts the queue editor's messages. The host sends them one by one and waits for pi to start
  * streaming in between, so they are queued instead of merging into a single run.
  */
+/** Editor label for a queued message; matches the wording of the queue bar. */
+function queueKindLabel(kind: QueuedEntry["kind"]): string {
+  return kind === "steering" ? "steering" : "follow-up";
+}
+
 function repostQueue(entries: QueuedEntry[]): void {
   const queued = entries
     .map((entry) => ({ text: entry.text.trim(), kind: entry.kind }))
@@ -413,26 +418,46 @@ export function App(): JSX.Element {
       />
       {queueEdit !== null ? (
         <div className="message-queue message-queue-editing" role="dialog" aria-label="Edit queued messages">
-          {queueEdit.map((entry, index) => (
-            <div className="message-queue-editor-row" key={`${entry.kind}:${index}`}>
-              <span className="message-queue-label">{entry.kind}</span>
-              <textarea
-                className="message-queue-editor-input"
-                aria-label={`Queued ${entry.kind} message ${index + 1}`}
-                value={entry.text}
-                rows={2}
-                onChange={(event) => changeQueuedMessage(index, event.target.value)}
-              />
-              <button
-                type="button"
-                className="message-queue-remove"
-                onClick={() => removeQueuedMessage(index)}
-                aria-label={`Remove queued ${entry.kind} message ${index + 1}`}
-              >
-                ×
-              </button>
-            </div>
-          ))}
+          {queueEdit.map((entry, index) => {
+            const label = queueKindLabel(entry.kind);
+            return (
+              <div className="message-queue-editor-row" key={`${entry.kind}:${index}`}>
+                <span className="message-queue-editor-kind">{label}</span>
+                <textarea
+                  className="message-queue-editor-input"
+                  aria-label={`Queued ${label} message ${index + 1}`}
+                  value={entry.text}
+                  rows={2}
+                  onChange={(event) => changeQueuedMessage(index, event.target.value)}
+                />
+                <button
+                  type="button"
+                  className="message-queue-remove"
+                  onClick={() => removeQueuedMessage(index)}
+                  title="Remove"
+                  aria-label={`Remove queued ${label} message ${index + 1}`}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="15"
+                    height="15"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <path d="M4 7h16" />
+                    <path d="M18 7v12.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 19.5V7" />
+                    <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                    <path d="M10 11v5M14 11v5" />
+                  </svg>
+                </button>
+              </div>
+            );
+          })}
           <div className="message-queue-editor-actions">
             <button type="button" className="message-queue-action" onClick={cancelQueueEdit}>
               Cancel

@@ -2144,36 +2144,62 @@ mark.search-hit {
 .message-queue-editing {
   flex-direction: column;
   align-items: stretch;
-  gap: 4px;
+  gap: 6px;
+  padding: 8px 10px 6px;
+  background: var(--bg-soft);
+  /* The queue bar uses a smaller size for secondary text; the editor is a primary input. */
+  font-size: var(--fs);
 }
 
 .message-queue-editor-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
+}
+
+/* Fixed label column keeps every text box on the same left edge. */
+.message-queue-editor-kind {
+  flex: 0 0 72px;
+  text-align: right;
+  font-size: calc(var(--fs) - 1px);
+  color: var(--fg-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .message-queue-editor-input {
   flex: 1;
   min-width: 0;
-  resize: vertical;
-  font: inherit;
+  min-height: 44px;
+  max-height: 120px;
+  resize: none;
+  font-family: inherit;
+  font-size: var(--fs);
+  line-height: 1.5;
   color: var(--fg);
-  background: var(--bg-raised);
+  background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  padding: 6px 9px;
+  outline: none;
 }
 
 .message-queue-editor-input:focus-visible {
-  outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 .message-queue-remove {
   flex: 0 0 auto;
-  padding: 0 2px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   border: none;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--fg-dim);
   cursor: pointer;
@@ -2181,31 +2207,45 @@ mark.search-hit {
 
 .message-queue-remove:hover,
 .message-queue-remove:focus-visible {
+  background: var(--error-bg);
   color: var(--error);
 }
 
 .message-queue-editor-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
+  /* Right inset equals the remove button (24px) plus its gap, so "Send all" lines up with
+     the text boxes instead of sticking out past them. */
+  gap: 8px;
+  padding: 2px 32px 0 0;
 }
 
 .message-queue-action {
-  padding: 0;
-  border: none;
-  background: transparent;
+  padding: 3px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
   color: var(--fg-dim);
-  font: inherit;
+  font-family: inherit;
+  font-size: calc(var(--fs) - 2px);
   cursor: pointer;
 }
 
 .message-queue-action:hover,
 .message-queue-action:focus-visible {
   color: var(--fg);
+  border-color: var(--accent);
 }
 
 .message-queue-action-primary {
   color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+@media (max-width: 420px) {
+  .message-queue-editor-kind {
+    flex-basis: 58px;
+  }
 }
 
 .message-queue-row {
