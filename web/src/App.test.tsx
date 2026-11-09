@@ -480,6 +480,64 @@ describe("App", () => {
     );
   });
 
+  it("steers and queues follow-ups while pi is streaming", async () => {
+    render(<App />);
+    await waitFor(() => expect(window.__piDeliver).toBeDefined());
+
+    deliver({
+      type: "status",
+      status: { phase: "running", message: "ready", model: "m", isStreaming: true },
+    });
+
+    const input = await screen.findByPlaceholderText(/Enter to steer/);
+
+    // Enter queues the message as steering.
+    fireEvent.change(input, { target: { value: "check the failing test" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() =>
+      expect(window.__piSent?.filter((message) => message.type === "prompt")).toEqual([
+        { type: "prompt", message: "check the failing test", streamingBehavior: "steer" },
+      ]),
+    );
+    expect((input as HTMLTextAreaElement).value).toBe("");
+
+    // The host confirms the queued steer immediately; the store coalesces submit + response
+    // into one rAF flush, so the composer re-enables without a visible disabled window.
+    deliver({
+      type: "records",
+      records: [{ type: "response", command: "prompt", success: true }],
+    });
+
+    // Alt+Enter queues a follow-up instead. Retry the key press while the coalesced flush is
+    // still in flight; once it commits, the composer accepts the follow-up.
+    fireEvent.change(input, { target: { value: "then run the suite" } });
+    await waitFor(() => {
+      fireEvent.keyDown(input, { key: "Enter", altKey: true });
+      expect(window.__piSent?.filter((message) => message.type === "prompt")).toHaveLength(2);
+    });
+    const prompts = window.__piSent?.filter((message) => message.type === "prompt") ?? [];
+    expect(prompts[1]).toEqual({
+      type: "prompt",
+      message: "then run the suite",
+      streamingBehavior: "followUp",
+    });
+
+    // The pending queues render above the composer until pi delivers them.
+    deliver({
+      type: "records",
+      records: [{ type: "queue_update", steering: ["check the failing test"], followUp: ["then run the suite"] }],
+    });
+    expect(await screen.findByRole("status", { name: "Queued messages" })).toBeDefined();
+    expect(screen.getByText("check the failing test")).toBeDefined();
+    expect(screen.getByText("then run the suite")).toBeDefined();
+
+    deliver({
+      type: "records",
+      records: [{ type: "queue_update", steering: [], followUp: [] }],
+    });
+    await waitFor(() => expect(screen.queryByRole("status", { name: "Queued messages" })).toBeNull());
+  });
+
   it("sends selected editor context when the message is empty", async () => {
     render(<App />);
     await waitFor(() => expect(window.__piDeliver).toBeDefined());

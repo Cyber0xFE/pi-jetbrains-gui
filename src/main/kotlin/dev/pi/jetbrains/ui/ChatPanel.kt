@@ -376,7 +376,8 @@ class ChatPanel(
                 val text = message.message.orEmpty()
                 if (text.isBlank() && message.images.isEmpty() && service.status.value.pendingContext == null) return
                 val images = message.images.map { RpcImage(data = it.data, mimeType = it.mimeType) }
-                scope.launch { request { service.prompt(text, images) } }
+                val behavior = message.streamingBehavior?.takeIf { it == "steer" || it == "followUp" }
+                scope.launch { request { service.prompt(text, images, behavior) } }
             }
             "abort" -> scope.launch { request { service.abort() } }
             "start" -> service.start()

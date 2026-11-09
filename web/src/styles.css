@@ -2108,6 +2108,37 @@ mark.search-hit {
   }
 }
 
+.message-queue {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 10px;
+  border-top: 1px solid var(--border);
+  font-size: 0.86em;
+}
+
+.message-queue-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.message-queue-label {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.message-queue-text {
+  flex: 1;
+  min-width: 0;
+  color: var(--fg-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .overlay {
   position: fixed;
   inset: 0;

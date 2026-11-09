@@ -161,41 +161,51 @@ export function App(): JSX.Element {
     post({ type: "get_tree" });
   }, [phase, state.status.sessionFile]);
 
-  const send = useCallback(() => {
-    const text = draft.trim();
-    if (text.length === 0 && images.length === 0 && !state.status.pendingContext) return;
-    // `/btw` keeps the main transcript untouched: bare `/btw` re-opens the last side question,
-    // otherwise the question goes to the host's print-mode runner, never to the session.
-    if (text === "/btw") {
-      setDraft("");
-      setBtwOpen(true);
-      return;
-    }
-    if (text.startsWith("/btw ")) {
-      const question = text.slice("/btw ".length).trim();
-      setDraft("");
-      if (question.length > 0) {
-        store.dispatch({ kind: "btwSend", question });
+  const send = useCallback(
+    (followUp = false) => {
+      const text = draft.trim();
+      if (text.length === 0 && images.length === 0 && !state.status.pendingContext) return;
+      // `/btw` keeps the main transcript untouched: bare `/btw` re-opens the last side question,
+      // otherwise the question goes to the host's print-mode runner, never to the session.
+      if (text === "/btw") {
+        setDraft("");
         setBtwOpen(true);
-        setBtwCollapsed(false);
-        post({ type: "btw", question });
+        return;
       }
-      return;
-    }
-    if (pendingPromptTimer.current !== null) window.clearTimeout(pendingPromptTimer.current);
-    pendingPromptStartedAt.current = Date.now();
-    setPendingPrompt(true);
-    setScrollToLatestRequest((current) => current + 1);
-    store.dispatch({ kind: "submit" });
-    setDraft("");
-    setImages([]);
-    // Let React paint the optimistic indicator before entering the native bridge. The bridge
-    // can synchronously start the request, which otherwise consumes this event before the
-    // browser gets a repaint opportunity.
-    window.requestAnimationFrame(() => {
-      post({ type: "prompt", message: text, images: images.length > 0 ? images : undefined });
-    });
-  }, [draft, images, state.status.pendingContext, store]);
+      if (text.startsWith("/btw ")) {
+        const question = text.slice("/btw ".length).trim();
+        setDraft("");
+        if (question.length > 0) {
+          store.dispatch({ kind: "btwSend", question });
+          setBtwOpen(true);
+          setBtwCollapsed(false);
+          post({ type: "btw", question });
+        }
+        return;
+      }
+      if (pendingPromptTimer.current !== null) window.clearTimeout(pendingPromptTimer.current);
+      pendingPromptStartedAt.current = Date.now();
+      setPendingPrompt(true);
+      setScrollToLatestRequest((current) => current + 1);
+      store.dispatch({ kind: "submit" });
+      setDraft("");
+      setImages([]);
+      // Like the pi TUI: while streaming, Enter steers and Alt+Enter queues a follow-up.
+      const streamingBehavior = state.status.isStreaming ? (followUp ? "followUp" : "steer") : undefined;
+      // Let React paint the optimistic indicator before entering the native bridge. The bridge
+      // can synchronously start the request, which otherwise consumes this event before the
+      // browser gets a repaint opportunity.
+      window.requestAnimationFrame(() => {
+        post({
+          type: "prompt",
+          message: text,
+          images: images.length > 0 ? images : undefined,
+          streamingBehavior,
+        });
+      });
+    },
+    [draft, images, state.status.pendingContext, state.status.isStreaming, store],
+  );
 
   const abort = useCallback(() => post({ type: "abort" }), []);
 
@@ -339,6 +349,22 @@ export function App(): JSX.Element {
         onSearchClose={() => setSearch((current) => ({ ...current, open: false }))}
         searchFocusRequest={searchFocusRequest}
       />
+      {(state.steeringQueue.length > 0 || state.followUpQueue.length > 0) && (
+        <div className="message-queue" role="status" aria-label="Queued messages">
+          {state.steeringQueue.map((text, index) => (
+            <div className="message-queue-row" key={`steering:${index}`}>
+              <span className="message-queue-label">steering</span>
+              <span className="message-queue-text">{text}</span>
+            </div>
+          ))}
+          {state.followUpQueue.map((text, index) => (
+            <div className="message-queue-row" key={`follow-up:${index}`}>
+              <span className="message-queue-label">follow-up</span>
+              <span className="message-queue-text">{text}</span>
+            </div>
+          ))}
+        </div>
+      )}
       <Composer
         value={draft}
         onChange={setDraft}
@@ -346,6 +372,7 @@ export function App(): JSX.Element {
         onSend={send}
         disabled={!ready || state.sending}
         busy={busy || Boolean(state.status.isStreaming || state.status.isCompacting)}
+        steering={Boolean(state.status.isStreaming)}
         commands={state.commands}
         files={state.files}
         onCompact={() => post({ type: "compact" })}

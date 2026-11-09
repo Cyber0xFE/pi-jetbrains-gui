@@ -80,6 +80,8 @@ The session list supports creating, switching, renaming, deleting, and forking s
 
 Press `Ctrl+F` in the session area to open the message search bar. It searches keywords in user messages and assistant replies, and supports toggling case sensitivity, whole-word matching, and regular expressions. `Enter` / `Shift+Enter` jump to the next/previous match, `Esc` or the close button exits search, and the message containing the current match is highlighted.
 
+While pi is streaming a reply, you can keep typing in the input box: `Enter` queues the message as **steering** (pi receives it after the current tool call finishes, before the next model call), and `Alt+Enter` queues it as a **follow-up** (pi processes it after the current run ends) — the same behavior as the pi TUI. Pending steering and follow-up messages are listed above the input box until pi delivers them.
+
 ### Settings and Keyboard Shortcuts
 
 In `Settings | Tools | Pi` you can configure the Node.js path, network proxy, chat font size (10–32px), accent color (customizes the Pi chat UI accent; emphasized elements such as user message bubbles follow it, and leaving it empty follows the IDE theme), diagnostic log directory, task-completion sound, and all Pi panel shortcuts. Default shortcuts:

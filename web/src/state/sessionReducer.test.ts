@@ -406,6 +406,51 @@ describe("sessionReducer", () => {
     expect(resetAgain.transcriptGeneration).toBe(state.transcriptGeneration + 1);
   });
 
+  it("tracks queued steering and follow-up messages from queue_update", () => {
+    let state = apply(
+      initialState,
+      records({ type: "queue_update", steering: ["first look at the tests"], followUp: [] }),
+    );
+    expect(state.steeringQueue).toEqual(["first look at the tests"]);
+    expect(state.followUpQueue).toEqual([]);
+
+    state = apply(
+      state,
+      records({ type: "queue_update", steering: [], followUp: ["run the full suite"] }),
+    );
+    expect(state.steeringQueue).toEqual([]);
+    expect(state.followUpQueue).toEqual(["run the full suite"]);
+
+    state = apply(
+      state,
+      records({ type: "queue_update", steering: ["a", "b"], followUp: ["c"] }),
+    );
+    expect(state.steeringQueue).toEqual(["a", "b"]);
+    expect(state.followUpQueue).toEqual(["c"]);
+  });
+
+  it("keeps the previous queues when queue_update omits a field", () => {
+    const state = apply(
+      initialState,
+      records({ type: "queue_update", steering: ["kept"], followUp: [] }),
+      records({ type: "queue_update" }),
+    );
+    expect(state.steeringQueue).toEqual(["kept"]);
+    expect(state.followUpQueue).toEqual([]);
+  });
+
+  it("clears queued steering and follow-up messages when the session changes", () => {
+    const populated = apply(
+      initialState,
+      records({ type: "queue_update", steering: ["old"], followUp: ["old too"] }),
+    );
+
+    const state = apply(populated, { kind: "inbound", message: { type: "reset", reason: "switch" } });
+
+    expect(state.steeringQueue).toEqual([]);
+    expect(state.followUpQueue).toEqual([]);
+  });
+
   it("stores sessions, tree, models, thinking levels and commands", () => {
     const state = apply(
       initialState,

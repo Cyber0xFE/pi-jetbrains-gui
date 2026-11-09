@@ -343,6 +343,8 @@ data class ClientMessage(
     val name: String? = null,
     /** `/btw` side question text. */
     val question: String? = null,
+    /** Queue behavior for `prompt` while pi is streaming: `steer` or `followUp`. */
+    val streamingBehavior: String? = null,
     /** Clipboard/editor images sent with a prompt; also used by `copy_image` requests. */
     val images: List<ClientImage> = emptyList(),
 )

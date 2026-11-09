@@ -245,7 +245,7 @@ export type Inbound =
 export type Outbound =
   | { type: "ready" }
   | { type: "start" }
-  | { type: "prompt"; message: string; images?: PromptImage[] }
+  | { type: "prompt"; message: string; images?: PromptImage[]; streamingBehavior?: "steer" | "followUp" }
   | { type: "btw"; question: string }
   | { type: "abort" }
   | { type: "request_state" }

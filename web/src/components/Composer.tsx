@@ -8,9 +8,11 @@ interface Props {
   onChange: (value: string) => void;
   /** Incremented when native actions place text in the composer. */
   focusRequest: number;
-  onSend: () => void;
+  onSend: (followUp?: boolean) => void;
   disabled: boolean;
   busy: boolean;
+  /** True while pi is streaming: Enter steers and Alt+Enter queues a follow-up, like the pi TUI. */
+  steering?: boolean;
   /** Discoverable commands from `get_commands` (plan M3.8). */
   commands: SlashCommand[];
   /** Project-relative files available for @ references. */
@@ -41,6 +43,7 @@ export function Composer({
   onSend,
   disabled,
   busy,
+  steering = false,
   commands,
   files,
   onCompact,
@@ -220,10 +223,15 @@ export function Composer({
     if (event.key !== "Enter") return;
     if (event.shiftKey) return;
     event.preventDefault();
-    if (disabled || busy) return;
-    onSend();
+    if (disabled) return;
+    // While compacting the input stays blocked; while streaming the message is queued (steer).
+    if (busy && !steering) return;
+    onSend(event.altKey);
   };
 
+  const canSend = value.trim().length > 0 || images.length > 0 || Boolean(pendingContext);
+  // With room to steer, the corner button queues the message; otherwise it stops the run.
+  const showStop = busy && (!steering || !canSend);
   return (
     <div className="composer">
       {pendingContext && (
@@ -308,12 +316,14 @@ export function Composer({
           placeholder={
             disabled
               ? "pi is not running"
-              : "Send a message to pi… (Enter to send, Shift+Enter for a newline, / for commands)"
+              : steering
+                ? "pi is streaming — Enter to steer, Alt+Enter to queue a follow-up (/ for commands)"
+                : "Send a message to pi… (Enter to send, Shift+Enter for a newline, / for commands)"
           }
           rows={3}
           spellCheck={false}
         />
-        {busy ? (
+        {showStop ? (
           <button type="button" className="composer-send composer-send-stop" onClick={onAbort} title="Stop" aria-label="Stop">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
               <rect x="4" y="4" width="16" height="16" rx="2" />
@@ -323,10 +333,10 @@ export function Composer({
           <button
             type="button"
             className="composer-send"
-            onClick={onSend}
-            disabled={disabled || (value.trim().length === 0 && images.length === 0 && !pendingContext)}
-            title="Send"
-            aria-label="Send"
+            onClick={() => onSend(false)}
+            disabled={disabled || !canSend}
+            title={steering ? "Steer" : "Send"}
+            aria-label={steering ? "Steer" : "Send"}
           >
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
               <path d="M3.4 20.4 22 12 3.4 3.6v6.53L15 12 3.39 13.87z" />

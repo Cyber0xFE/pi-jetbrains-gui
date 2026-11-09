@@ -374,8 +374,16 @@ class PiChatService(private val project: Project) : Disposable {
         return response
     }
 
-    /** Sends a prompt; queued editor context is prepended only once. */
-    suspend fun prompt(message: String, images: List<RpcImage> = emptyList()): RpcResponse {
+    /** Sends a prompt; queued editor context is prepended only once.
+     *
+     * While pi is streaming, callers must pass [streamingBehavior] (`steer` or `followUp`) or pi
+     * rejects the command; the message is then queued and delivered like in the pi TUI.
+     */
+    suspend fun prompt(
+        message: String,
+        images: List<RpcImage> = emptyList(),
+        streamingBehavior: String? = null,
+    ): RpcResponse {
         val context = editorContext
         val fullMessage = when {
             context.isNullOrBlank() -> message
@@ -383,7 +391,12 @@ class PiChatService(private val project: Project) : Disposable {
             else -> "$context\n\n$message"
         }
         return requireClient().send(
-            RpcCommand(type = "prompt", message = fullMessage, images = images.takeIf { it.isNotEmpty() }),
+            RpcCommand(
+                type = "prompt",
+                message = fullMessage,
+                images = images.takeIf { it.isNotEmpty() },
+                streamingBehavior = streamingBehavior,
+            ),
         ).await()
     }
 

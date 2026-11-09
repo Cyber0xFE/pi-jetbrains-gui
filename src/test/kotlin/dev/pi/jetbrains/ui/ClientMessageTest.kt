@@ -27,6 +27,24 @@ class ClientMessageTest {
     }
 
     @Test
+    fun `prompt message carries the steering behavior`() {
+        val json = PiJson.parseToJsonElement(
+            """{"type":"prompt","message":"先看这里","streamingBehavior":"steer"}""",
+        ).jsonObject
+        val message = PiJson.decodeFromJsonElement(ClientMessage.serializer(), json)
+
+        assertEquals("steer", message.streamingBehavior)
+    }
+
+    @Test
+    fun `prompt without steering behavior parses as null`() {
+        val json = PiJson.parseToJsonElement("""{"type":"prompt","message":"hi"}""").jsonObject
+        val message = PiJson.decodeFromJsonElement(ClientMessage.serializer(), json)
+
+        assertEquals(null, message.streamingBehavior)
+    }
+
+    @Test
     fun `btw host message serializes with the documented shape`() {
         val element: JsonElement = HostMessages.btw("answer", "你好", answer = "你好！")
 

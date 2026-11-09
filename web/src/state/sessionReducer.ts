@@ -126,6 +126,10 @@ export interface ChatState {
   files: string[];
   /** Most recent `/btw` side question; null until one is asked. */
   btw: BtwState | null;
+  /** Pending steering messages from `queue_update` (pi delivers them mid-run). */
+  steeringQueue: string[];
+  /** Pending follow-up messages from `queue_update` (pi delivers them after the run). */
+  followUpQueue: string[];
 }
 
 export const initialState: ChatState = {
@@ -155,6 +159,8 @@ export const initialState: ChatState = {
   commands: [],
   files: [],
   btw: null,
+  steeringQueue: [],
+  followUpQueue: [],
 };
 
 export type Action =
@@ -280,6 +286,8 @@ function resetTranscript(state: ChatState): ChatState {
     historyLoading: true,
     transcriptGeneration: state.transcriptGeneration + 1,
     cacheHitRate: null,
+    steeringQueue: [],
+    followUpQueue: [],
   };
 }
 
@@ -307,6 +315,8 @@ function applyRecord(state: ChatState, record: WireRecord): ChatState {
       return { ...state, busy: false, sending: false, streamingMessageId: null };
     case "compaction_end":
       return onCompactionEnd(state, record);
+    case "queue_update":
+      return onQueueUpdate(state, record);
     case "response":
       return onResponse(state, record);
     default:
@@ -729,6 +739,19 @@ function onCompactionEnd(state: ChatState, record: WireRecord): ChatState {
       ? `${Math.round(before / 1000)}k → ${Math.round(after / 1000)}k tokens`
       : "context compacted";
   return withNotice(state, "info", detail);
+}
+
+/** `queue_update` replaces both pending queues; missing fields keep the previous ones. */
+function onQueueUpdate(state: ChatState, record: WireRecord): ChatState {
+  const steering = toStringArray(record.steering) ?? state.steeringQueue;
+  const followUp = toStringArray(record.followUp) ?? state.followUpQueue;
+  if (steering === state.steeringQueue && followUp === state.followUpQueue) return state;
+  return { ...state, steeringQueue: steering, followUpQueue: followUp };
+}
+
+function toStringArray(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  return value.filter((item): item is string => typeof item === "string");
 }
 
 function onResponse(state: ChatState, record: WireRecord): ChatState {
