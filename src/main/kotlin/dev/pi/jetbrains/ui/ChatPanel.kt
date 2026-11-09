@@ -24,6 +24,7 @@ import dev.pi.jetbrains.PiSettings
 import dev.pi.jetbrains.editor.EditorNavigator
 import dev.pi.jetbrains.rpc.PiEvent
 import dev.pi.jetbrains.rpc.PiJson
+import dev.pi.jetbrains.rpc.RpcClearQueueResult
 import dev.pi.jetbrains.rpc.RpcCommandsData
 import dev.pi.jetbrains.rpc.RpcForkResult
 import dev.pi.jetbrains.rpc.RpcModelsData
@@ -380,6 +381,12 @@ class ChatPanel(
                 scope.launch { request { service.prompt(text, images, behavior) } }
             }
             "abort" -> scope.launch { request { service.abort() } }
+            "clear_queue" -> scope.launch {
+                val response = request { service.clearQueue() } ?: return@launch
+                if (!response.success) return@launch
+                val data = response.decodeDataAs<RpcClearQueueResult>()
+                bridge?.send(HostMessages.dequeue(data?.steering ?: emptyList(), data?.followUp ?: emptyList()))
+            }
             "start" -> service.start()
             "request_state" -> scope.launch {
                 request { service.requestState() }

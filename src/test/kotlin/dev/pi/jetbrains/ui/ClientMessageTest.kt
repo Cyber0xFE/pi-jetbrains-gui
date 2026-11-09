@@ -45,6 +45,15 @@ class ClientMessageTest {
     }
 
     @Test
+    fun `dequeue host message serializes with the documented shape`() {
+        val element: JsonElement = HostMessages.dequeue(listOf("a"), listOf("b", "c"))
+
+        assertEquals("dequeue", element.jsonObject["type"]?.toString()?.trim('"'))
+        assertEquals("[\"a\"]", element.jsonObject["steering"].toString())
+        assertEquals("[\"b\",\"c\"]", element.jsonObject["followUp"].toString())
+    }
+
+    @Test
     fun `btw host message serializes with the documented shape`() {
         val element: JsonElement = HostMessages.btw("answer", "你好", answer = "你好！")
 

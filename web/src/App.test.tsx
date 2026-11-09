@@ -538,6 +538,42 @@ describe("App", () => {
     await waitFor(() => expect(screen.queryByRole("status", { name: "Queued messages" })).toBeNull());
   });
 
+  it("restores queued messages to the composer for editing", async () => {
+    render(<App />);
+    await waitFor(() => expect(window.__piDeliver).toBeDefined());
+
+    deliver(
+      { type: "status", status: { phase: "running", message: "ready", model: "m", isStreaming: true } },
+      {
+        type: "records",
+        records: [{ type: "queue_update", steering: ["check the failing test"], followUp: ["then run the suite"] }],
+      },
+    );
+    const input = (await screen.findByRole("textbox", { name: "Message to pi" })) as HTMLTextAreaElement;
+    expect(await screen.findByRole("status", { name: "Queued messages" })).toBeDefined();
+
+    // The Edit button on the queue bar clears pi's queues.
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await waitFor(() =>
+      expect(window.__piSent?.filter((message) => message.type === "clear_queue")).toEqual([
+        { type: "clear_queue" },
+      ]),
+    );
+
+    // The host returns the cleared queues; queued text is restored ahead of the draft (TUI order).
+    fireEvent.change(input, { target: { value: "draft in progress" } });
+    deliver({ type: "dequeue", steering: ["check the failing test"], followUp: ["then run the suite"] });
+    await waitFor(() =>
+      expect(input.value).toBe("check the failing test\n\nthen run the suite\n\ndraft in progress"),
+    );
+
+    // Alt+Up on the composer asks the host to clear the queues as well.
+    fireEvent.keyDown(input, { key: "ArrowUp", altKey: true });
+    await waitFor(() =>
+      expect(window.__piSent?.filter((message) => message.type === "clear_queue")).toHaveLength(2),
+    );
+  });
+
   it("sends selected editor context when the message is empty", async () => {
     render(<App />);
     await waitFor(() => expect(window.__piDeliver).toBeDefined());

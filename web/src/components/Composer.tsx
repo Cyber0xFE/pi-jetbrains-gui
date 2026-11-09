@@ -26,6 +26,8 @@ interface Props {
   onRemoveImage: (index: number) => void;
   /** Abort action for the corner stop button, mirroring the composer's Escape semantics. */
   onAbort: () => void;
+  /** Restores all queued steering/follow-up messages to the composer (pi TUI Alt+Up). */
+  onDequeue: () => void;
 }
 
 const MAX_SUGGESTIONS = 8;
@@ -54,6 +56,7 @@ export function Composer({
   onAddImage,
   onRemoveImage,
   onAbort,
+  onDequeue,
 }: Props): JSX.Element {
   const [highlight, setHighlight] = useState(0);
   const [dismissed, setDismissed] = useState(false);
@@ -159,6 +162,13 @@ export function Composer({
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+    // Restore queued messages for editing, like the pi TUI's Alt+Up; skipped while a completion
+    // menu is open so the arrow keys keep navigating it.
+    if (event.altKey && event.key === "ArrowUp" && !filesOpen && !open) {
+      event.preventDefault();
+      onDequeue();
+      return;
+    }
     if (event.key === "Enter" && !event.shiftKey && !disabled && !busy) {
       const command = value.trim();
       if (command === "/compact") {

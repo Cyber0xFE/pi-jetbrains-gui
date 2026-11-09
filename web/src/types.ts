@@ -239,7 +239,8 @@ export type Inbound =
   | { type: "scroll_to_first" }
   | { type: "scroll_to_user_message"; direction: "previous" | "next" }
   | { type: "widget"; key: string; lines: string[]; placement: "aboveEditor" | "belowEditor" }
-  | { type: "extension_status"; key: string; text: string | null };
+  | { type: "extension_status"; key: string; text: string | null }
+  | { type: "dequeue"; steering: string[]; followUp: string[] };
 
 /** webview -> Kotlin. */
 export type Outbound =
@@ -286,4 +287,5 @@ export type Outbound =
   | { type: "abort_retry" }
   | { type: "get_commands" }
   | { type: "list_files" }
-  | { type: "clear_context" };
+  | { type: "clear_context" }
+  | { type: "clear_queue" };

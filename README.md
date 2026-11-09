@@ -80,7 +80,7 @@ The session list supports creating, switching, renaming, deleting, and forking s
 
 Press `Ctrl+F` in the session area to open the message search bar. It searches keywords in user messages and assistant replies, and supports toggling case sensitivity, whole-word matching, and regular expressions. `Enter` / `Shift+Enter` jump to the next/previous match, `Esc` or the close button exits search, and the message containing the current match is highlighted.
 
-While pi is streaming a reply, you can keep typing in the input box: `Enter` queues the message as **steering** (pi receives it after the current tool call finishes, before the next model call), and `Alt+Enter` queues it as a **follow-up** (pi processes it after the current run ends) — the same behavior as the pi TUI. Pending steering and follow-up messages are listed above the input box until pi delivers them.
+While pi is streaming a reply, you can keep typing in the input box: `Enter` queues the message as **steering** (pi receives it after the current tool call finishes, before the next model call), and `Alt+Enter` queues it as a **follow-up** (pi processes it after the current run ends) — the same behavior as the pi TUI. Pending steering and follow-up messages are listed above the input box until pi delivers them. Click **Edit** on that list (or press `Alt+Up` in the input box) to take all queued messages back into the composer for editing, like the pi TUI's dequeue action; edited messages are sent again with `Enter` or `Alt+Enter`.
 
 ### Settings and Keyboard Shortcuts
 

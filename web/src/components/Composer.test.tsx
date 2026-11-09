@@ -24,6 +24,7 @@ it("opens pending images in a dismissible preview without removing them", () => 
       onAddImage={() => undefined}
       onRemoveImage={onRemoveImage}
       onAbort={() => undefined}
+      onDequeue={() => undefined}
     />,
   );
 
@@ -55,10 +56,44 @@ it("offers /btw as a built-in command when the composer starts with /", () => {
       onAddImage={() => undefined}
       onRemoveImage={() => undefined}
       onAbort={() => undefined}
+      onDequeue={() => undefined}
     />,
   );
 
   const menu = view.getByRole("listbox", { name: "Slash commands" });
   expect(menu.textContent).toContain("/btw");
   expect(menu.textContent).toContain("Ask a side question without adding it to the session");
+});
+
+it("restores queued messages for editing with Alt+Up", () => {
+  const onDequeue = vi.fn();
+  const view = render(
+    <Composer
+      value=""
+      onChange={() => undefined}
+      focusRequest={0}
+      onSend={() => undefined}
+      disabled={false}
+      busy={false}
+      commands={[]}
+      files={[]}
+      onCompact={() => undefined}
+      onOpenTree={() => undefined}
+      pendingContext={null}
+      onClearContext={() => undefined}
+      images={[]}
+      onAddImage={() => undefined}
+      onRemoveImage={() => undefined}
+      onAbort={() => undefined}
+      onDequeue={onDequeue}
+    />,
+  );
+  const input = view.getByRole("textbox", { name: "Message to pi" });
+
+  fireEvent.keyDown(input, { key: "ArrowUp", altKey: true });
+  expect(onDequeue).toHaveBeenCalledTimes(1);
+
+  // Without Alt the arrow key is left to the browser.
+  fireEvent.keyDown(input, { key: "ArrowUp" });
+  expect(onDequeue).toHaveBeenCalledTimes(1);
 });

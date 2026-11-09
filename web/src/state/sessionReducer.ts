@@ -249,6 +249,7 @@ function applyInbound(state: ChatState, message: Inbound): ChatState {
     case "reset":
       return resetTranscript(state);
     case "prefill":
+    case "dequeue":
       // The composer lives in App state, not the transcript reducer.
       return state;
     case "focus_composer":

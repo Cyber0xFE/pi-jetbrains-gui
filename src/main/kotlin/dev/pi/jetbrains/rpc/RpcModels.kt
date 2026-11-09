@@ -162,6 +162,13 @@ data class RpcTreeData(
 @Serializable
 data class RpcSwitchResult(val cancelled: Boolean = false)
 
+/** `clear_queue` response data. */
+@Serializable
+data class RpcClearQueueResult(
+    val steering: List<String> = emptyList(),
+    val followUp: List<String> = emptyList(),
+)
+
 /** `fork` response data. */
 @Serializable
 data class RpcForkResult(

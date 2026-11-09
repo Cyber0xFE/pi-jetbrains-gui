@@ -80,6 +80,15 @@ export function App(): JSX.Element {
         setFocusDraftRequest((current) => current + 1);
         return;
       }
+      if (message.type === "dequeue") {
+        // The host cleared pi's queues; restore the messages to the composer for editing, like
+        // the pi TUI's Alt+Up: queued text first, then the draft that was already there.
+        const queued = [...message.steering, ...message.followUp].filter((text) => text.trim().length > 0);
+        if (queued.length === 0) return;
+        setDraft((current) => [queued.join("\n\n"), current].filter((text) => text.trim().length > 0).join("\n\n"));
+        setFocusDraftRequest((current) => current + 1);
+        return;
+      }
       if (message.type === "focus_composer") {
         setFocusDraftRequest((current) => current + 1);
         return;
@@ -208,6 +217,9 @@ export function App(): JSX.Element {
   );
 
   const abort = useCallback(() => post({ type: "abort" }), []);
+
+  /** Restores all queued steering/follow-up messages to the composer for editing (TUI Alt+Up). */
+  const editQueued = useCallback(() => post({ type: "clear_queue" }), []);
 
   const openSessionDialog = useCallback((tab: SessionDialogTab) => {
     post({ type: "list_sessions" });
@@ -351,6 +363,14 @@ export function App(): JSX.Element {
       />
       {(state.steeringQueue.length > 0 || state.followUpQueue.length > 0) && (
         <div className="message-queue" role="status" aria-label="Queued messages">
+          <button
+            type="button"
+            className="message-queue-edit"
+            onClick={editQueued}
+            title="Restore queued messages to the composer for editing (Alt+Up)"
+          >
+            Edit
+          </button>
           {state.steeringQueue.map((text, index) => (
             <div className="message-queue-row" key={`steering:${index}`}>
               <span className="message-queue-label">steering</span>
@@ -373,6 +393,7 @@ export function App(): JSX.Element {
         disabled={!ready || state.sending}
         busy={busy || Boolean(state.status.isStreaming || state.status.isCompacting)}
         steering={Boolean(state.status.isStreaming)}
+        onDequeue={editQueued}
         commands={state.commands}
         files={state.files}
         onCompact={() => post({ type: "compact" })}

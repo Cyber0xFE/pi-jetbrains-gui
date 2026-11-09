@@ -2118,6 +2118,23 @@ mark.search-hit {
   font-size: 0.86em;
 }
 
+.message-queue-edit {
+  align-self: flex-end;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-raised);
+  color: var(--fg-dim);
+  font-size: 0.9em;
+  cursor: pointer;
+}
+
+.message-queue-edit:hover,
+.message-queue-edit:focus-visible {
+  color: var(--fg);
+  border-color: var(--accent);
+}
+
 .message-queue-row {
   display: flex;
   gap: 8px;

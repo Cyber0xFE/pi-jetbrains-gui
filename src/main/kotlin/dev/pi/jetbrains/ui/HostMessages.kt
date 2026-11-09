@@ -300,6 +300,14 @@ data class HostBtwMessage(
 @Serializable
 data class HostFocusComposerMessage(val type: String = "focus_composer")
 
+/** Restores cleared queue messages to the composer for editing (pi TUI `Alt+Up` dequeue). */
+@Serializable
+data class HostDequeueMessage(
+    val type: String = "dequeue",
+    val steering: List<String> = emptyList(),
+    val followUp: List<String> = emptyList(),
+)
+
 @Serializable
 data class HostScrollToLatestMessage(val type: String = "scroll_to_latest")
 
@@ -460,6 +468,12 @@ object HostMessages {
 
     fun focusComposer(): JsonElement =
         PiJson.encodeToJsonElement(HostFocusComposerMessage.serializer(), HostFocusComposerMessage())
+
+    fun dequeue(steering: List<String>, followUp: List<String>): JsonElement =
+        PiJson.encodeToJsonElement(
+            HostDequeueMessage.serializer(),
+            HostDequeueMessage(steering = steering, followUp = followUp),
+        )
 
     fun scrollToLatest(): JsonElement =
         PiJson.encodeToJsonElement(HostScrollToLatestMessage.serializer(), HostScrollToLatestMessage())

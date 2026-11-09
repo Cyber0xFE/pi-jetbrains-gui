@@ -469,6 +469,10 @@ class PiChatService(private val project: Project) : Disposable {
     suspend fun abort(): RpcResponse =
         requireClient().send(RpcCommand(type = "abort")).await()
 
+    /** Clears all queued steering/follow-up messages and returns them for editing (TUI Alt+Up). */
+    suspend fun clearQueue(): RpcResponse =
+        requireClient().send(RpcCommand(type = "clear_queue")).await()
+
     /** Reads `get_session_stats` and refreshes the usage/context part of the footer. */
     suspend fun requestStats(): RpcResponse {
         val response = requireClient().send(RpcCommand(type = "get_session_stats")).await()
