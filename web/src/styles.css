@@ -2141,6 +2141,73 @@ mark.search-hit {
   color: var(--accent);
 }
 
+.message-queue-editing {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.message-queue-editor-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.message-queue-editor-input {
+  flex: 1;
+  min-width: 0;
+  resize: vertical;
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 6px;
+}
+
+.message-queue-editor-input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.message-queue-remove {
+  flex: 0 0 auto;
+  padding: 0 2px;
+  border: none;
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+
+.message-queue-remove:hover,
+.message-queue-remove:focus-visible {
+  color: var(--error);
+}
+
+.message-queue-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.message-queue-action {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  cursor: pointer;
+}
+
+.message-queue-action:hover,
+.message-queue-action:focus-visible {
+  color: var(--fg);
+}
+
+.message-queue-action-primary {
+  color: var(--accent);
+}
+
 .message-queue-row {
   display: flex;
   gap: 8px;

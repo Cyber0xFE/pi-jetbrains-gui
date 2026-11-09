@@ -538,7 +538,7 @@ describe("App", () => {
     await waitFor(() => expect(screen.queryByRole("status", { name: "Queued messages" })).toBeNull());
   });
 
-  it("restores queued messages to the composer for editing", async () => {
+  it("edits queued messages in place and re-posts them one by one", async () => {
     render(<App />);
     await waitFor(() => expect(window.__piDeliver).toBeDefined());
 
@@ -546,13 +546,13 @@ describe("App", () => {
       { type: "status", status: { phase: "running", message: "ready", model: "m", isStreaming: true } },
       {
         type: "records",
-        records: [{ type: "queue_update", steering: ["check the failing test"], followUp: ["then run the suite"] }],
+        records: [{ type: "queue_update", steering: ["first", "second"], followUp: ["third"] }],
       },
     );
     const input = (await screen.findByRole("textbox", { name: "Message to pi" })) as HTMLTextAreaElement;
     expect(await screen.findByRole("status", { name: "Queued messages" })).toBeDefined();
 
-    // The Edit action on the queue bar clears pi's queues.
+    // The Edit action clears pi's queues so the messages can be edited individually.
     fireEvent.click(screen.getByRole("button", { name: "✎ Edit" }));
     await waitFor(() =>
       expect(window.__piSent?.filter((message) => message.type === "clear_queue")).toEqual([
@@ -560,18 +560,49 @@ describe("App", () => {
       ]),
     );
 
-    // The host returns the cleared queues; queued text is restored ahead of the draft (TUI order).
-    fireEvent.change(input, { target: { value: "draft in progress" } });
-    deliver({ type: "dequeue", steering: ["check the failing test"], followUp: ["then run the suite"] });
-    await waitFor(() =>
-      expect(input.value).toBe("check the failing test\n\nthen run the suite\n\ndraft in progress"),
-    );
+    // The host returns the cleared queues: one editor per message, no merging into the draft.
+    deliver({ type: "dequeue", steering: ["first", "second"], followUp: ["third"] });
+    const editors = await screen.findAllByRole("textbox", { name: /Queued (steering|followUp) message/ });
+    expect(editors.map((editor) => (editor as HTMLTextAreaElement).value)).toEqual(["first", "second", "third"]);
+    expect(input.value).toBe("");
 
-    // Alt+Up on the composer asks the host to clear the queues as well.
+    // Editing one message keeps the others intact.
+    fireEvent.change(editors[1] as HTMLTextAreaElement, { target: { value: "second (edited)" } });
+    fireEvent.click(screen.getByRole("button", { name: "Remove queued followUp message 3" }));
+    expect(screen.getAllByRole("textbox", { name: /Queued (steering|followUp) message/ })).toHaveLength(2);
+
+    // Send all re-posts every message separately, with its original queue kind.
+    fireEvent.click(screen.getByRole("button", { name: "Send all" }));
+    await waitFor(() =>
+      expect(window.__piSent?.filter((message) => message.type === "prompt")).toEqual([
+        { type: "prompt", message: "first", streamingBehavior: "steer" },
+        { type: "prompt", message: "second (edited)", streamingBehavior: "steer" },
+      ]),
+    );
+    expect(screen.queryByRole("dialog", { name: "Edit queued messages" })).toBeNull();
+
+    // Alt+Up on the composer still opens the same editor.
+    deliver(
+      { type: "records", records: [{ type: "queue_update", steering: ["again"], followUp: [] }] },
+    );
+    expect(await screen.findByRole("status", { name: "Queued messages" })).toBeDefined();
     fireEvent.keyDown(input, { key: "ArrowUp", altKey: true });
     await waitFor(() =>
       expect(window.__piSent?.filter((message) => message.type === "clear_queue")).toHaveLength(2),
     );
+    deliver({ type: "dequeue", steering: ["again"], followUp: [] });
+    expect(await screen.findByRole("dialog", { name: "Edit queued messages" })).toBeDefined();
+
+    // Cancel restores the untouched queues.
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(window.__piSent?.filter((message) => message.type === "prompt")).toHaveLength(3),
+    );
+    expect(window.__piSent?.filter((message) => message.type === "prompt")[2]).toEqual({
+      type: "prompt",
+      message: "again",
+      streamingBehavior: "steer",
+    });
   });
 
   it("sends selected editor context when the message is empty", async () => {

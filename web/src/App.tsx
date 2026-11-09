@@ -18,6 +18,29 @@ import type { Block } from "./state/sessionReducer";
 type Dialog = "sessions" | "models" | "thinking" | null;
 type SessionDialogTab = "sessions" | "tree";
 
+/** One queued message taken back from pi for editing, with the queue it came from. */
+interface QueuedEntry {
+  kind: "steering" | "followUp";
+  text: string;
+}
+
+/** Re-posts messages one by one, keeping their queue kind and therefore their ordering. */
+function repostQueue(entries: QueuedEntry[], streaming: boolean): void {
+  const filled = entries.filter((entry) => entry.text.trim().length > 0);
+  filled.forEach((entry, index) => {
+    // While streaming every message returns to its own queue. Otherwise the first message starts
+    // a run and the rest must steer into it instead of being rejected as "already processing".
+    const streamingBehavior = streaming
+      ? entry.kind === "followUp"
+        ? "followUp"
+        : "steer"
+      : index === 0
+        ? undefined
+        : "steer";
+    post({ type: "prompt", message: entry.text.trim(), streamingBehavior });
+  });
+}
+
 export function App(): JSX.Element {
   const store = useMemo(() => new ChatStore(), []);
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
@@ -36,6 +59,10 @@ export function App(): JSX.Element {
   const [searchFocusRequest, setSearchFocusRequest] = useState(0);
   const [btwOpen, setBtwOpen] = useState(false);
   const [btwCollapsed, setBtwCollapsed] = useState(false);
+  /** Non-null while queued messages are being edited; they cannot be re-posted one by one otherwise. */
+  const [queueEdit, setQueueEdit] = useState<QueuedEntry[] | null>(null);
+  /** Snapshot taken when editing started, so Cancel can restore the queues untouched. */
+  const queueEditOrigin = useRef<QueuedEntry[]>([]);
   const pendingPromptStartedAt = useRef<number | null>(null);
   const pendingPromptTimer = useRef<number | null>(null);
 
@@ -81,12 +108,14 @@ export function App(): JSX.Element {
         return;
       }
       if (message.type === "dequeue") {
-        // The host cleared pi's queues; restore the messages to the composer for editing, like
-        // the pi TUI's Alt+Up: queued text first, then the draft that was already there.
-        const queued = [...message.steering, ...message.followUp].filter((text) => text.trim().length > 0);
-        if (queued.length === 0) return;
-        setDraft((current) => [queued.join("\n\n"), current].filter((text) => text.trim().length > 0).join("\n\n"));
-        setFocusDraftRequest((current) => current + 1);
+        // The host cleared pi's queues; edit them in place so each message keeps its own
+        // steering/follow-up identity instead of being merged into one prompt.
+        const entries: QueuedEntry[] = [
+          ...message.steering.map((text) => ({ kind: "steering" as const, text })),
+          ...message.followUp.map((text) => ({ kind: "followUp" as const, text })),
+        ];
+        queueEditOrigin.current = entries;
+        setQueueEdit(entries.length > 0 ? entries : null);
         return;
       }
       if (message.type === "focus_composer") {
@@ -220,6 +249,30 @@ export function App(): JSX.Element {
 
   /** Restores all queued steering/follow-up messages to the composer for editing (TUI Alt+Up). */
   const editQueued = useCallback(() => post({ type: "clear_queue" }), []);
+
+  /** Re-posts the edited queue messages one by one, keeping their kinds and order. */
+  const submitQueueEdit = useCallback(() => {
+    const entries = queueEdit ?? [];
+    setQueueEdit(null);
+    queueEditOrigin.current = [];
+    repostQueue(entries, Boolean(state.status.isStreaming));
+  }, [queueEdit, state.status.isStreaming]);
+
+  /** Drops the edits and puts the original queue back. */
+  const cancelQueueEdit = useCallback(() => {
+    const originals = queueEditOrigin.current;
+    setQueueEdit(null);
+    queueEditOrigin.current = [];
+    repostQueue(originals, Boolean(state.status.isStreaming));
+  }, [state.status.isStreaming]);
+
+  const changeQueuedMessage = useCallback((index: number, text: string) => {
+    setQueueEdit((current) => current?.map((entry, i) => (i === index ? { ...entry, text } : entry)) ?? null);
+  }, []);
+
+  const removeQueuedMessage = useCallback((index: number) => {
+    setQueueEdit((current) => current?.filter((_, i) => i !== index) ?? null);
+  }, []);
 
   const openSessionDialog = useCallback((tab: SessionDialogTab) => {
     post({ type: "list_sessions" });
@@ -361,31 +414,68 @@ export function App(): JSX.Element {
         onSearchClose={() => setSearch((current) => ({ ...current, open: false }))}
         searchFocusRequest={searchFocusRequest}
       />
-      {(state.steeringQueue.length > 0 || state.followUpQueue.length > 0) && (
-        <div className="message-queue" role="status" aria-label="Queued messages">
-          <div className="message-queue-items">
-            {state.steeringQueue.map((text, index) => (
-              <div className="message-queue-row" key={`steering:${index}`}>
-                <span className="message-queue-label">steering</span>
-                <span className="message-queue-text">{text}</span>
-              </div>
-            ))}
-            {state.followUpQueue.map((text, index) => (
-              <div className="message-queue-row" key={`follow-up:${index}`}>
-                <span className="message-queue-label">follow-up</span>
-                <span className="message-queue-text">{text}</span>
-              </div>
-            ))}
+      {queueEdit !== null ? (
+        <div className="message-queue message-queue-editing" role="dialog" aria-label="Edit queued messages">
+          {queueEdit.map((entry, index) => (
+            <div className="message-queue-editor-row" key={`${entry.kind}:${index}`}>
+              <span className="message-queue-label">{entry.kind}</span>
+              <textarea
+                className="message-queue-editor-input"
+                aria-label={`Queued ${entry.kind} message ${index + 1}`}
+                value={entry.text}
+                rows={2}
+                onChange={(event) => changeQueuedMessage(index, event.target.value)}
+              />
+              <button
+                type="button"
+                className="message-queue-remove"
+                onClick={() => removeQueuedMessage(index)}
+                aria-label={`Remove queued ${entry.kind} message ${index + 1}`}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <div className="message-queue-editor-actions">
+            <button type="button" className="message-queue-action" onClick={cancelQueueEdit}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="message-queue-action message-queue-action-primary"
+              onClick={submitQueueEdit}
+            >
+              Send all
+            </button>
           </div>
-          <button
-            type="button"
-            className="message-queue-edit"
-            onClick={editQueued}
-            title="Restore queued messages to the composer for editing (Alt+Up)"
-          >
-            ✎ Edit
-          </button>
         </div>
+      ) : (
+        (state.steeringQueue.length > 0 || state.followUpQueue.length > 0) && (
+          <div className="message-queue" role="status" aria-label="Queued messages">
+            <div className="message-queue-items">
+              {state.steeringQueue.map((text, index) => (
+                <div className="message-queue-row" key={`steering:${index}`}>
+                  <span className="message-queue-label">steering</span>
+                  <span className="message-queue-text">{text}</span>
+                </div>
+              ))}
+              {state.followUpQueue.map((text, index) => (
+                <div className="message-queue-row" key={`follow-up:${index}`}>
+                  <span className="message-queue-label">follow-up</span>
+                  <span className="message-queue-text">{text}</span>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="message-queue-edit"
+              onClick={editQueued}
+              title="Edit queued messages (Alt+Up)"
+            >
+              ✎ Edit
+            </button>
+          </div>
+        )
       )}
       <Composer
         value={draft}
