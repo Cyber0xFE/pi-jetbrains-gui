@@ -288,4 +288,5 @@ export type Outbound =
   | { type: "get_commands" }
   | { type: "list_files" }
   | { type: "clear_context" }
-  | { type: "clear_queue" };
+  | { type: "clear_queue" }
+  | { type: "send_queued"; queued: Array<{ text: string; kind: "steering" | "followUp" }> };

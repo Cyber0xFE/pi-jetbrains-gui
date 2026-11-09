@@ -43,10 +43,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -380,7 +382,12 @@ class ChatPanel(
                 val behavior = message.streamingBehavior?.takeIf { it == "steer" || it == "followUp" }
                 scope.launch { request { service.prompt(text, images, behavior) } }
             }
-            "abort" -> scope.launch { request { service.abort() } }
+            "abort" -> scope.launch { stopWithQueueRestore() }
+            "send_queued" -> {
+                val entries = message.queued.filter { it.text.isNotBlank() }
+                if (entries.isEmpty()) return
+                scope.launch { sendQueued(entries) }
+            }
             "clear_queue" -> scope.launch {
                 val response = request { service.clearQueue() } ?: return@launch
                 if (!response.success) return@launch
@@ -608,6 +615,66 @@ class ChatPanel(
                 bridge?.send(HostMessages.notice("failed to copy image: ${result.exceptionOrNull()?.message}"))
             }
         }
+    }
+
+    /**
+     * Re-posts the queue editor's messages one by one.
+     *
+     * They cannot be posted in a loop: pi only honours `streamingBehavior` while it is streaming,
+     * so messages sent before the first run starts would all be treated as ordinary prompts and
+     * merged into a single agent run. The first message starts the run; every later one waits for
+     * streaming to begin and then returns to its own queue (steer or follow-up).
+     */
+    private suspend fun sendQueued(entries: List<ClientQueuedMessage>) {
+        val first = entries.first()
+        val firstResponse = request { service.prompt(first.text) }
+        if (firstResponse?.success != true) {
+            restoreQueued(entries)
+            return
+        }
+        var index = 1
+        while (index < entries.size) {
+            val streaming = withTimeoutOrNull(QUEUE_START_TIMEOUT_MS) {
+                service.status.first { it.isStreaming }
+            } != null
+            if (!streaming) {
+                // The first run never started (error, cancelled preflight): keep the rest in the
+                // editor instead of turning them into additional prompts.
+                restoreQueued(entries.subList(index, entries.size))
+                return
+            }
+            val entry = entries[index]
+            val behavior = if (entry.kind == "steering") "steer" else "followUp"
+            request { service.prompt(entry.text, streamingBehavior = behavior) }
+            index++
+        }
+    }
+
+    /** Hands messages back to the queue editor, keeping their steering/follow-up grouping. */
+    private fun restoreQueued(entries: List<ClientQueuedMessage>) {
+        val steering = entries.filter { it.kind == "steering" }.map { it.text }
+        val followUp = entries.filter { it.kind != "steering" }.map { it.text }
+        if (steering.isEmpty() && followUp.isEmpty()) return
+        bridge?.send(HostMessages.dequeue(steering, followUp))
+    }
+
+    /**
+     * Stops the run the way the pi TUI does on Esc: pending steering/follow-up messages are cleared
+     * and handed back to the composer for editing before the abort is sent. pi keeps draining those
+     * queues after an abort (`_runAgentPrompt` continues while `hasQueuedMessages()`), so aborting
+     * first would restart the run instead of stopping it.
+     */
+    private suspend fun stopWithQueueRestore() {
+        val cleared = runCatching { service.clearQueue() }.getOrNull()
+        if (cleared?.success == true) {
+            val data = cleared.decodeDataAs<RpcClearQueueResult>()
+            val steering = data?.steering ?: emptyList()
+            val followUp = data?.followUp ?: emptyList()
+            if (steering.isNotEmpty() || followUp.isNotEmpty()) {
+                bridge?.send(HostMessages.dequeue(steering, followUp))
+            }
+        }
+        request { service.abort() }
     }
 
     /** Runs a command and surfaces transport failures that never become RPC responses. */
@@ -1223,5 +1290,7 @@ class ChatPanel(
         private const val EDT_DIAGNOSTIC_THRESHOLD_MS = 100.0
         private const val DIAGNOSTIC_INTERVAL_NS = 1_000_000_000L
         private const val BTW_DELTA_FLUSH_INTERVAL_NS = 50_000_000L
+        /** How long a queued re-post waits for the first message to start streaming. */
+        private const val QUEUE_START_TIMEOUT_MS = 30_000L
     }
 }

@@ -116,6 +116,18 @@ class PiClientTest {
     }
 
     @Test
+    fun `clears the queues and reports the messages handed back for editing`() = runBlocking {
+        val client = startClient()
+
+        val response = withTimeout(TIMEOUT_MS) { client.send(RpcCommand(type = "clear_queue")).await() }
+
+        assertTrue(response.success, "response was $response")
+        val cleared = response.decodeDataAs<RpcClearQueueResult>()
+        assertEquals(listOf("first steer"), cleared?.steering)
+        assertEquals(listOf("then run the suite"), cleared?.followUp)
+    }
+
+    @Test
     fun `times out a command that is never answered`() = runBlocking {
         val client = startClient()
 

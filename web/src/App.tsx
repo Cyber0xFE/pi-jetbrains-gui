@@ -24,21 +24,16 @@ interface QueuedEntry {
   text: string;
 }
 
-/** Re-posts messages one by one, keeping their queue kind and therefore their ordering. */
-function repostQueue(entries: QueuedEntry[], streaming: boolean): void {
-  const filled = entries.filter((entry) => entry.text.trim().length > 0);
-  filled.forEach((entry, index) => {
-    // While streaming every message returns to its own queue. Otherwise the first message starts
-    // a run and the rest must steer into it instead of being rejected as "already processing".
-    const streamingBehavior = streaming
-      ? entry.kind === "followUp"
-        ? "followUp"
-        : "steer"
-      : index === 0
-        ? undefined
-        : "steer";
-    post({ type: "prompt", message: entry.text.trim(), streamingBehavior });
-  });
+/**
+ * Re-posts the queue editor's messages. The host sends them one by one and waits for pi to start
+ * streaming in between, so they are queued instead of merging into a single run.
+ */
+function repostQueue(entries: QueuedEntry[]): void {
+  const queued = entries
+    .map((entry) => ({ text: entry.text.trim(), kind: entry.kind }))
+    .filter((entry) => entry.text.length > 0);
+  if (queued.length === 0) return;
+  post({ type: "send_queued", queued });
 }
 
 export function App(): JSX.Element {
@@ -114,8 +109,10 @@ export function App(): JSX.Element {
           ...message.steering.map((text) => ({ kind: "steering" as const, text })),
           ...message.followUp.map((text) => ({ kind: "followUp" as const, text })),
         ];
+        // An empty report (stop with nothing queued) must not close an editor the user has open.
+        if (entries.length === 0) return;
         queueEditOrigin.current = entries;
-        setQueueEdit(entries.length > 0 ? entries : null);
+        setQueueEdit(entries);
         return;
       }
       if (message.type === "focus_composer") {
@@ -250,21 +247,21 @@ export function App(): JSX.Element {
   /** Restores all queued steering/follow-up messages to the composer for editing (TUI Alt+Up). */
   const editQueued = useCallback(() => post({ type: "clear_queue" }), []);
 
-  /** Re-posts the edited queue messages one by one, keeping their kinds and order. */
+  /** Re-posts the edited queue messages; the host keeps them in order and queues them properly. */
   const submitQueueEdit = useCallback(() => {
     const entries = queueEdit ?? [];
     setQueueEdit(null);
     queueEditOrigin.current = [];
-    repostQueue(entries, Boolean(state.status.isStreaming));
-  }, [queueEdit, state.status.isStreaming]);
+    repostQueue(entries);
+  }, [queueEdit]);
 
   /** Drops the edits and puts the original queue back. */
   const cancelQueueEdit = useCallback(() => {
     const originals = queueEditOrigin.current;
     setQueueEdit(null);
     queueEditOrigin.current = [];
-    repostQueue(originals, Boolean(state.status.isStreaming));
-  }, [state.status.isStreaming]);
+    repostQueue(originals);
+  }, []);
 
   const changeQueuedMessage = useCallback((index: number, text: string) => {
     setQueueEdit((current) => current?.map((entry, i) => (i === index ? { ...entry, text } : entry)) ?? null);

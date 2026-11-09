@@ -353,8 +353,17 @@ data class ClientMessage(
     val question: String? = null,
     /** Queue behavior for `prompt` while pi is streaming: `steer` or `followUp`. */
     val streamingBehavior: String? = null,
+    /** `send_queued`: pending messages re-ordered by the queue editor, posted one by one. */
+    val queued: List<ClientQueuedMessage> = emptyList(),
     /** Clipboard/editor images sent with a prompt; also used by `copy_image` requests. */
     val images: List<ClientImage> = emptyList(),
+)
+
+/** One message from the queue editor; `kind` keeps the steering/follow-up identity. */
+@Serializable
+data class ClientQueuedMessage(
+    val text: String,
+    val kind: String = "followUp",
 )
 
 @Serializable

@@ -538,6 +538,48 @@ describe("App", () => {
     await waitFor(() => expect(screen.queryByRole("status", { name: "Queued messages" })).toBeNull());
   });
 
+  it("opens the queue editor with the messages pi hands back after a stop", async () => {
+    render(<App />);
+    await waitFor(() => expect(window.__piDeliver).toBeDefined());
+
+    deliver(
+      { type: "status", status: { phase: "running", message: "ready", model: "m", isStreaming: true } },
+      { type: "records", records: [{ type: "queue_update", steering: ["first"], followUp: ["next"] }] },
+    );
+    const input = (await screen.findByRole("textbox", { name: "Message to pi" })) as HTMLTextAreaElement;
+    expect(await screen.findByRole("status", { name: "Queued messages" })).toBeDefined();
+
+    // Stop is handled by the host: it clears the queues first, then aborts.
+    fireEvent.click(screen.getByRole("button", { name: "Stop" }));
+    await waitFor(() =>
+      expect(window.__piSent?.filter((message) => message.type === "abort")).toEqual([{ type: "abort" }]),
+    );
+
+    // The cleared messages come back for editing instead of being dropped.
+    deliver({ type: "dequeue", steering: ["first"], followUp: ["next"] });
+    expect(await screen.findByRole("dialog", { name: "Edit queued messages" })).toBeDefined();
+
+    // A later empty report (nothing left to clear) must not close the editor.
+    deliver({ type: "dequeue", steering: [], followUp: [] });
+    expect(screen.getByRole("dialog", { name: "Edit queued messages" })).toBeDefined();
+
+    // Cancel re-queues them so a stop never silently discards pending messages. The host posts
+    // them one by one, so the queue kinds travel with the request.
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(window.__piSent?.filter((message) => message.type === "send_queued")).toEqual([
+        {
+          type: "send_queued",
+          queued: [
+            { text: "first", kind: "steering" },
+            { text: "next", kind: "followUp" },
+          ],
+        },
+      ]),
+    );
+    expect(input.value).toBe("");
+  });
+
   it("edits queued messages in place and re-posts them one by one", async () => {
     render(<App />);
     await waitFor(() => expect(window.__piDeliver).toBeDefined());
@@ -571,12 +613,18 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remove queued followUp message 3" }));
     expect(screen.getAllByRole("textbox", { name: /Queued (steering|followUp) message/ })).toHaveLength(2);
 
-    // Send all re-posts every message separately, with its original queue kind.
+    // Send all hands the messages to the host, which posts them one by one so the first starts a
+    // run and the rest are queued instead of being merged into it.
     fireEvent.click(screen.getByRole("button", { name: "Send all" }));
     await waitFor(() =>
-      expect(window.__piSent?.filter((message) => message.type === "prompt")).toEqual([
-        { type: "prompt", message: "first", streamingBehavior: "steer" },
-        { type: "prompt", message: "second (edited)", streamingBehavior: "steer" },
+      expect(window.__piSent?.filter((message) => message.type === "send_queued")).toEqual([
+        {
+          type: "send_queued",
+          queued: [
+            { text: "first", kind: "steering" },
+            { text: "second (edited)", kind: "steering" },
+          ],
+        },
       ]),
     );
     expect(screen.queryByRole("dialog", { name: "Edit queued messages" })).toBeNull();
@@ -593,15 +641,14 @@ describe("App", () => {
     deliver({ type: "dequeue", steering: ["again"], followUp: [] });
     expect(await screen.findByRole("dialog", { name: "Edit queued messages" })).toBeDefined();
 
-    // Cancel restores the untouched queues.
+    // Cancel restores the untouched queue through the same host-side path.
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() =>
-      expect(window.__piSent?.filter((message) => message.type === "prompt")).toHaveLength(3),
+      expect(window.__piSent?.filter((message) => message.type === "send_queued")).toHaveLength(2),
     );
-    expect(window.__piSent?.filter((message) => message.type === "prompt")[2]).toEqual({
-      type: "prompt",
-      message: "again",
-      streamingBehavior: "steer",
+    expect(window.__piSent?.filter((message) => message.type === "send_queued")[1]).toEqual({
+      type: "send_queued",
+      queued: [{ text: "again", kind: "steering" }],
     });
   });
 

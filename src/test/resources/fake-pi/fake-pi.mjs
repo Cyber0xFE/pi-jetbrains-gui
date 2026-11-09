@@ -129,6 +129,21 @@ function handle(line) {
 		case "abort_retry":
 			send({ id, type: "response", command: command.type, success: true });
 			return;
+		case "abort":
+			// The queues are already empty: `clear_queue` runs before `abort` in the stop path.
+			send({ id, type: "response", command: "abort", success: true });
+			return;
+		case "clear_queue":
+			// One pending steering message and one follow-up, the TUI stop path hands both back.
+			send({
+				id,
+				type: "response",
+				command: "clear_queue",
+				success: true,
+				data: { steering: ["first steer"], followUp: ["then run the suite"] },
+			});
+			send({ type: "queue_update", steering: [], followUp: [] });
+			return;
 		case "echo":
 			// A malformed record must be dropped by the client without breaking the stream.
 			process.stdout.write("this is not json\n");

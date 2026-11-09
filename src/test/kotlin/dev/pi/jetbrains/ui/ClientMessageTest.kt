@@ -45,6 +45,18 @@ class ClientMessageTest {
     }
 
     @Test
+    fun `send_queued carries the messages and their queue kinds`() {
+        val json = PiJson.parseToJsonElement(
+            """{"type":"send_queued","queued":[{"text":"first","kind":"steering"},{"text":"next","kind":"followUp"}]}""",
+        ).jsonObject
+        val message = PiJson.decodeFromJsonElement(ClientMessage.serializer(), json)
+
+        assertEquals("send_queued", message.type)
+        assertEquals(listOf("first", "next"), message.queued.map { it.text })
+        assertEquals(listOf("steering", "followUp"), message.queued.map { it.kind })
+    }
+
+    @Test
     fun `dequeue host message serializes with the documented shape`() {
         val element: JsonElement = HostMessages.dequeue(listOf("a"), listOf("b", "c"))
 
