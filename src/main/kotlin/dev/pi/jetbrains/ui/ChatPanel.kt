@@ -33,7 +33,6 @@ import dev.pi.jetbrains.rpc.RpcExtensionUiResponse
 import dev.pi.jetbrains.rpc.RpcImage
 import dev.pi.jetbrains.rpc.RpcSwitchResult
 import dev.pi.jetbrains.rpc.RpcThinkingLevelsData
-import dev.pi.jetbrains.rpc.RpcTreeData
 import dev.pi.jetbrains.rpc.decodeDataAs
 import dev.pi.jetbrains.runtime.SideQuestionRunner
 import dev.pi.jetbrains.session.SessionTree
@@ -746,9 +745,10 @@ class ChatPanel(
         val activeBridge = bridge ?: return
         val response = request { service.sessionTree() } ?: return
         if (!response.success) return
-        val data = response.decodeDataAs<RpcTreeData>() ?: return
-        val rows = SessionTree.flatten(data.tree, data.leafId)
-        activeBridge.send(HostMessages.tree(rows, data.leafId, service.status.value.sessionId))
+        val data = response.data as? JsonObject ?: return
+        val leafId = (data["leafId"] as? JsonPrimitive)?.contentOrNull
+        val rows = SessionTree.flatten(data, leafId)
+        activeBridge.send(HostMessages.tree(rows, leafId, service.status.value.sessionId))
     }
 
     private suspend fun sendModels() {

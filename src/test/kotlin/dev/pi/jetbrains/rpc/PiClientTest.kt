@@ -208,9 +208,11 @@ class PiClientTest {
         assertEquals(listOf("review", "skill:draw"), commands?.commands?.map { it.name })
         assertEquals("skill", commands?.commands?.last()?.source)
 
-        val tree = client.send(RpcCommand(type = "get_tree")).await().decodeDataAs<RpcTreeData>()
-        assertEquals("entry-2", tree?.leafId)
-        val rows = SessionTree.flatten(tree?.tree.orEmpty(), tree?.leafId)
+        val treeResponse = client.send(RpcCommand(type = "get_tree")).await()
+        val treeData = treeResponse.data as JsonObject
+        val leafId = (treeData["leafId"] as? JsonPrimitive)?.contentOrNull
+        assertEquals("entry-2", leafId)
+        val rows = SessionTree.flatten(treeData, leafId)
         assertEquals(listOf("entry-1"), rows.map { it.id })
         assertEquals("user: hi", rows.first().text)
         assertTrue(rows.first().forkable)

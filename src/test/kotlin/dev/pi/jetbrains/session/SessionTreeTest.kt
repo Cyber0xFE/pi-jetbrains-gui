@@ -2,6 +2,10 @@ package dev.pi.jetbrains.session
 
 import dev.pi.jetbrains.rpc.PiJson
 import dev.pi.jetbrains.rpc.RpcSessionTreeNode
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.decodeFromJsonElement
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -132,6 +136,57 @@ class SessionTreeTest {
         // its first generation after the branch each get +1 (pi's justBranched rule).
         assertEquals(listOf("root", "a1", "a2", "b1"), rows.map { it.id })
         assertEquals(listOf(0, 1, 2, 1), rows.map { it.depth })
+    }
+
+    @Test
+    fun `flattens a deep raw tree without recursive deserialization`() {
+        // A real session is one deeply nested chain; decoding it into RpcSessionTreeNode
+        // overflowed the stack and the swallowed failure left the tree picker empty.
+        val depth = 800
+        fun roleOf(i: Int): String = if (i % 2 == 0) "user" else "assistant"
+        fun entry(id: String, role: String, text: String, parentId: String?): JsonObject = JsonObject(
+            mapOf(
+                "type" to JsonPrimitive("message"),
+                "id" to JsonPrimitive(id),
+                "parentId" to (parentId?.let(::JsonPrimitive) ?: JsonNull),
+                "message" to JsonObject(
+                    mapOf(
+                        "role" to JsonPrimitive(role),
+                        "content" to JsonArray(
+                            listOf(JsonObject(mapOf("type" to JsonPrimitive("text"), "text" to JsonPrimitive(text)))),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        var node = JsonObject(
+            mapOf(
+                "entry" to entry("e$depth", roleOf(depth), "m$depth", "e${depth - 1}"),
+                "children" to JsonArray(emptyList()),
+            ),
+        )
+        for (i in depth - 1 downTo 0) {
+            node = JsonObject(
+                mapOf(
+                    "entry" to entry("e$i", roleOf(i), "m$i", if (i == 0) null else "e${i - 1}"),
+                    "children" to JsonArray(listOf(node)),
+                ),
+            )
+        }
+        val data = JsonObject(
+            mapOf(
+                "tree" to JsonArray(listOf(node)),
+                "leafId" to JsonPrimitive("e$depth"),
+            ),
+        )
+
+        val rows = SessionTree.flatten(data, "e$depth")
+
+        assertEquals((0..depth).count { roleOf(it) == "user" }, rows.size)
+        assertEquals("user: m0", rows.first().text)
+        assertTrue(rows.all { it.depth == 0 })
+        assertTrue(rows.last().active)
     }
 
     private fun decode(json: String): List<RpcSessionTreeNode> =

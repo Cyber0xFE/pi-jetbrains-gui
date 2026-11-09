@@ -29,6 +29,29 @@ data class SessionTreeImage(val data: String, val mimeType: String)
 /** A `toolCall` block extracted from an assistant message, keyed by call id. */
 private data class ToolCallInfo(val name: String, val arguments: JsonObject)
 
+/** Explicit-stack DFS frame for [SessionTree.flattenEntries]. */
+private data class Visit(val id: String, val indent: Int, val justBranched: Boolean)
+
+/**
+ * Iterative index of a `get_tree` response. Entries stay raw so arbitrarily deep session chains
+ * cannot overflow the thread stack like recursive kotlinx deserialization does.
+ */
+private class TreeIndex {
+    val entries = LinkedHashMap<String, JsonObject>()
+    val parentOf = HashMap<String, String?>()
+    val labels = HashMap<String, String?>()
+    val childIds = HashMap<String, MutableList<String>>()
+    val roots = ArrayList<String>()
+
+    fun add(id: String, entry: JsonObject, inheritedParent: String?, label: String?) {
+        entries[id] = entry
+        parentOf[id] = (entry["parentId"] as? JsonPrimitive)?.contentOrNull ?: inheritedParent
+        if (label != null) labels[id] = label
+        if (inheritedParent == null) roots.add(id)
+        else childIds.getOrPut(inheritedParent) { mutableListOf() }.add(id)
+    }
+}
+
 /**
  * Flattens `get_tree` into depth-first rows plus the active branch marker.
  *
@@ -39,42 +62,81 @@ private data class ToolCallInfo(val name: String, val arguments: JsonObject)
  */
 object SessionTree {
     fun flatten(tree: List<RpcSessionTreeNode>, leafId: String?): List<FlatTreeEntry> {
-        val nodeById = LinkedHashMap<String, RpcSessionTreeNode>()
-        val parentOf = HashMap<String, String?>()
-        val labels = HashMap<String, String?>()
-        indexNodes(tree, null, nodeById, parentOf, labels)
+        val index = TreeIndex()
+        val stack = ArrayDeque<Pair<RpcSessionTreeNode, String?>>()
+        for (node in tree.asReversed()) stack.addLast(node to null)
+        while (stack.isNotEmpty()) {
+            val (node, inheritedParent) = stack.removeLast()
+            val id = node.entry.string("id") ?: continue
+            index.add(id, node.entry, inheritedParent, node.label)
+            for (child in node.children.asReversed()) stack.addLast(child to id)
+        }
+        return flattenEntries(index, leafId)
+    }
 
+    /**
+     * Flattens the raw `get_tree` data. Long sessions are one deeply nested chain, which makes
+     * `decodeDataAs<RpcTreeData>()` overflow the stack (the failure is swallowed and the tree
+     * picker stays empty); this walks the already-parsed JSON iteratively instead.
+     */
+    fun flatten(data: JsonObject, leafId: String? = null): List<FlatTreeEntry> {
+        val index = TreeIndex()
+        val roots = data["tree"] as? JsonArray ?: JsonArray(emptyList())
+        val stack = ArrayDeque<Pair<JsonObject, String?>>()
+        for (i in roots.lastIndex downTo 0) {
+            (roots[i] as? JsonObject)?.let { stack.addLast(it to null) }
+        }
+        while (stack.isNotEmpty()) {
+            val (node, inheritedParent) = stack.removeLast()
+            val entry = node["entry"] as? JsonObject ?: continue
+            val id = entry.string("id") ?: continue
+            index.add(id, entry, inheritedParent, node.string("label"))
+            val children = node["children"] as? JsonArray ?: continue
+            for (i in children.lastIndex downTo 0) {
+                (children[i] as? JsonObject)?.let { stack.addLast(it to id) }
+            }
+        }
+        return flattenEntries(index, leafId)
+    }
+
+    private fun flattenEntries(index: TreeIndex, leafId: String?): List<FlatTreeEntry> {
         val toolCalls = HashMap<String, ToolCallInfo>()
-        collectToolCalls(tree, toolCalls)
+        index.entries.values.forEach { collectToolCalls(it, toolCalls) }
 
-        val activePath = activeIds(parentOf, leafId)
+        val activePath = activeIds(index.parentOf, leafId)
 
         // Subtree contains the active leaf? Used to sort the active branch first (as pi does).
-        val containsActive = HashMap<String, Boolean>()
-        fun computeContains(node: RpcSessionTreeNode): Boolean {
-            val id = node.entry.string("id")
-            val has = (id != null && id == leafId) || node.children.any { computeContains(it) }
-            if (id != null) containsActive[id] = has
-            return has
+        val order = ArrayList<String>(index.entries.size)
+        val stack = ArrayDeque<String>()
+        for (i in index.roots.lastIndex downTo 0) stack.addLast(index.roots[i])
+        while (stack.isNotEmpty()) {
+            val id = stack.removeLast()
+            order.add(id)
+            val children = index.childIds[id] ?: continue
+            for (i in children.lastIndex downTo 0) stack.addLast(children[i])
         }
-        tree.forEach { computeContains(it) }
+        val containsActive = HashMap<String, Boolean>(index.entries.size)
+        for (i in order.lastIndex downTo 0) {
+            val id = order[i]
+            containsActive[id] = id == leafId || index.childIds[id]?.any { containsActive[it] == true } == true
+        }
 
         // The RPC fork command accepts user-message entries only, so the tree shows only rows
         // that can be selected as fork points. Hidden entries are skipped while their user
         // descendants are attached to the nearest visible ancestor below.
-        fun isVisible(node: RpcSessionTreeNode): Boolean {
-            val entry = node.entry
+        fun isVisible(id: String): Boolean {
+            val entry = index.entries[id] ?: return false
             val message = entry["message"] as? JsonObject
             return entry.string("type") == "message" && message?.string("role") == "user"
         }
 
         // Attach each visible node to its nearest visible ancestor (pi's `recalculateVisualStructure`).
         val visibleChildren = HashMap<String?, MutableList<String>>()
-        for ((id, node) in nodeById) {
-            if (!isVisible(node)) continue
-            var ancestor: String? = parentOf[id]
-            while (ancestor != null && nodeById[ancestor]?.let(::isVisible) != true) {
-                ancestor = parentOf[ancestor]
+        for (id in index.entries.keys) {
+            if (!isVisible(id)) continue
+            var ancestor: String? = index.parentOf[id]
+            while (ancestor != null && !isVisible(ancestor)) {
+                ancestor = index.parentOf[ancestor]
             }
             visibleChildren.getOrPut(ancestor) { mutableListOf() }.add(id)
         }
@@ -82,60 +144,45 @@ object SessionTree {
         fun ordered(ids: List<String>): List<String> =
             ids.sortedByDescending { containsActive[it] == true }
 
-        val rows = ArrayList<FlatTreeEntry>(nodeById.size)
+        val rows = ArrayList<FlatTreeEntry>(index.entries.size)
         val rootIds = ordered(visibleChildren[null] ?: emptyList())
         val multipleRoots = rootIds.size > 1
 
         // pi's indent rules: only branch points (children > 1) and the first
         // generation after a branch increase depth; single-child chains stay flat.
-        fun visit(id: String, indent: Int, justBranched: Boolean) {
-            val node = nodeById.getValue(id)
-            val displayIndent = if (multipleRoots) maxOf(0, indent - 1) else indent
-            rows.add(rowOf(node, displayIndent, labels[id], toolCalls, activePath))
-            val children = ordered(visibleChildren[id] ?: emptyList())
+        val visits = ArrayDeque<Visit>()
+        for (i in rootIds.lastIndex downTo 0) {
+            visits.addLast(Visit(rootIds[i], if (multipleRoots) 1 else 0, multipleRoots))
+        }
+        while (visits.isNotEmpty()) {
+            val visit = visits.removeLast()
+            val displayIndent = if (multipleRoots) maxOf(0, visit.indent - 1) else visit.indent
+            rows.add(rowOf(index.entries.getValue(visit.id), displayIndent, index.labels[visit.id], toolCalls, activePath))
+            val children = ordered(visibleChildren[visit.id] ?: emptyList())
             val multipleChildren = children.size > 1
             val childIndent = when {
-                multipleChildren -> indent + 1
-                justBranched && indent > 0 -> indent + 1
-                else -> indent
+                multipleChildren -> visit.indent + 1
+                visit.justBranched && visit.indent > 0 -> visit.indent + 1
+                else -> visit.indent
             }
-            children.forEach { visit(it, childIndent, multipleChildren) }
+            for (i in children.lastIndex downTo 0) {
+                visits.addLast(Visit(children[i], childIndent, multipleChildren))
+            }
         }
-        rootIds.forEach { visit(it, if (multipleRoots) 1 else 0, multipleRoots) }
         return rows
     }
 
-    private fun indexNodes(
-        nodes: List<RpcSessionTreeNode>,
-        parentId: String?,
-        nodeById: MutableMap<String, RpcSessionTreeNode>,
-        parentOf: MutableMap<String, String?>,
-        labels: MutableMap<String, String?>,
-    ) {
-        for (node in nodes) {
-            val id = node.entry.string("id") ?: continue
-            nodeById[id] = node
-            parentOf[id] = (node.entry["parentId"] as? JsonPrimitive)?.contentOrNull ?: parentId
-            if (node.label != null) labels[id] = node.label
-            indexNodes(node.children, id, nodeById, parentOf, labels)
-        }
-    }
-
-    private fun collectToolCalls(nodes: List<RpcSessionTreeNode>, out: MutableMap<String, ToolCallInfo>) {
-        for (node in nodes) {
-            val message = node.entry["message"] as? JsonObject
-            if (message?.string("role") == "assistant") {
-                val content = message["content"] as? JsonArray
-                content?.forEach { block ->
-                    val obj = block as? JsonObject ?: return@forEach
-                    if (obj.string("type") == "toolCall") {
-                        val id = obj.string("id") ?: return@forEach
-                        val args = obj["arguments"] as? JsonObject ?: JsonObject(emptyMap())
-                        out[id] = ToolCallInfo(obj.string("name") ?: "tool", args)
-                    }
-                }
+    private fun collectToolCalls(entry: JsonObject, out: MutableMap<String, ToolCallInfo>) {
+        val message = entry["message"] as? JsonObject
+        if (message?.string("role") != "assistant") return
+        val content = message["content"] as? JsonArray
+        content?.forEach { block ->
+            val obj = block as? JsonObject ?: return@forEach
+            if (obj.string("type") == "toolCall") {
+                val id = obj.string("id") ?: return@forEach
+                val args = obj["arguments"] as? JsonObject ?: JsonObject(emptyMap())
+                out[id] = ToolCallInfo(obj.string("name") ?: "tool", args)
             }
-            collectToolCalls(node.children, out)
         }
     }
 
@@ -150,13 +197,12 @@ object SessionTree {
     }
 
     private fun rowOf(
-        node: RpcSessionTreeNode,
+        entry: JsonObject,
         depth: Int,
         label: String?,
         toolCalls: Map<String, ToolCallInfo>,
         activePath: Set<String>,
     ): FlatTreeEntry {
-        val entry = node.entry
         val id = entry.string("id") ?: return FlatTreeEntry(id = "", parentId = null, type = "unknown")
         val role = (entry["message"] as? JsonObject)?.string("role")
         return FlatTreeEntry(
