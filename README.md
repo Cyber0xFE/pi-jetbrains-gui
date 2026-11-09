@@ -2,7 +2,7 @@
 
 > 🌏 This document is also available in [简体中文 (Chinese)](./README.zh-CN.md).
 
-A graphical plugin for using the [pi](https://github.com/badlogic/pi-mono) coding agent inside IntelliJ IDEA–based IDEs.
+A graphical plugin for using the [pi](https://github.com/badlogic/pi-mono) coding agent inside JetBrains IDEs (IntelliJ IDEA, PyCharm, and other IDEs in the JetBrains family).
 The plugin launches a local `pi --mode rpc` subprocess and renders conversations, tool calls, and diffs in the Pi tool window of your IDE.
 
 ## Features

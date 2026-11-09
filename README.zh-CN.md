@@ -1,6 +1,6 @@
 # Pi JetBrains GUI
 
-在 IntelliJ IDEA 系列 IDE 中使用 [pi](https://github.com/badlogic/pi-mono) coding agent 的图形界面插件。
+在 JetBrains 系列 IDE（IntelliJ IDEA、PyCharm 等）中使用 [pi](https://github.com/badlogic/pi-mono) coding agent 的图形界面插件。
 插件通过 `pi --mode rpc` 启动本地子进程，并在 IDE 的 Pi 工具窗口中显示对话、工具调用和 diff。
 
 ## 功能
