@@ -505,7 +505,10 @@ function onMessageEnd(state: ChatState, message: WireMessage | undefined, record
   if (message.role === "toolResult") return attachToolResult(state, message);
 
   const id = messageId(message);
-  const existing = state.messages.find((candidate) => candidate.id === id) ?? findStreaming(state);
+  // The streaming fallback only belongs to assistant messages: a user `message_end` without a
+  // matching `message_start` must not overwrite the reply that is still streaming.
+  const existing = state.messages.find((candidate) => candidate.id === id)
+    ?? (message.role === "assistant" ? findStreaming(state) : undefined);
   const role = toRole(message.role);
   const rebuilt: ChatMessage = {
     id: existing?.id ?? id,
@@ -816,7 +819,35 @@ function findStreaming(state: ChatState): ChatMessage | undefined {
 }
 
 function messageId(message: WireMessage): string {
-  return `${message.role}:${message.timestamp ?? "unknown"}`;
+  const base = `${message.role}:${message.timestamp ?? "unknown"}`;
+  // pi stamps queued user prompts with `Date.now()` when they are enqueued, so two messages sent
+  // in the same millisecond (a queue edit that re-posts several follow-ups, for example) share
+  // the timestamp. Their content still differs, and `message_start`/`message_end` of the same
+  // message carry identical content, so the content hash keeps them apart without breaking pairing.
+  if (message.role === "user") {
+    const fingerprint = contentFingerprint(message.content);
+    if (fingerprint !== null) return `${base}:${fingerprint}`;
+  }
+  return base;
+}
+
+/**
+ * Stable digest of a user message payload. Text is normalized so a plain string and the matching
+ * text block produce the same value (live events and hydrated history use both shapes).
+ */
+function contentFingerprint(content: WireMessage["content"]): string | null {
+  const text = typeof content === "string"
+    ? content
+    : Array.isArray(content)
+      ? content.map((block) => (block.type === "text" ? (block as WireTextContent).text ?? "" : "\u0000image")).join("\u0001")
+      : "";
+  if (text.length === 0) return null;
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `${text.length}-${(hash >>> 0).toString(36)}`;
 }
 
 function toRole(role: string): ChatMessage["role"] {

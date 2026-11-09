@@ -18,6 +18,15 @@ function assistantStart(timestamp = 1): WireRecord {
   return { type: "message_start", message: { role: "assistant", content: [], timestamp, stopReason: "pending" } };
 }
 
+
+/** `message_start` + `message_end` pair, the way pi replays a queued user prompt. */
+function userMessage(text: string, timestamp: number, paired = false): WireRecord[] {
+  const message: WireMessage = { role: "user", content: [{ type: "text", text }], timestamp };
+  return paired
+    ? [{ type: "message_start", message }, { type: "message_end", message }]
+    : [{ type: "message_start", message }];
+}
+
 describe("sessionReducer", () => {
   it("accumulates text deltas and lets message_end win", () => {
     const state = apply(
@@ -642,5 +651,61 @@ describe("sessionReducer", () => {
     );
 
     expect(state.btw).toEqual({ question: "hm?", answer: null, error: null, pending: false });
+  });
+
+  it("keeps two user messages that share a timestamp but differ in content", () => {
+    const shared = 1794208490561;
+    const state = apply(
+      initialState,
+      records(
+        ...userMessage("先不要总结 test1 目录", shared, true),
+        ...userMessage("算了，只总结2个就行了", shared, true),
+      ),
+    );
+
+    expect(state.messages.filter((message) => message.role === "user")).toHaveLength(2);
+    expect(state.messages.map((message) => (message.blocks[0] as { text?: string }).text)).toEqual([
+      "先不要总结 test1 目录",
+      "算了，只总结2个就行了",
+    ]);
+  });
+
+  it("keeps equal-timestamp user messages replayed by history", () => {
+    const shared = 1794208490561;
+    const state = apply(
+      initialState,
+      {
+        kind: "inbound",
+        message: {
+          type: "history",
+          final: true,
+          messages: [
+            { role: "user", content: [{ type: "text", text: "first" }], timestamp: shared },
+            { role: "user", content: [{ type: "text", text: "second" }], timestamp: shared },
+          ],
+        },
+      },
+    );
+
+    expect(state.messages.map((message) => (message.blocks[0] as { text?: string }).text)).toEqual([
+      "first",
+      "second",
+    ]);
+  });
+
+  it("does not replace the streaming assistant with an unmatched user message_end", () => {
+    const state = apply(
+      initialState,
+      records(
+        assistantStart(11),
+        update({ type: "text_start", contentIndex: 0 }),
+        update({ type: "text_delta", contentIndex: 0, delta: "partial answer" }),
+        { type: "message_end", message: { role: "user", content: [{ type: "text", text: "steer" }], timestamp: 12 } },
+      ),
+    );
+
+    const assistant = state.messages.find((message) => message.role === "assistant");
+    expect(assistant?.blocks).toEqual([{ kind: "text", text: "partial answer" }]);
+    expect(state.messages.filter((message) => message.role === "user")).toHaveLength(1);
   });
 });
