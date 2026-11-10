@@ -50,6 +50,10 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         var chatFontSize: Int = DEFAULT_CHAT_FONT_SIZE,
         /** Accent color override for the Pi chat webview as #RRGGBB; empty means follow the IDE. */
         var accentColor: String = "",
+        /** Absolute path to an image shown behind the chat transcript; empty means no image. */
+        var backgroundImage: String = "",
+        /** Background image opacity in percent, mirroring the IDE background image setting. */
+        var backgroundImageOpacity: Int = DEFAULT_BACKGROUND_IMAGE_OPACITY,
         var logDirectory: String = "",
         var panelShortcut: String = DEFAULT_PANEL_SHORTCUT,
         var newTabShortcut: String = DEFAULT_NEW_TAB_SHORTCUT,
@@ -90,6 +94,10 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
 
     fun notifyAccentColorChanged() {
         ApplicationManager.getApplication().messageBus.syncPublisher(ACCENT_COLOR_CHANGED).accentColorChanged()
+    }
+
+    fun notifyBackgroundImageChanged() {
+        ApplicationManager.getApplication().messageBus.syncPublisher(BACKGROUND_IMAGE_CHANGED).backgroundImageChanged()
     }
 
     /**
@@ -188,6 +196,7 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         val NETWORK_PROXY_CHANGED = Topic.create("Pi network proxy changed", PiNetworkProxyListener::class.java)
         val CHAT_FONT_SIZE_CHANGED = Topic.create("Pi chat font size changed", PiChatFontSizeListener::class.java)
         val ACCENT_COLOR_CHANGED = Topic.create("Pi accent color changed", PiAccentColorListener::class.java)
+        val BACKGROUND_IMAGE_CHANGED = Topic.create("Pi background image changed", PiBackgroundImageListener::class.java)
         const val SHOW_PI_TOOL_WINDOW_ACTION_ID = "dev.pi.jetbrains.ShowPiToolWindow"
         const val NEW_PI_TAB_ACTION_ID = "dev.pi.jetbrains.NewPiTab"
         const val CLOSE_PI_TAB_ACTION_ID = "dev.pi.jetbrains.ClosePiTab"
@@ -209,6 +218,9 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         const val DEFAULT_CHAT_FONT_SIZE = 14
         const val MIN_CHAT_FONT_SIZE = 10
         const val MAX_CHAT_FONT_SIZE = 32
+        const val DEFAULT_BACKGROUND_IMAGE_OPACITY = 15
+        const val MIN_BACKGROUND_IMAGE_OPACITY = 0
+        const val MAX_BACKGROUND_IMAGE_OPACITY = 100
 
         /** Parses a #RRGGBB accent color override; returns null for blank or invalid values. */
         fun parseAccentColor(value: String): java.awt.Color? = value.trim()
@@ -234,4 +246,8 @@ fun interface PiChatFontSizeListener {
 
 fun interface PiAccentColorListener {
     fun accentColorChanged()
+}
+
+fun interface PiBackgroundImageListener {
+    fun backgroundImageChanged()
 }

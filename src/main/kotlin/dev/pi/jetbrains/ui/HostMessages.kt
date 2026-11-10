@@ -107,6 +107,10 @@ data class HostTheme(
     val errorBackground: String,
     val dark: Boolean,
     val fontSize: Float,
+    /** Optional `data:` URI with the background image; null or blank means no image. */
+    val backgroundImage: String? = null,
+    /** Background image opacity as a 0..1 fraction. */
+    val backgroundImageOpacity: Float = 0f,
 )
 
 @Serializable

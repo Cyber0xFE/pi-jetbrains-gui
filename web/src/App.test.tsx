@@ -18,6 +18,8 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  document.documentElement.style.removeProperty("--bg-image");
+  document.documentElement.style.removeProperty("--bg-image-opacity");
   delete window.__piNativePost;
   delete window.__piDeliver;
   delete window.__piSent;
@@ -43,6 +45,54 @@ describe("App", () => {
     await waitFor(() =>
       expect(window.__piSent?.filter((message) => message.type === "start")).toEqual([{ type: "start" }]),
     );
+  });
+
+  it("applies the themed background image and opacity to the document root", async () => {
+    render(<App />);
+    await waitFor(() => expect(window.__piDeliver).toBeDefined());
+
+    deliver({
+      type: "theme",
+      theme: {
+        background: "#ffffff",
+        foreground: "#20242b",
+        foregroundDim: "#707782",
+        raisedBackground: "#eef2f7",
+        border: "#dfe3e9",
+        accent: "#3978dc",
+        error: "#b42318",
+        errorBackground: "#fdecea",
+        dark: false,
+        fontSize: 14,
+        backgroundImage: "data:image/png;base64,AAAA",
+        backgroundImageOpacity: 0.15,
+      },
+    });
+
+    const root = document.documentElement.style;
+    await waitFor(() => expect(root.getPropertyValue("--bg-image")).toBe('url("data:image/png;base64,AAAA")'));
+    expect(root.getPropertyValue("--bg-image-opacity")).toBe("0.15");
+
+    deliver({
+      type: "theme",
+      theme: {
+        background: "#ffffff",
+        foreground: "#20242b",
+        foregroundDim: "#707782",
+        raisedBackground: "#eef2f7",
+        border: "#dfe3e9",
+        accent: "#3978dc",
+        error: "#b42318",
+        errorBackground: "#fdecea",
+        dark: false,
+        fontSize: 14,
+        backgroundImage: "data:image/png;base64,AAAA",
+        backgroundImageOpacity: 0,
+      },
+    });
+
+    await waitFor(() => expect(root.getPropertyValue("--bg-image")).toBe("none"));
+    expect(root.getPropertyValue("--bg-image-opacity")).toBe("0");
   });
 
   it("renders history, streamed deltas, tool cards and notices", async () => {

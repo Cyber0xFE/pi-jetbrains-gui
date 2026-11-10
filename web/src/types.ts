@@ -141,6 +141,10 @@ export interface WireTheme {
   errorBackground: string;
   dark: boolean;
   fontSize: number;
+  /** `data:` URI for the optional chat background image, or null when none is configured. */
+  backgroundImage?: string | null;
+  /** Background image opacity as a 0..1 fraction. */
+  backgroundImageOpacity?: number;
 }
 
 export interface WireStatus {

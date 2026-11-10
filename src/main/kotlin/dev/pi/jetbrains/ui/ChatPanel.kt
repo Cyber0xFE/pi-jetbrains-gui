@@ -18,6 +18,7 @@ import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
 import dev.pi.jetbrains.PiChatService
 import dev.pi.jetbrains.PiAccentColorListener
+import dev.pi.jetbrains.PiBackgroundImageListener
 import dev.pi.jetbrains.PiChatFontSizeListener
 import dev.pi.jetbrains.PiModelsJson
 import dev.pi.jetbrains.PiSettings
@@ -139,6 +140,9 @@ class ChatPanel(
     private var bridge: WebViewBridge? = null
     private var browser: JBCefBrowser? = null
 
+    /** Last encoded background image, keyed by path and modification time. */
+    private var backgroundImageCache: BackgroundImageCache? = null
+
     init {
         val view: Component = if (JBCefApp.isSupported()) {
             createBrowser() ?: unavailableView()
@@ -158,6 +162,10 @@ class ChatPanel(
         ApplicationManager.getApplication().messageBus.connect(this).subscribe(
             PiSettings.ACCENT_COLOR_CHANGED,
             PiAccentColorListener { bridge?.send(themeMessage()) },
+        )
+        ApplicationManager.getApplication().messageBus.connect(this).subscribe(
+            PiSettings.BACKGROUND_IMAGE_CHANGED,
+            PiBackgroundImageListener { bridge?.send(themeMessage()) },
         )
         project.messageBus.connect(this).subscribe(
             VirtualFileManager.VFS_CHANGES,
@@ -1248,8 +1256,45 @@ class ChatPanel(
                 fontSize = PiSettings.get().getState().chatFontSize
                     .coerceIn(PiSettings.MIN_CHAT_FONT_SIZE, PiSettings.MAX_CHAT_FONT_SIZE)
                     .toFloat(),
+                backgroundImage = backgroundImageDataUri(),
+                backgroundImageOpacity = PiSettings.get().getState().backgroundImageOpacity
+                    .coerceIn(
+                        PiSettings.MIN_BACKGROUND_IMAGE_OPACITY,
+                        PiSettings.MAX_BACKGROUND_IMAGE_OPACITY,
+                    ) / 100f,
             ),
         )
+    }
+
+    /**
+     * Encodes the configured background image as a data URI so the webview never needs file access.
+     * Results are cached by path and modification time; the image is only read when settings change.
+     */
+    private fun backgroundImageDataUri(): String? {
+        val path = PiSettings.get().getState().backgroundImage.trim()
+        if (path.isEmpty()) return null
+        val file = java.io.File(path)
+        val lastModified = if (file.isFile) file.lastModified() else -1L
+        val cached = backgroundImageCache
+        if (cached != null && cached.path == path && cached.lastModified == lastModified) return cached.dataUri
+        val dataUri = runCatching {
+            if (!file.isFile || file.length() > MAX_BACKGROUND_IMAGE_BYTES) return@runCatching null
+            val mimeType = backgroundImageMimeType(file.name) ?: return@runCatching null
+            "data:$mimeType;base64," + Base64.getEncoder().encodeToString(file.readBytes())
+        }.getOrNull()
+        backgroundImageCache = BackgroundImageCache(path, lastModified, dataUri)
+        return dataUri
+    }
+
+    private data class BackgroundImageCache(val path: String, val lastModified: Long, val dataUri: String?)
+
+    private fun backgroundImageMimeType(fileName: String): String? = when (fileName.substringAfterLast('.', "").lowercase()) {
+        "png" -> "image/png"
+        "jpg", "jpeg" -> "image/jpeg"
+        "gif" -> "image/gif"
+        "webp" -> "image/webp"
+        "bmp" -> "image/bmp"
+        else -> null
     }
 
     private fun cssColor(color: java.awt.Color): String =
@@ -1286,6 +1331,7 @@ class ChatPanel(
         private const val HISTORY_CHUNK_CHARS = 256 * 1024
         private const val COMPACT_TIMEOUT_NOTICE = "compaction did not finish in time"
         private const val MAX_TOOL_RESULT_BYTES = 512 * 1024
+        private const val MAX_BACKGROUND_IMAGE_BYTES = 4L * 1024 * 1024
         private const val MAX_JSON_DEPTH = 64
         private const val EDT_DIAGNOSTIC_THRESHOLD_MS = 100.0
         private const val DIAGNOSTIC_INTERVAL_NS = 1_000_000_000L

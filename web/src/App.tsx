@@ -182,6 +182,15 @@ export function App(): JSX.Element {
     root.style.setProperty("--error", theme.error);
     root.style.setProperty("--error-bg", theme.errorBackground);
     root.style.setProperty("--fs", `${Math.max(10, Math.min(32, theme.fontSize))}px`);
+    // The host encodes the background image as a data URI; base64 never contains quotes, so
+    // wrapping it in url("...") is safe. Skip the image entirely at zero opacity so the webview
+    // does not decode an invisible picture.
+    const backgroundOpacity = Math.max(0, Math.min(1, theme.backgroundImageOpacity ?? 0));
+    root.style.setProperty(
+      "--bg-image",
+      theme.backgroundImage && backgroundOpacity > 0 ? `url("${theme.backgroundImage}")` : "none",
+    );
+    root.style.setProperty("--bg-image-opacity", `${backgroundOpacity}`);
   }, [state.theme]);
 
   const phase = state.status.phase;

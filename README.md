@@ -14,7 +14,7 @@ The plugin launches a local `pi --mode rpc` subprocess and renders conversations
 - Save and restore pi sessions
 - Automatically attach the current editor selection as context
 - Follow the IDE light/dark theme
-- Configure the Node.js path, network proxy, log directory, and task-completion sound in settings
+- Configure the Node.js path, network proxy, log directory, task-completion sound, and an optional chat background image in settings
 - Choose models and thinking levels, view context usage and token statistics; add custom models from the model selector (appended to `~/.pi/agent/models.json` without overwriting existing configuration)
 - Create, switch, rename, delete, and fork sessions, and view branches in the session tree
 - Browse pi commands with `/` and reference project files with `@`
@@ -84,7 +84,7 @@ While pi is streaming a reply, you can keep typing in the input box: `Enter` que
 
 ### Settings and Keyboard Shortcuts
 
-In `Settings | Tools | Pi` you can configure the Node.js path, network proxy, chat font size (10–32px), accent color (customizes the Pi chat UI accent; emphasized elements such as user message bubbles follow it, and leaving it empty follows the IDE theme), diagnostic log directory, task-completion sound, and all Pi panel shortcuts. Default shortcuts:
+In `Settings | Tools | Pi` you can configure the Node.js path, network proxy, chat font size (10–32px), accent color (customizes the Pi chat UI accent; emphasized elements such as user message bubbles follow it, and leaving it empty follows the IDE theme), background image (an optional PNG/JPG/GIF/WebP/BMP picture shown behind the chat transcript, with an opacity slider like the IDE's editor background image; files up to 4 MB are encoded into the webview and reapplied immediately), diagnostic log directory, task-completion sound, and all Pi panel shortcuts. Default shortcuts:
 
 | Action | Default shortcut |
 | --- | --- |

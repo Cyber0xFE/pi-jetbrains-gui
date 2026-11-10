@@ -1,7 +1,11 @@
 package dev.pi.jetbrains.ui
 
+import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
+import com.intellij.openapi.fileChooser.FileChooserFactory
 import com.intellij.openapi.keymap.KeymapUtil
 import com.intellij.openapi.options.Configurable
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.ColorPanel
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
@@ -39,6 +43,21 @@ class PiSettingsConfigurable : Configurable {
     private val networkProxy = JTextField().apply {
         toolTipText = "例如 http://127.0.0.1:7890；同时设置 HTTP_PROXY / HTTPS_PROXY；留空则继承系统环境"
         accessibleContext.accessibleName = "网络代理地址"
+    }
+    private val backgroundImage = JTextField().apply {
+        toolTipText = "背景图像路径，支持 PNG、JPG、GIF、WebP 和 BMP；留空则不显示背景图像"
+        accessibleContext.accessibleName = "Pi 背景图像"
+    }
+    private val backgroundImageOpacity = JSpinner(
+        SpinnerNumberModel(
+            PiSettings.DEFAULT_BACKGROUND_IMAGE_OPACITY,
+            PiSettings.MIN_BACKGROUND_IMAGE_OPACITY,
+            PiSettings.MAX_BACKGROUND_IMAGE_OPACITY,
+            1,
+        ),
+    ).apply {
+        toolTipText = "背景图像不透明度（0–100）"
+        accessibleContext.accessibleName = "Pi 背景图像不透明度"
     }
     private val logDirectory = JTextField()
     private val taskCompletionSound = JCheckBox("任务完成时播放声音")
@@ -315,6 +334,35 @@ class PiSettingsConfigurable : Configurable {
             })
         }
         addField("主题色（可选）：", accentColorRow, "自定义 Pi 聊天界面的强调色，点击色块选择颜色；留空时跟随 IDE 主题。")
+        val backgroundImageRow = JPanel(BorderLayout(8, 0)).apply {
+            isOpaque = false
+            add(backgroundImage, BorderLayout.CENTER)
+            add(JPanel(FlowLayout(FlowLayout.LEFT, 6, 0)).apply {
+                isOpaque = false
+                add(JButton("选择…").apply {
+                    accessibleContext.accessibleName = "选择 Pi 背景图像"
+                    addActionListener { chooseBackgroundImage() }
+                })
+                add(JButton("清除").apply {
+                    accessibleContext.accessibleName = "清除 Pi 背景图像"
+                    addActionListener { backgroundImage.text = "" }
+                })
+            }, BorderLayout.EAST)
+        }
+        addField(
+            "背景图像（可选）：",
+            backgroundImageRow,
+            "选择一张图片作为 Pi 聊天区域的背景，支持 PNG、JPG、GIF、WebP 和 BMP；留空、文件不可读或超过 4 MB 时不显示背景图像。",
+        )
+        val backgroundImageOpacityRow = JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
+            isOpaque = false
+            add(backgroundImageOpacity)
+        }
+        addField(
+            "背景不透明度（%）：",
+            backgroundImageOpacityRow,
+            "背景图像的不透明度，0 为完全透明，100 为完全不透明。",
+        )
         form.add(taskCompletionSound.apply {
             isOpaque = false
             accessibleContext.accessibleName = "任务完成时播放声音"
@@ -349,6 +397,8 @@ class PiSettingsConfigurable : Configurable {
             logDirectory.text != state.logDirectory ||
             chatFontSizeValue() != state.chatFontSize ||
             accentColorHex() != state.accentColor ||
+            backgroundImage.text.trim() != state.backgroundImage ||
+            backgroundImageOpacityValue() != state.backgroundImageOpacity ||
             taskCompletionSound.isSelected != state.taskCompletionSoundEnabled ||
             panelShortcutValue != state.panelShortcut ||
             newTabShortcutValue != state.newTabShortcut ||
@@ -366,6 +416,8 @@ class PiSettingsConfigurable : Configurable {
         val state = settings.getState()
         val fontSizeChanged = chatFontSizeValue() != state.chatFontSize
         val accentColorChanged = accentColorHex() != state.accentColor
+        val backgroundImageChanged = backgroundImage.text.trim() != state.backgroundImage ||
+            backgroundImageOpacityValue() != state.backgroundImageOpacity
         val proxyEnabled = networkProxyEnabled.isSelected
         val proxy = networkProxy.text.trim()
         val proxyChanged = proxyEnabled != state.networkProxyEnabled || proxy != state.networkProxy
@@ -375,6 +427,8 @@ class PiSettingsConfigurable : Configurable {
         state.logDirectory = logDirectory.text.trim()
         state.chatFontSize = chatFontSizeValue()
         state.accentColor = accentColorHex()
+        state.backgroundImage = backgroundImage.text.trim()
+        state.backgroundImageOpacity = backgroundImageOpacityValue()
         state.taskCompletionSoundEnabled = taskCompletionSound.isSelected
         state.panelShortcut = panelShortcutValue
         state.newTabShortcut = newTabShortcutValue
@@ -389,6 +443,7 @@ class PiSettingsConfigurable : Configurable {
         if (proxyChanged) settings.notifyNetworkProxyChanged()
         if (fontSizeChanged) settings.notifyChatFontSizeChanged()
         if (accentColorChanged) settings.notifyAccentColorChanged()
+        if (backgroundImageChanged) settings.notifyBackgroundImageChanged()
     }
 
     override fun reset() {
@@ -400,6 +455,11 @@ class PiSettingsConfigurable : Configurable {
         logDirectory.text = state.logDirectory
         chatFontSize.value = state.chatFontSize.coerceIn(PiSettings.MIN_CHAT_FONT_SIZE, PiSettings.MAX_CHAT_FONT_SIZE)
         accentColorPanel.selectedColor = PiSettings.parseAccentColor(state.accentColor)
+        backgroundImage.text = state.backgroundImage
+        backgroundImageOpacity.value = state.backgroundImageOpacity.coerceIn(
+            PiSettings.MIN_BACKGROUND_IMAGE_OPACITY,
+            PiSettings.MAX_BACKGROUND_IMAGE_OPACITY,
+        )
         taskCompletionSound.isSelected = state.taskCompletionSoundEnabled
         panelShortcutValue = state.panelShortcut
         val keyStroke = panelShortcutValue.takeIf { it.isNotBlank() }?.let { KeyStroke.getKeyStroke(it) }
@@ -433,6 +493,21 @@ class PiSettingsConfigurable : Configurable {
     override fun disposeUIResources() {
         panel = null
     }
+
+    private fun chooseBackgroundImage() {
+        val descriptor = FileChooserDescriptorFactory.createSingleFileDescriptor().apply {
+            title = "选择背景图像"
+            description = "选择一张 PNG、JPG、GIF、WebP 或 BMP 图片"
+        }
+        val chosen: Array<VirtualFile> = FileChooserFactory.getInstance()
+            .createFileChooser(descriptor, null, null)
+            .choose(null as VirtualFile?, null as Project?)
+        chosen.firstOrNull()?.path?.let { backgroundImage.text = it }
+    }
+
+    private fun backgroundImageOpacityValue(): Int = (backgroundImageOpacity.value as? Number)?.toInt()
+        ?.coerceIn(PiSettings.MIN_BACKGROUND_IMAGE_OPACITY, PiSettings.MAX_BACKGROUND_IMAGE_OPACITY)
+        ?: PiSettings.DEFAULT_BACKGROUND_IMAGE_OPACITY
 
     private fun chatFontSizeValue(): Int = (chatFontSize.value as? Number)?.toInt()
         ?.coerceIn(PiSettings.MIN_CHAT_FONT_SIZE, PiSettings.MAX_CHAT_FONT_SIZE)

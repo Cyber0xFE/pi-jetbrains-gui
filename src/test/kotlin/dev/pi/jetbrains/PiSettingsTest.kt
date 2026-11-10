@@ -16,6 +16,8 @@ class PiSettingsTest {
         assertEquals(PiSettings.DEFAULT_NEXT_TAB_SHORTCUT, settings.getState().nextTabShortcut)
         assertEquals(PiSettings.DEFAULT_SCROLL_TO_LATEST_SHORTCUT, settings.getState().scrollToLatestShortcut)
         assertEquals(PiSettings.DEFAULT_SCROLL_TO_FIRST_SHORTCUT, settings.getState().scrollToFirstShortcut)
+        assertEquals("", settings.getState().backgroundImage)
+        assertEquals(PiSettings.DEFAULT_BACKGROUND_IMAGE_OPACITY, settings.getState().backgroundImageOpacity)
 
         settings.getState().networkProxy = "   "
         assertTrue(settings.processEnvironment().isEmpty())
