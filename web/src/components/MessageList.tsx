@@ -23,6 +23,9 @@ const VISIBLE_BATCH = 60;
 /** Keep the outline readable; larger histories scroll inside the outline itself. */
 const OUTLINE_MAX_VISIBLE = 15;
 const OUTLINE_ITEM_STEP = 27;
+/* Mirrors the outline dot metrics in styles.css: 15px markers, 12px gaps, 18px top padding. */
+const OUTLINE_ITEM_HEIGHT = 15;
+const OUTLINE_TRACK_PADDING = 18;
 const OUTLINE_OVERSCAN = 20;
 const EMPTY_FILE_REFERENCES: string[] = [];
 
@@ -194,6 +197,11 @@ export function MessageList({
     setShowLatestButton(false);
     element.scrollTop = element.scrollHeight;
     previousScrollTop.current = element.scrollTop;
+    // The initial mount also lands here; only an explicit back-to-latest request pans the outline.
+    if (scrollToLatestRequest > 0) {
+      const latestUserMessage = userMessages[userMessages.length - 1]?.message;
+      if (latestUserMessage) revealOutlineMessage(latestUserMessage.id);
+    }
   }, [scrollToLatestRequest]);
 
   useEffect(() => {
@@ -269,13 +277,37 @@ export function MessageList({
     });
   };
 
+  // Pans the scrolling outline so the dot of `messageId` sits inside its visible window. Without
+  // this a jump to a message whose dot is scrolled out of the outline leaves no position cue.
+  const revealOutlineMessage = (messageId: string): void => {
+    const element = outlineScroller.current;
+    if (!element) return;
+    const index = userMessages.findIndex(({ message }) => message.id === messageId);
+    if (index < 0) return;
+    const top = OUTLINE_TRACK_PADDING + index * OUTLINE_ITEM_STEP;
+    const bottom = top + OUTLINE_ITEM_HEIGHT;
+    const viewTop = element.scrollTop;
+    const viewBottom = viewTop + element.clientHeight;
+    // Keep one dot of slack inside the fade mask so the marker never sticks to an edge.
+    if (top - OUTLINE_ITEM_STEP < viewTop) {
+      element.scrollTop = Math.max(0, top - OUTLINE_ITEM_STEP);
+    } else if (bottom + OUTLINE_ITEM_STEP > viewBottom) {
+      element.scrollTop = bottom + OUTLINE_ITEM_STEP - element.clientHeight;
+    } else {
+      return;
+    }
+    // Feed the virtualized window right away instead of waiting for the scroll event.
+    setOutlineScrollTop(element.scrollTop);
+  };
+
   const scrollToLatest = (): void => {
     const element = scroller.current;
     if (!element) return;
     const latestUserMessage = userMessages[userMessages.length - 1]?.message;
-    if (latestUserMessage) setActiveMessageId(latestUserMessage.id);
-    const outline = outlineScroller.current;
-    if (outline) outline.scrollTo({ top: outline.scrollHeight, behavior: "smooth" });
+    if (latestUserMessage) {
+      setActiveMessageId(latestUserMessage.id);
+      revealOutlineMessage(latestUserMessage.id);
+    }
     stickToBottom.current = true;
     latestButtonVisible.current = false;
     setShowLatestButton(false);
@@ -296,8 +328,20 @@ export function MessageList({
   const jumpToMessage = (messageId: string, messageIndex: number): void => {
     setPendingMessageId(messageId);
     setActiveMessageId(messageId);
+    revealOutlineMessage(messageId);
     setVisibleCount((current) => Math.max(current, messages.length - messageIndex));
   };
+
+  // Follow the active message wherever the transcript moves: jumps, search hits, back-to-latest
+  // and plain scrolling all end up here, so the outline never points at an off-screen dot.
+  const previousActiveMessageId = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = previousActiveMessageId.current;
+    previousActiveMessageId.current = activeMessageId;
+    // The first message of a freshly loaded transcript is not a jump; leave the outline alone.
+    if (!activeMessageId || previous === null || previous === activeMessageId) return;
+    revealOutlineMessage(activeMessageId);
+  }, [activeMessageId]);
 
   // Scroll to the exact match whenever the cursor moves. `activeMatchRef` keeps the effect out
   // of the streaming render path: a new token must not scroll the user away, only explicit
@@ -311,6 +355,7 @@ export function MessageList({
     if (!match) return;
     stickToBottom.current = false;
     setActiveMessageId(match.messageId);
+    revealOutlineMessage(match.messageId);
     setVisibleCount((current) => Math.max(current, messagesLengthRef.current - match.messageIndex));
     // Two frames: the first lets the (possibly expanded) transcript paint, then scroll the
     // match's own mark into view — in a long message the hit is otherwise left below the fold.

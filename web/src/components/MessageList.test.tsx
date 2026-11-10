@@ -593,6 +593,103 @@ it("steps down to the closest user message below the viewport", () => {
   expect(view.getByRole("button", { name: "Jump to user message 3: Question 2" }).getAttribute("aria-current")).toBe("location");
 });
 
+it("pans the scrolling outline to the dot of a user message it jumps to", () => {
+  HTMLElement.prototype.scrollIntoView = vi.fn();
+  const messages: ChatMessage[] = [];
+  for (let index = 0; index < 16; index += 1) {
+    messages.push(
+      { id: `user-${index}`, role: "user", blocks: [{ kind: "text", text: `Question ${index}` }], timestamp: index * 2, streaming: false },
+      { id: `assistant-${index}`, role: "assistant", blocks: [{ kind: "text", text: `Answer ${index}` }], timestamp: index * 2 + 1, streaming: false },
+    );
+  }
+  const props = { messages, tools: {}, loadingHistory: false, emptyHint: "", thinkingLabel: null, connecting: false };
+  const view = render(<MessageList {...props} previousUserMessageRequest={0} nextUserMessageRequest={0} />);
+  const log = view.getByRole("log");
+  Object.defineProperties(log, { scrollHeight: { configurable: true, value: 20000 }, clientHeight: { configurable: true, value: 400 } });
+  Array.from(log.querySelectorAll(".message-user")).forEach((element, index) => {
+    Object.defineProperty(element, "offsetTop", { configurable: true, value: index * 1200 });
+  });
+  const outline = view.container.querySelector<HTMLElement>(".message-outline-track")!;
+  Object.defineProperties(outline, {
+    scrollHeight: { configurable: true, value: 18 + 16 * 27 },
+    clientHeight: { configurable: true, value: 400 },
+  });
+  log.scrollTop = 18600;
+
+  // Stepping up lands on the newest user message, whose dot sits below the outline window.
+  view.rerender(<MessageList {...props} previousUserMessageRequest={1} nextUserMessageRequest={0} />);
+  expect(outline.scrollTop).toBe(18 + 15 * 27 + 15 + 27 - 400);
+
+  // Jumping back to the first user message pans the outline up again.
+  fireEvent.click(view.getByRole("button", { name: "Jump to user message 1: Question 0" }));
+  expect(outline.scrollTop).toBe(0);
+});
+
+it("pans the outline to the newest dot on a back-to-latest request", () => {
+  const messages: ChatMessage[] = [];
+  for (let index = 0; index < 16; index += 1) {
+    messages.push(
+      { id: `user-${index}`, role: "user", blocks: [{ kind: "text", text: `Question ${index}` }], timestamp: index * 2, streaming: false },
+      { id: `assistant-${index}`, role: "assistant", blocks: [{ kind: "text", text: `Answer ${index}` }], timestamp: index * 2 + 1, streaming: false },
+    );
+  }
+  const props = { messages, tools: {}, loadingHistory: false, emptyHint: "", thinkingLabel: null, connecting: false };
+  const view = render(<MessageList {...props} scrollToLatestRequest={0} />);
+  const log = view.getByRole("log");
+  Object.defineProperties(log, { scrollHeight: { configurable: true, value: 20000 }, clientHeight: { configurable: true, value: 400 } });
+  const outline = view.container.querySelector<HTMLElement>(".message-outline-track")!;
+  Object.defineProperties(outline, {
+    scrollHeight: { configurable: true, value: 18 + 16 * 27 },
+    clientHeight: { configurable: true, value: 400 },
+  });
+  expect(outline.scrollTop).toBe(0);
+
+  // The host asks for the latest message while the outline still rests on its first dots.
+  view.rerender(<MessageList {...props} scrollToLatestRequest={1} />);
+  expect(log.scrollTop).toBe(20000);
+  expect(outline.scrollTop).toBe(18 + 15 * 27 + 15 + 27 - 400);
+});
+
+it("pans the outline to whatever user message the transcript scrolls onto", () => {
+  const messages: ChatMessage[] = [];
+  for (let index = 0; index < 16; index += 1) {
+    messages.push(
+      { id: `user-${index}`, role: "user", blocks: [{ kind: "text", text: `Question ${index}` }], timestamp: index * 2, streaming: false },
+      { id: `assistant-${index}`, role: "assistant", blocks: [{ kind: "text", text: `Answer ${index}` }], timestamp: index * 2 + 1, streaming: false },
+    );
+  }
+  const frames = new Map<number, FrameRequestCallback>();
+  let frameId = 0;
+  vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+    frames.set(++frameId, callback);
+    return frameId;
+  });
+  vi.spyOn(window, "cancelAnimationFrame").mockImplementation((id) => { frames.delete(id); });
+  const props = { messages, tools: {}, loadingHistory: false, emptyHint: "", thinkingLabel: null, connecting: false };
+  const view = render(<MessageList {...props} />);
+  const log = view.getByRole("log");
+  Object.defineProperties(log, { scrollHeight: { configurable: true, value: 20000 }, clientHeight: { configurable: true, value: 400 } });
+  Array.from(log.querySelectorAll(".message-user")).forEach((element, index) => {
+    Object.defineProperty(element, "offsetTop", { configurable: true, value: index * 1200 });
+  });
+  const outline = view.container.querySelector<HTMLElement>(".message-outline-track")!;
+  Object.defineProperties(outline, {
+    scrollHeight: { configurable: true, value: 18 + 16 * 27 },
+    clientHeight: { configurable: true, value: 200 },
+  });
+
+  // Plain scrolling — no jump request — still lines the outline up with the active message.
+  log.scrollTop = 8000;
+  fireEvent.scroll(log);
+  act(() => {
+    const pending = [...frames.values()];
+    frames.clear();
+    pending.forEach((callback) => callback(0));
+  });
+  // The sixth dot (index 6) no longer fits inside the 200px outline window.
+  expect(outline.scrollTop).toBe(18 + 6 * 27 + 15 + 27 - 200);
+});
+
 it("does not move past the first or last user message", () => {
   HTMLElement.prototype.scrollIntoView = vi.fn();
   const messages: ChatMessage[] = [
