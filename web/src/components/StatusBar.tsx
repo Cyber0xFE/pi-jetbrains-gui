@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { formatCost, formatTokens } from "../format";
 import type { WireStatus } from "../types";
 
@@ -42,6 +42,17 @@ export function StatusBar({
   const [autoCompactionHovered, setAutoCompactionHovered] = useState(false);
   const [autoCompactionFocused, setAutoCompactionFocused] = useState(false);
   const showAutoCompactionTooltip = autoCompactionHovered || autoCompactionFocused;
+  // The footer's running indicator cycles "." -> ".." -> "..." on a timer instead of a CSS
+  // animation: the IDE webview inherits the OS "show animations" setting, so keyframes are
+  // dropped (prefers-reduced-motion) on machines with Windows animation effects off.
+  const streaming = busy || status.isStreaming;
+  const [ellipsisDots, setEllipsisDots] = useState(1);
+  useEffect(() => {
+    if (!streaming) return;
+    setEllipsisDots(1);
+    const timer = window.setInterval(() => setEllipsisDots((dots) => (dots % 3) + 1), 400);
+    return () => window.clearInterval(timer);
+  }, [streaming]);
   const usage = status.usage ?? null;
   const contextWindow = status.context?.contextWindow ?? status.contextWindow ?? null;
   const percent = status.context?.percent ?? null;
@@ -125,7 +136,18 @@ export function StatusBar({
             )}
           </span>
           {status.isCompacting && <span className="status-streaming">compacting…</span>}
-          {(busy || status.isStreaming) && <span className="status-streaming">running…</span>}
+          {streaming && (
+            <span className="status-streaming">
+              running
+              <span className="status-ellipsis" aria-hidden="true">
+                {[1, 2, 3].map((dot) => (
+                  <span key={dot} className={dot <= ellipsisDots ? undefined : "status-ellipsis-off"}>
+                    .
+                  </span>
+                ))}
+              </span>
+            </span>
+          )}
         </div>
         <div className="status-right">
           <button

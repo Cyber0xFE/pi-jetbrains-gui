@@ -308,6 +308,14 @@ body {
   color: var(--accent);
 }
 
+/* Typing-style ". .. ..." ellipsis while streaming. StatusBar toggles the hidden dots on a
+   timer (visibility keeps the text width stable) instead of CSS keyframes, because the IDE
+   webview inherits the OS animation setting and drops keyframes when Windows animation
+   effects are off. */
+.status-ellipsis-off {
+  visibility: hidden;
+}
+
 .status-extensions {
   flex-wrap: wrap;
   color: var(--fg-dim);

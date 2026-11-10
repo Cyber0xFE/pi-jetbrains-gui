@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WireStatus } from "../types";
 import { StatusBar } from "./StatusBar";
@@ -157,6 +157,29 @@ describe("StatusBar", () => {
     );
 
     expect(screen.getByText("clean 2 warnings")).toBeDefined();
+  });
+
+  it("animates a typing-style ellipsis while pi is streaming", () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = render(footer({ phase: "running", message: "ready", model: "m" }, { busy: true }));
+
+      const ellipsis = container.querySelector(".status-ellipsis");
+      expect(ellipsis?.getAttribute("aria-hidden")).toBe("true");
+      expect(ellipsis?.querySelectorAll("span")).toHaveLength(3);
+      expect(container.querySelector(".status-streaming")?.textContent).toBe("running...");
+
+      const hiddenDots = () => container.querySelectorAll(".status-ellipsis-off").length;
+      expect(hiddenDots()).toBe(2);
+      act(() => vi.advanceTimersByTime(400));
+      expect(hiddenDots()).toBe(1);
+      act(() => vi.advanceTimersByTime(400));
+      expect(hiddenDots()).toBe(0);
+      act(() => vi.advanceTimersByTime(400));
+      expect(hiddenDots()).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("surfaces the failure message for stopped or failed processes", () => {
