@@ -2407,11 +2407,22 @@ mark.search-hit {
 }
 
 .picker-label {
-  flex: 0 1 auto;
-  max-width: 55%;
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Trailing badge/detail group: right-aligned so the row's metadata hugs the right edge. */
+.picker-meta {
+  display: inline-flex;
+  flex: 0 1 auto;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  max-width: 60%;
 }
 
 .picker-badge {
@@ -2425,8 +2436,7 @@ mark.search-hit {
 
 .picker-detail {
   flex: 0 1 auto;
-  max-width: 55%;
-  margin-left: auto;
+  min-width: 0;
   color: var(--fg-dim);
   font-size: 0.86em;
   text-align: right;
@@ -2478,32 +2488,38 @@ mark.search-hit {
 
 .picker-delete {
   display: inline-flex;
-  flex: 0 0 auto;
+  position: absolute;
+  top: 50%;
+  right: 6px;
   align-items: center;
   justify-content: center;
   width: 28px;
   height: 28px;
-  margin-left: 2px;
   border: 1px solid transparent;
   border-radius: 7px;
+  background: var(--bg-raised);
   color: var(--fg-dim);
   opacity: 0;
+  transform: translateY(-50%);
   cursor: pointer;
   transition: opacity 120ms ease, color 120ms ease, background 120ms ease, border-color 120ms ease;
 }
 
 .picker-rename {
   display: inline-flex;
-  flex: 0 0 auto;
+  position: absolute;
+  top: 50%;
+  right: 36px;
   align-items: center;
   justify-content: center;
   width: 28px;
   height: 28px;
-  margin-left: 2px;
   border: 1px solid transparent;
   border-radius: 7px;
+  background: var(--bg-raised);
   color: var(--fg-dim);
   opacity: 0;
+  transform: translateY(-50%);
   cursor: pointer;
   transition: opacity 120ms ease, color 120ms ease, background 120ms ease, border-color 120ms ease;
 }

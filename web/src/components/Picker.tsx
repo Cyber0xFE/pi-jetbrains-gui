@@ -176,9 +176,13 @@ export function Picker({ title, items, placeholder, emptyText, actions, scrollPo
               >
                 <span className="picker-marker">{item.active ? "●" : ""}</span>
                 <span className="picker-label">{item.label}</span>
-                {item.badge && <span className="picker-badge">{item.badge}</span>}
-                {item.default && <span className="picker-default">default</span>}
-                {item.detail && <span className="picker-detail">{item.detail}</span>}
+                {(item.badge || item.default || item.detail) && (
+                  <span className="picker-meta">
+                    {item.badge && <span className="picker-badge">{item.badge}</span>}
+                    {item.default && <span className="picker-default">default</span>}
+                    {item.detail && <span className="picker-detail">{item.detail}</span>}
+                  </span>
+                )}
                 {item.onAction && (
                   <span
                     className="picker-action"
