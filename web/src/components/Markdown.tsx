@@ -86,6 +86,12 @@ interface InlineTokenLike {
 }
 
 /**
+ * Full-width and CJK punctuation: linkify-it only trims ASCII punctuation from a match, so
+ * `（或直接访问 http://localhost:3000/login）` keeps the closing `）` inside the link target.
+ */
+const CJK_TRAILING_PUNCTUATION = /[\u00b7\u2010-\u201f\u2026\u3001-\u303f\ufe10-\ufe19\ufe30-\ufe4f\uff01-\uff0f\uff1a-\uff20\uff3b-\uff40\uff5b-\uff65]/;
+
+/**
  * `markdown-it` 14 runs its inline `linkify` rule before `emphasis` so bare URLs beat emphasis
  * markers. linkify-it does not stop at CJK text, so a URL followed directly by Chinese swallows
  * both the closing marker and the following sentence: `**打开：http://…/5**（店铺` rendered as a
@@ -115,9 +121,13 @@ const linkifyKeepingEmphasisMarkers = (state: InlineStateLike, silent: boolean):
   let url = link.url;
   if (url.length <= protoLength) return false;
   // A `*` inside the match belongs to the surrounding emphasis, not to the URL (markdown-it only
-  // trims them from the tail, which is not enough when CJK text follows the marker).
+  // trims them from the tail, which is not enough when CJK text follows the marker). The same tail
+  // trim is needed for full-width punctuation, which linkify-it would otherwise URL-encode into
+  // the link target.
   const markerIndex = url.indexOf("*");
-  if (markerIndex > 0) url = url.slice(0, markerIndex);
+  let end = markerIndex > 0 ? markerIndex : url.length;
+  while (end > 0 && CJK_TRAILING_PUNCTUATION.test(url[end - 1] ?? "")) end -= 1;
+  if (end !== url.length) url = url.slice(0, end);
   if (url.length <= protoLength) return false;
 
   const fullUrl = md.normalizeLink(url);

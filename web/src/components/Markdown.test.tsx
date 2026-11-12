@@ -106,6 +106,24 @@ describe("Markdown", () => {
     expect(container.textContent).toContain("（店铺 5 = 天猫小家电旗舰店");
   });
 
+  it("keeps full-width punctuation that follows a bare URL out of the link target", () => {
+    // linkify-it's path character class only excludes ASCII punctuation, so `）` used to end up
+    // in the anchor text and href (`http://localhost:3000/login%EF%BC%89`).
+    const source = "1. 点右上角 「登录」按钮（或直接访问 http://localhost:3000/login）";
+    const { container } = render(<Markdown text={source} streaming={false} />);
+    const anchor = container.querySelector("a");
+    expect(anchor?.textContent).toBe("http://localhost:3000/login");
+    expect(anchor?.getAttribute("href")).toBe("http://localhost:3000/login");
+    expect(container.textContent).toContain("http://localhost:3000/login）");
+  });
+
+  it("trims trailing CJK punctuation runs from a bare URL", () => {
+    const { container } = render(<Markdown text={"详见 http://localhost:3000/login）。"} streaming={false} />);
+    const anchor = container.querySelector("a");
+    expect(anchor?.textContent).toBe("http://localhost:3000/login");
+    expect(container.textContent).toContain("login）。");
+  });
+
   it("keeps intraword underscores literal while rendering CJK-adjacent emphasis", () => {
     const { container } = render(<Markdown text={"foo_bar_baz 与 **中文**一起"} streaming={false} />);
     expect(container.querySelector("strong")?.textContent).toBe("中文");
