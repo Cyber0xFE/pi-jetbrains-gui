@@ -59,6 +59,87 @@ function highlight(code: string, language: string): string {
   }
 }
 
+function isAsciiAlpha(code: number): boolean {
+  return (code >= 0x41 && code <= 0x5a) || (code >= 0x61 && code <= 0x7a);
+}
+
+function isSchemeChar(code: number): boolean {
+  return isAsciiAlpha(code) || (code >= 0x30 && code <= 0x39) || code === 0x2b || code === 0x2d || code === 0x2e;
+}
+
+/** The subset of `StateInline` the custom linkify rule touches. */
+interface InlineStateLike {
+  src: string;
+  pos: number;
+  posMax: number;
+  pending: string;
+  linkLevel?: number;
+  md: MarkdownIt;
+  push(type: string, tag: string, nesting: -1 | 0 | 1): InlineTokenLike;
+}
+
+interface InlineTokenLike {
+  attrs: [string, string][] | null;
+  markup: string;
+  info: string;
+  content: string;
+}
+
+/**
+ * `markdown-it` 14 runs its inline `linkify` rule before `emphasis` so bare URLs beat emphasis
+ * markers. linkify-it does not stop at CJK text, so a URL followed directly by Chinese swallows
+ * both the closing marker and the following sentence: `**打开：http://…/5**（店铺` rendered as a
+ * literal `**`, one oversized link and an unclosed bold. Cut the match at the first `*` so the
+ * emphasis markers stay in the text stream; everything else mirrors markdown-it's own rule.
+ */
+const linkifyKeepingEmphasisMarkers = (state: InlineStateLike, silent: boolean): boolean => {
+  const md = state.md;
+  if (!md.options.linkify) return false;
+  // `linkLevel` is a runtime-only counter used to skip linkify inside link labels.
+  if ((state.linkLevel ?? 0) > 0) return false;
+
+  const pos = state.pos;
+  if (pos + 3 > state.posMax) return false;
+  if (state.src.charCodeAt(pos) !== 0x3a || state.src.charCodeAt(pos + 1) !== 0x2f || state.src.charCodeAt(pos + 2) !== 0x2f) {
+    return false;
+  }
+
+  const protoMin = pos - Math.min(10, state.pending.length, pos);
+  let protoStart = pos;
+  while (protoStart > protoMin && isSchemeChar(state.src.charCodeAt(protoStart - 1))) protoStart -= 1;
+  if (protoStart === pos || !isAsciiAlpha(state.src.charCodeAt(protoStart))) return false;
+
+  const protoLength = pos - protoStart;
+  const link = md.linkify.matchAtStart(state.src.slice(protoStart));
+  if (!link) return false;
+  let url = link.url;
+  if (url.length <= protoLength) return false;
+  // A `*` inside the match belongs to the surrounding emphasis, not to the URL (markdown-it only
+  // trims them from the tail, which is not enough when CJK text follows the marker).
+  const markerIndex = url.indexOf("*");
+  if (markerIndex > 0) url = url.slice(0, markerIndex);
+  if (url.length <= protoLength) return false;
+
+  const fullUrl = md.normalizeLink(url);
+  if (!md.validateLink(fullUrl)) return false;
+
+  if (!silent) {
+    state.pending = state.pending.slice(0, -protoLength);
+    const open = state.push("link_open", "a", 1);
+    open.attrs = [["href", fullUrl]];
+    open.markup = "linkify";
+    open.info = "auto";
+    const text = state.push("text", "", 0);
+    text.content = md.normalizeLinkText(url);
+    const close = state.push("link_close", "a", -1);
+    close.markup = "linkify";
+    close.info = "auto";
+  }
+
+  state.pos += url.length - protoLength;
+  return true;
+};
+
 function createRenderer(withHighlight: boolean, fileReferences: readonly string[]): MarkdownIt {
   const renderer = new MarkdownIt({
     // Model output is untrusted HTML: never let raw tags through.
@@ -70,6 +151,7 @@ function createRenderer(withHighlight: boolean, fileReferences: readonly string[
   // CommonMark treats `**x（y）**后` as literal because the closing marker is preceded by
   // CJK punctuation and followed by a CJK character; relax that for CJK-adjacent emphasis.
   renderer.use(cjkFriendly);
+  renderer.inline.ruler.at("linkify", linkifyKeepingEmphasisMarkers);
   const referenceTrie = createReferenceTrie(fileReferences);
   renderer.inline.ruler.before("text", "file_reference", (state, silent) => {
     if (state.src[state.pos] !== "@") return false;

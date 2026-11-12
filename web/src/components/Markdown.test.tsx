@@ -92,6 +92,20 @@ describe("Markdown", () => {
     expect(container.querySelector("strong")?.textContent).toBe("截至此刻的完整状态（含 payload）");
   });
 
+  it("keeps a bold marker that follows a bare URL directly by CJK text", () => {
+    // linkify runs before emphasis and used to swallow the closing `**` plus the CJK tail into
+    // the link, leaving `**` literal and the bold unclosed.
+    const source =
+      "**打开：http://localhost:3000/stores/5**（店铺 5 = 天猫小家电旗舰店，库存 5 / 预警线 8，属于低库存）";
+    const { container } = render(<Markdown text={source} streaming={false} />);
+    const anchor = container.querySelector("a");
+    expect(container.querySelector("strong")?.textContent).toBe("打开：http://localhost:3000/stores/5");
+    expect(anchor?.textContent).toBe("http://localhost:3000/stores/5");
+    expect(anchor?.getAttribute("href")).toBe("http://localhost:3000/stores/5");
+    expect(container.textContent).not.toContain("**");
+    expect(container.textContent).toContain("（店铺 5 = 天猫小家电旗舰店");
+  });
+
   it("keeps intraword underscores literal while rendering CJK-adjacent emphasis", () => {
     const { container } = render(<Markdown text={"foo_bar_baz 与 **中文**一起"} streaming={false} />);
     expect(container.querySelector("strong")?.textContent).toBe("中文");
