@@ -37,16 +37,21 @@ class SessionTreeTest {
 
         val rows = SessionTree.flatten(tree, leafId = "e2")
 
-        assertEquals(listOf("e1"), rows.map { it.id })
-        assertEquals(listOf(0), rows.map { it.depth })
+        // Every entry is returned depth-first; the webview collapses non-user rows by default.
+        assertEquals(listOf("e1", "e2", "e3"), rows.map { it.id })
+        assertEquals(listOf(0, 1, 0), rows.map { it.depth })
         assertEquals("start", rows[0].label)
         assertEquals("user: hello", rows[0].text)
         assertTrue(rows[0].forkable)
         assertTrue(rows[0].active)
+        assertEquals("hi there", rows[1].text.removePrefix("assistant: "))
+        assertEquals("e1", rows[1].parentId)
+        assertTrue(rows[1].active)
+        assertTrue(!rows[1].forkable)
     }
 
     @Test
-    fun `shows only user messages while preserving user branches across hidden entries`() {
+    fun `returns hidden assistant and bookkeeping rows with their parent chain`() {
         val tree = decode(
             """
             [
@@ -64,9 +69,11 @@ class SessionTreeTest {
 
         val rows = SessionTree.flatten(tree, leafId = "u2")
 
-        assertEquals(listOf("u1", "u2"), rows.map { it.id })
-        assertEquals(listOf(0, 0), rows.map { it.depth })
-        assertTrue(rows.all { it.role == "user" && it.forkable })
+        assertEquals(listOf("u1", "a1", "u2"), rows.map { it.id })
+        assertEquals(listOf(0, 0, 0), rows.map { it.depth })
+        assertEquals(listOf("user", "assistant", "user"), rows.map { it.role })
+        assertEquals(listOf(true, false, true), rows.map { it.forkable })
+        assertEquals(listOf(null, "u1", "a1"), rows.map { it.parentId })
     }
 
     @Test
@@ -106,10 +113,12 @@ class SessionTreeTest {
 
         val rows = SessionTree.flatten(tree, leafId = "e5")
 
-        // Bookkeeping entries, assistant messages and tool results are hidden; only the user
-        // message remains in the tree.
-        assertEquals(listOf("e1"), rows.map { it.id })
-        assertEquals(listOf(0), rows.map { it.depth })
+        // The chain stays flat at depth 0; non-user rows ride along so the webview can expand them.
+        assertEquals(listOf("e1", "e2", "e3", "e4", "e5"), rows.map { it.id })
+        assertEquals(listOf(0, 0, 0, 0, 0), rows.map { it.depth })
+        assertEquals("[bash: ls -la]", rows[4].text)
+        assertEquals("e4", rows[4].parentId)
+        assertTrue(rows.last().active)
     }
 
     @Test
@@ -183,7 +192,7 @@ class SessionTreeTest {
 
         val rows = SessionTree.flatten(data, "e$depth")
 
-        assertEquals((0..depth).count { roleOf(it) == "user" }, rows.size)
+        assertEquals((0..depth).map { "e$it" }, rows.map { it.id })
         assertEquals("user: m0", rows.first().text)
         assertTrue(rows.all { it.depth == 0 })
         assertTrue(rows.last().active)

@@ -736,8 +736,8 @@ describe("App", () => {
         type: "session_tree",
         entries: [
           { id: "entry-1", type: "message", role: "user", text: "hello", depth: 0, forkable: true, active: true },
-          { id: "assistant-1", type: "message", role: "assistant", text: "assistant: hidden", depth: 0, forkable: false, active: true },
-          { id: "tool-1", type: "message", role: "toolResult", text: "[bash: hidden]", depth: 0, forkable: false, active: true },
+          { id: "assistant-1", parentId: "entry-1", type: "message", role: "assistant", text: "assistant: hidden", depth: 0, forkable: false, active: true },
+          { id: "tool-1", parentId: "assistant-1", type: "message", role: "toolResult", text: "[bash: hidden]", depth: 0, forkable: false, active: true },
         ],
         leafId: "entry-1",
         sessionId: "session-1",
@@ -750,8 +750,28 @@ describe("App", () => {
 
     expect(await screen.findByRole("dialog", { name: "Session tree" })).toBeDefined();
     expect(screen.getByText("hello")).toBeDefined();
+    // Non-user rows are collapsed by default; clicking the user message reveals them in place.
     expect(screen.queryByText("assistant: hidden")).toBeNull();
     expect(screen.queryByText("[bash: hidden]")).toBeNull();
+
+    fireEvent.click(screen.getByRole("option", { name: /hello/ }));
+    expect(screen.getByText("assistant: hidden")).toBeDefined();
+    expect(screen.getByText("[bash: hidden]")).toBeDefined();
+
+    fireEvent.click(screen.getByRole("option", { name: /hello/ }));
+    expect(screen.queryByText("assistant: hidden")).toBeNull();
+    expect(screen.queryByText("[bash: hidden]")).toBeNull();
+    // Clicking a row only expands/collapses; forking stays on the hover button.
+    expect(window.__piSent?.filter((message) => message.type === "fork")).toEqual([]);
+
+    const forkButtons = screen.getAllByRole("button", { name: "fork from here" });
+    expect(forkButtons).toHaveLength(1);
+    fireEvent.click(forkButtons[0]!);
+    await waitFor(() =>
+      expect(window.__piSent?.filter((message) => message.type === "fork")).toEqual([
+        { type: "fork", entryId: "entry-1" },
+      ]),
+    );
     expect(input.value).toBe("");
     expect(window.__piSent?.filter((message) => message.type === "prompt")).toEqual([]);
   });
@@ -772,7 +792,7 @@ describe("App", () => {
 
     fireEvent.change(await screen.findByPlaceholderText(/Send a message to pi/), { target: { value: "/tree" } });
     fireEvent.keyDown(await screen.findByPlaceholderText(/Send a message to pi/), { key: "Enter" });
-    fireEvent.click(await screen.findByRole("option", { name: /inspect/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "fork from here" }));
 
     await waitFor(() => expect(window.__piSent?.filter((message) => message.type === "fork")).toEqual([
       { type: "fork", entryId: "entry-image", images: [image] },

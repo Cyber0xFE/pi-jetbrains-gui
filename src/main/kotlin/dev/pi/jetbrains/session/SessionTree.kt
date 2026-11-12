@@ -55,10 +55,10 @@ private class TreeIndex {
 /**
  * Flattens `get_tree` into depth-first rows plus the active branch marker.
  *
- * Indentation and default filtering mirror pi's interactive `/tree` view
- * (`tree-selector.ts`): single-child chains stay flat, depth only increases at
- * real branch points (and the first generation after one), and bookkeeping
- * entries plus text-less assistant messages are hidden by default.
+ * Indentation mirrors pi's interactive `/tree` view (`tree-selector.ts`): single-child chains
+ * stay flat and depth only increases at real branch points (and the first generation after one).
+ * Every entry is returned; the webview shows user messages by default and reveals the remaining
+ * rows on demand per fork point.
  */
 object SessionTree {
     fun flatten(tree: List<RpcSessionTreeNode>, leafId: String?): List<FlatTreeEntry> {
@@ -121,31 +121,11 @@ object SessionTree {
             containsActive[id] = id == leafId || index.childIds[id]?.any { containsActive[it] == true } == true
         }
 
-        // The RPC fork command accepts user-message entries only, so the tree shows only rows
-        // that can be selected as fork points. Hidden entries are skipped while their user
-        // descendants are attached to the nearest visible ancestor below.
-        fun isVisible(id: String): Boolean {
-            val entry = index.entries[id] ?: return false
-            val message = entry["message"] as? JsonObject
-            return entry.string("type") == "message" && message?.string("role") == "user"
-        }
-
-        // Attach each visible node to its nearest visible ancestor (pi's `recalculateVisualStructure`).
-        val visibleChildren = HashMap<String?, MutableList<String>>()
-        for (id in index.entries.keys) {
-            if (!isVisible(id)) continue
-            var ancestor: String? = index.parentOf[id]
-            while (ancestor != null && !isVisible(ancestor)) {
-                ancestor = index.parentOf[ancestor]
-            }
-            visibleChildren.getOrPut(ancestor) { mutableListOf() }.add(id)
-        }
-
         fun ordered(ids: List<String>): List<String> =
             ids.sortedByDescending { containsActive[it] == true }
 
         val rows = ArrayList<FlatTreeEntry>(index.entries.size)
-        val rootIds = ordered(visibleChildren[null] ?: emptyList())
+        val rootIds = ordered(index.roots)
         val multipleRoots = rootIds.size > 1
 
         // pi's indent rules: only branch points (children > 1) and the first
@@ -157,8 +137,17 @@ object SessionTree {
         while (visits.isNotEmpty()) {
             val visit = visits.removeLast()
             val displayIndent = if (multipleRoots) maxOf(0, visit.indent - 1) else visit.indent
-            rows.add(rowOf(index.entries.getValue(visit.id), displayIndent, index.labels[visit.id], toolCalls, activePath))
-            val children = ordered(visibleChildren[visit.id] ?: emptyList())
+            rows.add(
+                rowOf(
+                    index.entries.getValue(visit.id),
+                    index.parentOf[visit.id],
+                    displayIndent,
+                    index.labels[visit.id],
+                    toolCalls,
+                    activePath,
+                ),
+            )
+            val children = ordered(index.childIds[visit.id] ?: emptyList())
             val multipleChildren = children.size > 1
             val childIndent = when {
                 multipleChildren -> visit.indent + 1
@@ -198,6 +187,7 @@ object SessionTree {
 
     private fun rowOf(
         entry: JsonObject,
+        parentId: String?,
         depth: Int,
         label: String?,
         toolCalls: Map<String, ToolCallInfo>,
@@ -207,7 +197,7 @@ object SessionTree {
         val role = (entry["message"] as? JsonObject)?.string("role")
         return FlatTreeEntry(
             id = id,
-            parentId = (entry["parentId"] as? JsonPrimitive)?.contentOrNull,
+            parentId = parentId,
             type = entry.string("type") ?: "unknown",
             role = role,
             label = label,

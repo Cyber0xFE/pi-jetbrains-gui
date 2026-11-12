@@ -22,7 +22,8 @@ type Tab = "sessions" | "tree";
 
 /**
  * One dialog for the session list and the fork tree (plan M3.2 / M3.3). Sessions select via
- * `switch_session`; forkable tree rows (user messages) call `fork` with their entry id.
+ * `switch_session`; tree rows collapse to one row per user message, clicking a row expands the
+ * assistant/tool rows underneath, and the row's hover button calls `fork` with its entry id.
  */
 export function SessionDialog({
   sessions,
@@ -39,6 +40,7 @@ export function SessionDialog({
   onFork,
 }: Props): JSX.Element {
   const [tab, setTab] = useState<Tab>(initialTab);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [renameTarget, setRenameTarget] = useState<SessionSummary | null>(null);
@@ -63,10 +65,51 @@ export function SessionDialog({
     [sessions, onDelete, openRename],
   );
 
-  const treeItems = useMemo<PickerItem[]>(
-    () => tree.filter((entry) => entry.type === "message" && entry.role === "user").map((entry) => treeItem(entry, leafId)),
-    [tree, leafId],
-  );
+  const treeItems = useMemo<PickerItem[]>(() => {
+    const byId = new Map(tree.map((entry) => [entry.id, entry]));
+    const ownerCache = new Map<string, string | null>();
+
+    // Non-user rows belong to the nearest user message above them; they only show once that
+    // row is expanded, which keeps the default view at one row per fork point.
+    const userOwnerOf = (id: string): string | null => {
+      if (ownerCache.has(id)) return ownerCache.get(id) ?? null;
+      const seen = new Set<string>();
+      let current = byId.get(id)?.parentId ?? null;
+      while (current && !seen.has(current)) {
+        seen.add(current);
+        const ancestor = byId.get(current);
+        if (!ancestor) {
+          current = null;
+          break;
+        }
+        if (isUserRow(ancestor)) break;
+        current = ancestor.parentId ?? null;
+      }
+      const owner = current && byId.has(current) ? current : null;
+      ownerCache.set(id, owner);
+      return owner;
+    };
+
+    const hiddenRows = new Map<string, TreeEntry[]>();
+    for (const entry of tree) {
+      if (isUserRow(entry)) continue;
+      const owner = userOwnerOf(entry.id);
+      if (!owner) continue;
+      const owned = hiddenRows.get(owner);
+      if (owned) owned.push(entry);
+      else hiddenRows.set(owner, [entry]);
+    }
+
+    const items: PickerItem[] = [];
+    for (const entry of tree) {
+      if (!isUserRow(entry)) continue;
+      items.push(treeItem(entry, leafId, onFork));
+      if (!expanded.has(entry.id)) continue;
+      // Revealed rows sit directly under their fork point, ahead of later branches.
+      for (const hidden of hiddenRows.get(entry.id) ?? []) items.push(treeItem(hidden, leafId, onFork));
+    }
+    return items;
+  }, [tree, leafId, onFork, expanded]);
 
   const items = tab === "sessions" ? sessionItems : treeItems;
   const submitRename = (): void => {
@@ -147,8 +190,16 @@ export function SessionDialog({
           const session = sessions.find((candidate) => candidate.path === item.key);
           onSwitch(item.key, session?.id);
         } else {
+          // Clicking a user message expands/collapses it; forking only happens via the
+          // hover button so a mis-click on the row cannot fork the session.
           const entry = tree.find((candidate) => candidate.id === item.key);
-          onFork(item.key, entry?.images);
+          if (!entry || !isUserRow(entry)) return;
+          setExpanded((previous) => {
+            const next = new Set(previous);
+            if (next.has(entry.id)) next.delete(entry.id);
+            else next.add(entry.id);
+            return next;
+          });
         }
       }}
       onClose={onClose}
@@ -196,14 +247,27 @@ export function SessionDialog({
   );
 }
 
-function treeItem(entry: TreeEntry, leafId: string | null): PickerItem {
+function isUserRow(entry: TreeEntry): boolean {
+  return entry.type === "message" && entry.role === "user";
+}
+
+/**
+ * Rows keep their depth; fork points expose a hover-only "fork from here" button, and clicking
+ * a user message row expands or collapses the entries hidden underneath it.
+ */
+function treeItem(
+  entry: TreeEntry,
+  leafId: string | null,
+  onFork: (entryId: string, images: TreeEntry["images"]) => void,
+): PickerItem {
   return {
     key: entry.id,
     label: entry.label?.trim() || entry.text || `[${entry.type}]`,
-    detail: entry.forkable ? "fork from here" : `${entry.type}${entry.role ? `/${entry.role}` : ""}`,
     badge: entry.active ? "active" : undefined,
     active: entry.active || entry.id === leafId,
     disabled: !entry.forkable,
     depth: entry.depth,
+    onAction: entry.forkable ? () => onFork(entry.id, entry.images) : undefined,
+    actionLabel: entry.forkable ? "fork from here" : undefined,
   };
 }

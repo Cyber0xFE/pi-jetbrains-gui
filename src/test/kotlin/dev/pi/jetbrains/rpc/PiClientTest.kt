@@ -213,10 +213,11 @@ class PiClientTest {
         val leafId = (treeData["leafId"] as? JsonPrimitive)?.contentOrNull
         assertEquals("entry-2", leafId)
         val rows = SessionTree.flatten(treeData, leafId)
-        assertEquals(listOf("entry-1"), rows.map { it.id })
+        assertEquals(listOf("entry-1", "entry-2"), rows.map { it.id })
         assertEquals("user: hi", rows.first().text)
         assertTrue(rows.first().forkable)
-        assertTrue(rows.single().active, "the visible user ancestor stays on the active branch")
+        assertTrue(rows.first().active, "the visible user ancestor stays on the active branch")
+        assertTrue(rows.last().active)
 
         val cancelled = client.send(RpcCommand(type = "switch_session", sessionPath = "cancel-me"))
             .await().decodeDataAs<RpcSwitchResult>()
