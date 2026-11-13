@@ -90,26 +90,20 @@ intellijPlatform {
         """.trimIndent()
 
         changeNotes = """
-            <h2>What's New in 0.4.0</h2>
+            <h2>What's New in 0.4.1</h2>
             <h3>Features</h3>
             <ul>
-              <li><b>Steering and follow-up messages while streaming:</b> the composer no longer locks up while pi is answering a prompt. <code>Enter</code> queues the message as <b>steering</b> (pi receives it after the current tool call, before the next model call) and <code>Alt+Enter</code> queues it as a <b>follow-up</b> (pi processes it after the current run), matching the pi TUI. Pending messages are listed above the composer and disappear as pi delivers them.</li>
-              <li><b>Edit queued messages:</b> click <b>Edit</b> on the queue bar or press <code>Alt+Up</code> in the composer to pull pending steering and follow-up messages back in, like the pi TUI <code>dequeue</code> action. Each message gets its own inline editor with its steering/follow-up label, can be removed individually, re-queued with <b>Send all</b>, or restored untouched with <b>Cancel</b>.</li>
-              <li>The user-message navigation outline now shows a slim scrollbar when you hover or focus it, so long conversations are visibly scrollable.</li>
+              <li><b>Custom chat background image:</b> in <b>Settings | Tools | Pi</b> you can pick an optional picture (PNG, JPG, GIF, WebP, BMP, up to 4 MB) to sit behind the chat transcript, with a file chooser, a clear button and an opacity slider (0–100%, default 15) like the IDE's editor background image. The image is encoded into the webview and reapplied immediately when it or the opacity changes; transparent chat surfaces let it show through while the toolbar and composer stay opaque.</li>
+              <li><b>Collapsible session tree:</b> the tree now opens with one row per user message. Assistant replies, tool results, compaction and bookkeeping entries stay collapsed underneath; click a user message to expand or collapse everything that followed from it, with branch indentation preserved on the revealed rows.</li>
+              <li><b>Fork from a row, not by clicking it:</b> forking moved to a <b>fork from here</b> button that appears when you hover a user message. Clicking the row itself only expands it, so browsing a long session no longer forks it by accident.</li>
+              <li>The footer's <b>running</b> indicator now cycles through <code>.</code> → <code>..</code> → <code>...</code> while pi works. The animation is timer-driven rather than CSS-based, so it still plays on machines with Windows animation effects turned off (the webview then drops CSS keyframes).</li>
             </ul>
             <h3>Fixes</h3>
             <ul>
-              <li>Stopping a run now clears the pending queue before aborting, matching the pi TUI <code>Esc</code> behavior: queued steering and follow-up messages are handed back to the editor instead of being silently drained after the abort.</li>
-              <li><b>Send all</b> re-queues messages one at a time: the first message starts a run and the rest return to their own steering/follow-up queues once pi starts streaming, instead of being merged into a single prompt.</li>
-              <li>User messages queued within the same millisecond no longer vanish from the WebView after re-queueing.</li>
-              <li>Renaming a session that is not the active one no longer breaks its message chain, which previously left the history empty when the session was opened.</li>
-              <li>The session tree no longer stays empty when a very long session is opened for the first time.</li>
-              <li>Literal <code>&lt;thinking&gt;</code> tags inside Markdown code are shown as written instead of being parsed as reasoning blocks.</li>
-              <li>pi installed through npm is detected even when <code>npm root -g</code> fails on the IDE's stale <code>PATH</code>, by falling back to the npm next to the resolved Node.js binary.</li>
-            </ul>
-            <h3>Maintenance</h3>
-            <ul>
-              <li>RPC protocol snapshot refreshed against pi v0.80.2.</li>
+              <li>Bold text placed directly after a bare URL keeps its closing <code>**</code>: <code>**打开：http://localhost:3000/5**（店铺</code> now renders as bold instead of a literal marker followed by an oversized link.</li>
+              <li>Bare URLs followed by full-width or CJK punctuation no longer swallow that punctuation into the link target, where it was percent-encoded into the URL.</li>
+              <li>The session and picker rows now align their badge, <code>default</code> marker and detail text as one right-aligned block, and the rename/delete actions appear as a hover overlay instead of squeezing the row contents.</li>
+              <li>Jumping to a user message — by clicking a dot, stepping through the previous/next navigation, landing on a <code>Ctrl+F</code> hit, or returning to the latest message — now scrolls the left dot track to the matching dot as well. Plain scrolling updates it too, so the track never points at a dot outside its visible window.</li>
             </ul>
 
         """.trimIndent()
