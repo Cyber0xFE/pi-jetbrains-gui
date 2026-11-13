@@ -104,6 +104,7 @@ intellijPlatform {
               <li>Bare URLs followed by full-width or CJK punctuation no longer swallow that punctuation into the link target, where it was percent-encoded into the URL.</li>
               <li>The session and picker rows now align their badge, <code>default</code> marker and detail text as one right-aligned block, and the rename/delete actions appear as a hover overlay instead of squeezing the row contents.</li>
               <li>Jumping to a user message — by clicking a dot, stepping through the previous/next navigation, landing on a <code>Ctrl+F</code> hit, or returning to the latest message — now scrolls the left dot track to the matching dot as well. Plain scrolling updates it too, so the track never points at a dot outside its visible window.</li>
+              <li>Selecting a chat background image in settings no longer crashes on IntelliJ IDEA 2026.3, where the file chooser dialog signature changed; the file chooser now uses the stable <code>FileChooser.chooseFile</code> API and filters the dialog to image extensions.</li>
             </ul>
 
         """.trimIndent()

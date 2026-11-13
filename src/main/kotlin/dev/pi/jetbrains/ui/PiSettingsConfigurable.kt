@@ -1,11 +1,9 @@
 package dev.pi.jetbrains.ui
 
-import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
-import com.intellij.openapi.fileChooser.FileChooserFactory
+import com.intellij.openapi.fileChooser.FileChooser
+import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.keymap.KeymapUtil
 import com.intellij.openapi.options.Configurable
-import com.intellij.openapi.project.Project
-import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.ColorPanel
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
@@ -495,14 +493,16 @@ class PiSettingsConfigurable : Configurable {
     }
 
     private fun chooseBackgroundImage() {
-        val descriptor = FileChooserDescriptorFactory.createSingleFileDescriptor().apply {
-            title = "选择背景图像"
-            description = "选择一张 PNG、JPG、GIF、WebP 或 BMP 图片"
-        }
-        val chosen: Array<VirtualFile> = FileChooserFactory.getInstance()
-            .createFileChooser(descriptor, null, null)
-            .choose(null as VirtualFile?, null as Project?)
-        chosen.firstOrNull()?.path?.let { backgroundImage.text = it }
+        // Build the descriptor directly and use FileChooser.chooseFile: the
+        // FileChooserDescriptorFactory.createSingleFileDescriptor() shortcut is deprecated, and
+        // FileChooserDialog.choose gained a (Project, VirtualFile...) signature in 2026.3, which
+        // made the old FileChooserFactory call binary-incompatible with newer IDEs. Extension filters
+        // are left to the dialog's description: FileChooserDescriptor.withExtensionFilter only
+        // exists from 2024.3 on, and withFileFilter would need the deprecated Condition type.
+        val descriptor = FileChooserDescriptor(true, false, false, false, false, false)
+            .withTitle("选择背景图像")
+            .withDescription("选择一张 PNG、JPG、GIF、WebP 或 BMP 图片")
+        FileChooser.chooseFile(descriptor, null, null)?.path?.let { backgroundImage.text = it }
     }
 
     private fun backgroundImageOpacityValue(): Int = (backgroundImageOpacity.value as? Number)?.toInt()
