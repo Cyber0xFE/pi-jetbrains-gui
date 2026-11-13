@@ -570,6 +570,13 @@ class PiChatService(private val project: Project) : Disposable {
     suspend fun sessionTree(): RpcResponse =
         requireClient().send(RpcCommand(type = "get_tree")).await()
 
+    /**
+     * Flat session entries. Preferred over [sessionTree]: the nested `get_tree` payload overflows
+     * recursive JSON parsing once a session chain grows deep enough.
+     */
+    suspend fun sessionEntries(): RpcResponse =
+        requireClient().send(RpcCommand(type = "get_entries")).await()
+
     suspend fun availableModels(): RpcResponse =
         requireClient().send(RpcCommand(type = "get_available_models")).await()
 

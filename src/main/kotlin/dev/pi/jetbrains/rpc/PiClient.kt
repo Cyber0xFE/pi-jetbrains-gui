@@ -27,6 +27,21 @@ class PiRequestTimeoutException(
 ) : TimeoutException("pi did not answer '$commandType' ($requestId) within ${timeout.toMillis()}ms")
 
 /**
+ * Raised when pi answered a command but its record could not be parsed.
+ *
+ * Without this the deferred stays pending and the request only surfaces as a misleading timeout,
+ * which hides the actual cause (e.g. a `StackOverflowError` from a deeply nested `get_tree`).
+ */
+class PiResponseParseException(
+    val requestId: String,
+    val commandType: String,
+    cause: Throwable,
+) : IOException(
+    "pi answered '$commandType' ($requestId) with an unparseable record (${cause.javaClass.simpleName})",
+    cause,
+)
+
+/**
  * Command / response correlation and event fan-out over one [PiProcess] (plan 5.3).
  *
  * Both responses and session events are published on [events]; responses additionally resolve the
@@ -129,7 +144,8 @@ class PiClient(
         val event = try {
             PiEvent.parse(line)
         } catch (t: Throwable) {
-            log("dropping unparseable record: ${t.message} :: ${line.take(200)}")
+            failUnparseableResponse(line, t)
+            log("dropping unparseable record: ${t.message ?: t.javaClass.simpleName} :: ${line.take(200)}")
             return
         }
 
@@ -153,6 +169,20 @@ class PiClient(
         }
     }
 
+    /**
+     * A response that fails to parse never resolves its deferred on its own, so fail the pending
+     * request here. The id is read from the record head instead of re-parsing the payload, which is
+     * exactly what just failed.
+     */
+    private fun failUnparseableResponse(line: String, cause: Throwable) {
+        val head = line.take(PARSE_FAILURE_HEAD_CHARS)
+        if (!RESPONSE_TYPE.containsMatchIn(head)) return
+        val id = REQUEST_ID.find(head)?.groupValues?.get(1) ?: return
+        val request = pending.remove(id) ?: return
+        log("failing $id (${request.command.type}) after unparseable response")
+        request.deferred.completeExceptionally(PiResponseParseException(id, request.command.type, cause))
+    }
+
     private fun handleExit(code: Int?) {
         _running.value = false
         val failure = PiProcessExitedException(code)
@@ -168,5 +198,10 @@ class PiClient(
 
     companion object {
         val DEFAULT_TIMEOUT: Duration = Duration.ofSeconds(30)
+
+        /** pi writes `id`/`type` first, so the head is enough to correlate a broken record. */
+        private const val PARSE_FAILURE_HEAD_CHARS = 512
+        private val RESPONSE_TYPE = Regex("\"type\"\\s*:\\s*\"response\"")
+        private val REQUEST_ID = Regex("\"id\"\\s*:\\s*\"([^\"\\\\]{1,120})\"")
     }
 }

@@ -99,6 +99,51 @@ object SessionTree {
         return flattenEntries(index, leafId)
     }
 
+    /**
+     * Flattens the flat `get_entries` result into the rows [flatten] builds from `get_tree`.
+     *
+     * `get_tree` wraps every branch level in another `children` array, so a long session becomes one
+     * JSON document thousands of levels deep. `PiJson.parseToJsonElement` is recursive, so it
+     * overflows the stdout reader's stack before the record ever reaches this class; the response is
+     * dropped and the request times out. `get_entries` carries the same entries as a flat list whose
+     * records stay shallow at any session length.
+     *
+     * Labels live in `label` entries resolved per target, like pi's `getTree()` node labels, and
+     * sibling order follows pi's timestamp sort.
+     */
+    fun flattenEntries(entries: List<JsonObject>, leafId: String? = null): List<FlatTreeEntry> {
+        val index = TreeIndex()
+        val nodes = HashMap<String, JsonObject>(entries.size)
+        val labels = HashMap<String, String>()
+        for (entry in entries) {
+            val id = entry.string("id") ?: continue
+            nodes[id] = entry
+            if (entry.string("type") != "label") continue
+            val target = entry.string("targetId") ?: continue
+            val label = entry.string("label")
+            if (label.isNullOrEmpty()) labels.remove(target) else labels[target] = label
+        }
+        for (entry in entries) {
+            val id = entry.string("id") ?: continue
+            val parentId = entry.string("parentId")?.takeIf { it != id && it in nodes }
+            index.entries[id] = entry
+            labels[id]?.let { index.labels[id] = it }
+            if (parentId == null) {
+                index.roots.add(id)
+            } else {
+                index.parentOf[id] = parentId
+                index.childIds.getOrPut(parentId) { mutableListOf() }.add(id)
+            }
+        }
+        for (children in index.childIds.values) {
+            children.sortBy { timestampOf(index.entries[it]) ?: "" }
+        }
+        return flattenEntries(index, leafId)
+    }
+
+    /** ISO-8601 strings from one writer sort lexicographically exactly like pi's `new Date(...)`. */
+    private fun timestampOf(entry: JsonObject?): String? = entry?.string("timestamp")
+
     private fun flattenEntries(index: TreeIndex, leafId: String?): List<FlatTreeEntry> {
         val toolCalls = HashMap<String, ToolCallInfo>()
         index.entries.values.forEach { collectToolCalls(it, toolCalls) }

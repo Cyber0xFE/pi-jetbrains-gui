@@ -100,6 +100,26 @@ function handle(line) {
 				},
 			});
 			return;
+		case "get_entries":
+			send({
+				id,
+				type: "response",
+				command: "get_entries",
+				success: true,
+				data: {
+					entries: [
+						{ type: "message", id: "entry-1", parentId: null, timestamp: "2025-10-30T00:00:00.000Z", message: { role: "user", content: "hi" } },
+						{ type: "message", id: "entry-2", parentId: "entry-1", timestamp: "2025-10-30T00:00:01.000Z", message: { role: "assistant", content: [{ type: "text", text: "hello" }] } },
+					],
+					leafId: "entry-2",
+				},
+			});
+			return;
+		case "broken_response":
+			// The id is readable but the payload is not JSON: the client must fail the pending request
+			// instead of waiting for its timeout.
+			process.stdout.write(`{"id":"${id}","type":"response","command":"broken_response","success":true,"data":{"tree":[}\n`);
+			return;
 		case "switch_session":
 			send({ id, type: "response", command: "switch_session", success: true, data: { cancelled: command.sessionPath === "cancel-me" } });
 			return;

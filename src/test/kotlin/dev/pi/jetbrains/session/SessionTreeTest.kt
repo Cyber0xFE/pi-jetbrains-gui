@@ -198,6 +198,86 @@ class SessionTreeTest {
         assertTrue(rows.last().active)
     }
 
+    @Test
+    fun `flattens a long flat entry list the same way as the nested tree`() {
+        // `get_entries` keeps the stdout record shallow, so chains of any length parse safely.
+        val depth = 1400
+        val entries = ArrayList<JsonObject>(depth + 1)
+        for (i in 0..depth) {
+            entries.add(
+                flatMessage(
+                    id = "e$i",
+                    parentId = if (i == 0) null else "e${i - 1}",
+                    role = if (i % 2 == 0) "user" else "assistant",
+                    text = "m$i",
+                    timestamp = "2025-10-30T00:00:00.000Z",
+                ),
+            )
+        }
+
+        val rows = SessionTree.flattenEntries(entries, leafId = "e$depth")
+
+        assertEquals((0..depth).map { "e$it" }, rows.map { it.id })
+        assertEquals("user: m0", rows.first().text)
+        assertTrue(rows.all { it.depth == 0 })
+        assertTrue(rows.all { it.active })
+        assertTrue(rows.last().active)
+    }
+
+    @Test
+    fun `resolves label entries and orders siblings by timestamp`() {
+        val entries = listOf(
+            flatMessage("e0", null, "user", "root", "2025-10-30T00:00:00.000Z"),
+            // Reversed on disk; pi sorts children by timestamp in the tree view.
+            flatMessage("e2", "e0", "user", "second", "2025-10-30T00:00:02.000Z"),
+            flatMessage("e1", "e0", "user", "first", "2025-10-30T00:00:01.000Z"),
+            flatLabel("l1", "e2", "e1", "keep"),
+        )
+
+        // No active leaf, so sibling order comes from the timestamps alone.
+        val rows = SessionTree.flattenEntries(entries, leafId = null)
+
+        assertEquals(listOf("e0", "e1", "e2", "l1"), rows.map { it.id })
+        assertEquals("keep", rows.first { it.id == "e1" }.label)
+    }
+
+    private fun flatMessage(id: String, parentId: String?, role: String, text: String, timestamp: String): JsonObject =
+        JsonObject(
+            mapOf(
+                "type" to JsonPrimitive("message"),
+                "id" to JsonPrimitive(id),
+                "parentId" to (parentId?.let(::JsonPrimitive) ?: JsonNull),
+                "timestamp" to JsonPrimitive(timestamp),
+                "message" to JsonObject(
+                    mapOf(
+                        "role" to JsonPrimitive(role),
+                        "content" to JsonArray(
+                            listOf(
+                                JsonObject(
+                                    mapOf(
+                                        "type" to JsonPrimitive("text"),
+                                        "text" to JsonPrimitive(text),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+    private fun flatLabel(id: String, parentId: String?, targetId: String, label: String): JsonObject =
+        JsonObject(
+            mapOf(
+                "type" to JsonPrimitive("label"),
+                "id" to JsonPrimitive(id),
+                "parentId" to (parentId?.let(::JsonPrimitive) ?: JsonNull),
+                "timestamp" to JsonPrimitive("2025-10-30T00:00:03.000Z"),
+                "targetId" to JsonPrimitive(targetId),
+                "label" to JsonPrimitive(label),
+            ),
+        )
+
     private fun decode(json: String): List<RpcSessionTreeNode> =
         PiJson.decodeFromJsonElement(
             kotlinx.serialization.builtins.ListSerializer(RpcSessionTreeNode.serializer()),

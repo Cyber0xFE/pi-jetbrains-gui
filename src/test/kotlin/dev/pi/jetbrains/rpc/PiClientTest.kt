@@ -140,6 +140,21 @@ class PiClientTest {
     }
 
     @Test
+    fun `fails the pending request when its response cannot be parsed`() = runBlocking {
+        val client = startClient()
+
+        // The record is dropped by the reader, so only an explicit failure can end the request
+        // before its (much longer) timeout.
+        val deferred = client.send(RpcCommand(type = "broken_response"), timeout = Duration.ofSeconds(5))
+
+        val failure = assertFailsWith<PiResponseParseException> {
+            withTimeout(TIMEOUT_MS) { deferred.await() }
+        }
+        assertEquals("broken_response", failure.commandType)
+        assertEquals("req-1", failure.requestId)
+    }
+
+    @Test
     fun `fails pending requests when the process exits`() = runBlocking {
         val client = startClient()
 
@@ -191,7 +206,7 @@ class PiClientTest {
     }
 
     @Test
-    fun `decodes M3 model, thinking, command and tree payloads`() = runBlocking {
+    fun `decodes M3 model, thinking, command and session-entry payloads`() = runBlocking {
         val client = startClient()
 
         val models = client.send(RpcCommand(type = "get_available_models"))
@@ -208,11 +223,14 @@ class PiClientTest {
         assertEquals(listOf("review", "skill:draw"), commands?.commands?.map { it.name })
         assertEquals("skill", commands?.commands?.last()?.source)
 
-        val treeResponse = client.send(RpcCommand(type = "get_tree")).await()
+        val treeResponse = client.send(RpcCommand(type = "get_entries")).await()
         val treeData = treeResponse.data as JsonObject
         val leafId = (treeData["leafId"] as? JsonPrimitive)?.contentOrNull
         assertEquals("entry-2", leafId)
-        val rows = SessionTree.flatten(treeData, leafId)
+        val entries = (treeData["entries"] as? kotlinx.serialization.json.JsonArray)
+            ?.mapNotNull { it as? JsonObject }
+            .orEmpty()
+        val rows = SessionTree.flattenEntries(entries, leafId)
         assertEquals(listOf("entry-1", "entry-2"), rows.map { it.id })
         assertEquals("user: hi", rows.first().text)
         assertTrue(rows.first().forkable)

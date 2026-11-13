@@ -749,13 +749,18 @@ class ChatPanel(
         sendTree()
     }
 
+    /**
+     * Loads the session tree from `get_entries` rather than `get_tree`: the nested tree payload is
+     * one deep JSON object per branch level and blows the stdout reader's stack on long sessions.
+     */
     private suspend fun sendTree() {
         val activeBridge = bridge ?: return
-        val response = request { service.sessionTree() } ?: return
+        val response = request { service.sessionEntries() } ?: return
         if (!response.success) return
         val data = response.data as? JsonObject ?: return
         val leafId = (data["leafId"] as? JsonPrimitive)?.contentOrNull
-        val rows = SessionTree.flatten(data, leafId)
+        val entries = (data["entries"] as? JsonArray)?.mapNotNull { it as? JsonObject } ?: return
+        val rows = SessionTree.flattenEntries(entries, leafId)
         activeBridge.send(HostMessages.tree(rows, leafId, service.status.value.sessionId))
     }
 
