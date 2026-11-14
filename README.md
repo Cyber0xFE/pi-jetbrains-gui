@@ -26,7 +26,7 @@ The plugin launches a local `pi --mode rpc` subprocess and renders conversations
 
 ## Requirements
 
-- IntelliJ IDEA 2024.2 or later (minimum plugin build `242`)
+- Any IntelliJ Platform IDE (IntelliJ IDEA, PyCharm, WebStorm, GoLand, PhpStorm, CLion, Rider, ...) 2024.2 or later (minimum plugin build `242`)
 - Java 21 (for building the plugin)
 - Node.js `22.19.0` or later
 - The pi coding agent installed via any of the following:
@@ -64,7 +64,7 @@ To run a development IDE with the plugin:
 
 The plugin ZIP is generated in `build/distributions/`. The Gradle build automatically installs webview dependencies and bundles the React/TypeScript frontend into the plugin resources.
 
-On Windows, a successful local build also queues plugin updates for existing IntelliJ IDEA and PyCharm configuration directories (2024.2 or later) under `%APPDATA%/JetBrains/`. It uses each IDE's built-in update queue, preserves other pending plugins, and does not overwrite JARs held open by a running IDE. Updates are installed the next time you restart the IDE; the build never closes your IDE automatically. The `Queued plugin update` message in the build log only means the update was queued, not that a running IDE has already loaded it.
+On Windows, a successful local build also queues plugin updates for every detected JetBrains IDE configuration directory (2024.2 or later) under `%APPDATA%/JetBrains/`, including IntelliJ IDEA, PyCharm, WebStorm, GoLand, PhpStorm, CLion, Rider, and the rest of the family. It uses each IDE's built-in update queue, preserves other pending plugins, and does not overwrite JARs held open by a running IDE. Updates are installed the next time you restart the IDE; the build never closes your IDE automatically. Configuration directories without a `%LOCALAPPDATA%/JetBrains/<config-dir-name>/.home` record (an IDE that has never been launched) are skipped with a log message. The `Queued plugin update` message in the build log only means the update was queued, not that a running IDE has already loaded it.
 
 To only build the ZIP without installing: `./gradlew buildPlugin -PinstallLocalPlugin=false`. To specify local configuration directories, pass `-PlocalIdePluginDirs=dir1;dir2` (quote the whole argument in PowerShell); these must be each IDE's `plugins` directory, and a corresponding `%LOCALAPPDATA%/JetBrains/<config-dir-name>/.home` record must exist. Custom cache paths are not supported yet.
 

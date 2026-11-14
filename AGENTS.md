@@ -82,16 +82,16 @@ RPC schema 校验默认读取 `../pi`：
 ./gradlew buildPlugin -PinstallLocalPlugin=false
 ```
 
-`buildPlugin` 的 ZIP 输出在 `build/distributions/`。默认情况下，Windows 构建成功后会向本机已发现的 IntelliJ IDEA 和 PyCharm 配置目录排队插件更新；构建不会关闭或重启 IDE，必须重启目标 IDE 后更新才会生效。构建日志中的 `Queued plugin update` 仅表示已排队，不表示当前运行中的 IDE 已经加载新版本。需要指定目标插件目录时使用 `-PlocalIdePluginDirs=目录1;目录2`。
+`buildPlugin` 的 ZIP 输出在 `build/distributions/`。默认情况下，Windows 构建成功后会向本机已发现的所有 JetBrains IDE 配置目录（IntelliJIdea/IdeaIC/PyCharm/WebStorm/GoLand/PhpStorm/CLion/Rider 等，2024.2 或更高）排队插件更新；构建不会关闭或重启 IDE，必须重启目标 IDE 后更新才会生效。构建日志中的 `Queued plugin update` 仅表示已排队，不表示当前运行中的 IDE 已经加载新版本。需要指定目标插件目录时使用 `-PlocalIdePluginDirs=目录1;目录2`。
 
-本地安装逻辑要求目标 IDE 至少成功启动过一次，以便在 `%LOCALAPPDATA%/JetBrains/<配置目录名>/.home` 找到 IDE 安装目录。`localIdePluginDirs` 指向各 IDE 的 `plugins` 目录，不是 IDE 安装目录；自定义缓存路径当前不受支持。若只需验证 ZIP，可显式传入 `-PinstallLocalPlugin=false`。
+本地安装逻辑要求目标 IDE 至少成功启动过一次，以便在 `%LOCALAPPDATA%/JetBrains/<配置目录名>/.home` 找到 IDE 安装目录；自动发现时缺少 `.home` 的目录会被跳过并打印提示，显式传入的目录则直接报错。`localIdePluginDirs` 指向各 IDE 的 `plugins` 目录，不是 IDE 安装目录；自定义缓存路径当前不受支持。若只需验证 ZIP，可显式传入 `-PinstallLocalPlugin=false`。
 
 ## 自动构建
 
 - 代码改动完成后**必须自动重新构建插件**，无需用户提醒：
   - 修改 `web/src`、`src/main/kotlin`、插件资源、协议模型或构建相关文件后：执行 `./gradlew buildPlugin`（Windows 使用 `gradlew.bat`）验证并打包插件。
   - 构建失败必须先修复并重试，直到构建通过后再交付；不要把仅通过前端测试或 Kotlin 测试当作插件构建成功。
-  - `buildPlugin` 成功后会自动为本机 PyCharm 和 IntelliJ IDEA 排队插件更新；交付时说明排队结果，并提醒用户重启 IDE 自动安装生效。不要自动关闭或重启 IDE。
+  - `buildPlugin` 成功后会自动为本机所有已发现的 JetBrains IDE 排队插件更新；交付时说明排队结果，并提醒用户重启 IDE 自动安装生效。不要自动关闭或重启 IDE。
   - 若本机 IDE 更新排队失败，必须修复问题或明确报告失败原因，不能把“仅 ZIP 打包成功”描述为本地安装成功。
 - **提交代码（用户要求 `git commit`）时不需要先构建插件，也不需要先跑测试**：直接提交即可，构建和测试只在功能交付时执行，不要因提交而额外触发 `buildPlugin` 或测试。
 - 只修改文档、测试说明或其他不影响插件产物的文件时，可不执行插件构建，但应在交付说明中明确未构建的原因。

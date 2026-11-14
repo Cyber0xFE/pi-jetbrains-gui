@@ -214,19 +214,25 @@ tasks.named<Zip>("buildPlugin") {
         if (providers.gradleProperty("installLocalPlugin").orElse("true").get() != "false") {
             val configuredDirs = providers.gradleProperty("localIdePluginDirs").orNull
             val jetBrainsDir = System.getenv("APPDATA")?.let { file("$it/JetBrains") }
+            // Every JetBrains IDE names its configuration directory <ProductCode><YYYY.R>
+            // (IntelliJIdea2024.2, WebStorm2025.3, GoLand2024.2, ...). Matching the version suffix
+            // instead of a product allow-list covers the whole JetBrains family; sibling entries
+            // such as `bl`, `crl`, `consentOptions` or `PermanentDeviceId` have no version.
+            val ideConfigDir = Regex("[A-Za-z]+(\\d{4})\\.(\\d+)")
+            val explicitPluginDirs = configuredDirs != null
             val pluginDirs = if (configuredDirs != null) {
                 configuredDirs.split(';').filter { it.isNotBlank() }.map { file(it.trim()) }
             } else {
                 jetBrainsDir?.listFiles().orEmpty()
-                    .filter { it.isDirectory && it.name.matches(Regex("(IntelliJIdea|IdeaIC|PyCharm|PyCharmCE)\\d{4}\\.\\d+")) }
+                    .filter { it.isDirectory && ideConfigDir.matches(it.name) }
                     .filter {
-                        val (year, release) = Regex("(\\d{4})\\.(\\d+)$").find(it.name)!!.destructured
+                        val (year, release) = ideConfigDir.find(it.name)!!.destructured
                         year.toInt() > 2024 || (year.toInt() == 2024 && release.toInt() >= 2)
                     }
                     .map { it.resolve("plugins") }
             }
             if (pluginDirs.isEmpty()) {
-                logger.lifecycle("No local IDEA/PyCharm profiles found; skipping plugin installation.")
+                logger.lifecycle("No local JetBrains IDE profiles found; skipping plugin installation.")
             }
             pluginDirs.distinctBy { it.canonicalPath }.forEach { pluginsDir ->
                 // Queue the update through the target IDE's own bundled JBR (see
@@ -236,7 +242,15 @@ tasks.named<Zip>("buildPlugin") {
                     ?: throw GradleException("LOCALAPPDATA is required for local IDE installation.")
                 val systemDir = file("$localAppData/JetBrains/${pluginsDir.parentFile.name}")
                 val homeFile = systemDir.resolve(".home")
-                check(homeFile.isFile) { "Cannot locate IDE home: $homeFile. Launch this IDE once first." }
+                if (!homeFile.isFile) {
+                    // A freshly installed IDE that has never been launched has no `.home` record
+                    // yet; skip it instead of failing the whole build. Explicitly requested
+                    // directories still fail so typos are not silently ignored.
+                    val message = "Cannot locate IDE home: $homeFile. Launch this IDE once first."
+                    if (explicitPluginDirs) throw GradleException(message)
+                    logger.lifecycle("Skipping plugin update for $pluginsDir: $message")
+                    return@forEach
+                }
                 val ideHome = file(homeFile.readText().trim())
                 val ideLib = ideHome.resolve("lib")
                 val jars = ideLib.listFiles().orEmpty().filter { it.extension == "jar" }
