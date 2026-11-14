@@ -16,6 +16,19 @@ function surface(height = 2000, viewport = 400): HTMLElement {
   return element;
 }
 
+function wideSurface(width = 900, viewport = 300): HTMLElement {
+  const element = document.createElement("div");
+  widthOf(element, width, viewport);
+  return element;
+}
+
+function widthOf(element: HTMLElement, width: number, viewport: number): void {
+  Object.defineProperties(element, {
+    scrollWidth: { configurable: true, value: width },
+    clientWidth: { configurable: true, value: viewport },
+  });
+}
+
 function wheel(deltaY: number, options: WheelEventInit = {}, element = root): WheelEvent {
   const event = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY, ...options });
   element.dispatchEvent(event);
@@ -189,6 +202,19 @@ describe("smooth wheel scrolling", () => {
     expect(card.scrollTop).toBe(700);
   });
 
+  it("keeps vertical scrolling working in a card that also overflows sideways", () => {
+    const card = surface(900, 200);
+    card.style.overflowY = "auto";
+    card.style.overflowX = "auto";
+    widthOf(card, 900, 300);
+    root.append(card);
+
+    wheel(100, {}, card);
+    finish();
+    expect(card.scrollTop).toBe(250);
+    expect(card.scrollLeft).toBe(0);
+  });
+
   it("hands off from a finishing card animation and notifies transcript scroll intent", () => {
     dispose();
     const onIntent = vi.fn();
@@ -211,13 +237,112 @@ describe("smooth wheel scrolling", () => {
     expect(onIntent).toHaveBeenCalledWith(100);
   });
 
-  it.each([{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { deltaX: 150 }, { cancelable: false }])(
-    "preserves native zoom, horizontal gestures and non-cancelable events: %j",
+  it.each([{ ctrlKey: true }, { metaKey: true }, { deltaX: 150 }, { cancelable: false }])(
+    "preserves native zoom, mixed-axis gestures and non-cancelable events: %j",
     (options) => {
       expect(wheel(100, options).defaultPrevented).toBe(false);
       expect(frames.size).toBe(0);
     },
   );
+
+  it("leaves shift-wheel alone when nothing can scroll sideways", () => {
+    expect(wheel(100, { shiftKey: true }).defaultPrevented).toBe(false);
+    const card = surface(900, 200);
+    card.style.overflowY = "auto";
+    root.append(card);
+    expect(wheel(100, { shiftKey: true }, card).defaultPrevented).toBe(false);
+    expect(card.scrollTop).toBe(0);
+    expect(frames.size).toBe(0);
+  });
+
+  it("scrolls a code card sideways with shift + wheel", () => {
+    const card = wideSurface();
+    card.style.overflowX = "auto";
+    const code = document.createElement("code");
+    card.append(code);
+    root.append(card);
+
+    expect(wheel(100, { shiftKey: true }, code).defaultPrevented).toBe(true);
+    tick();
+    expect(card.scrollLeft).toBeGreaterThan(0);
+    expect(card.scrollLeft).toBeLessThan(250);
+    finish();
+    expect(card.scrollLeft).toBe(250);
+    expect(root.scrollTop).toBe(0);
+
+    wheel(-100, { shiftKey: true }, code);
+    finish();
+    expect(card.scrollLeft).toBe(0);
+  });
+
+  it("tracks SHIFT from the keyboard for wheel events without the modifier", () => {
+    const card = wideSurface();
+    card.style.overflowX = "auto";
+    const code = document.createElement("code");
+    card.append(code);
+    root.append(card);
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Shift", shiftKey: true }));
+    expect(wheel(100, {}, code).defaultPrevented).toBe(true);
+    finish();
+    expect(card.scrollLeft).toBe(250);
+    expect(root.scrollTop).toBe(0);
+
+    window.dispatchEvent(new KeyboardEvent("keyup", { key: "Shift", shiftKey: false }));
+    wheel(100, {}, code);
+    finish();
+    expect(card.scrollLeft).toBe(250);
+    expect(root.scrollTop).toBe(250);
+  });
+
+  it.each([
+    { shiftKey: true, deltaX: -120 },
+    { deltaX: -120, deltaY: 0 },
+  ])("treats an already-horizontal delta as sideways (deltaX opposes scrollLeft): %j", (options) => {
+    const card = wideSurface();
+    card.style.overflowX = "auto";
+    root.append(card);
+    expect(wheel(0, options, card).defaultPrevented).toBe(true);
+    finish();
+    expect(card.scrollLeft).toBe(300);
+    expect(root.scrollTop).toBe(0);
+  });
+
+  it("leaves a sideways notch at the left edge to the browser", () => {
+    const card = wideSurface();
+    card.style.overflowX = "auto";
+    root.append(card);
+    expect(wheel(0, { shiftKey: true, deltaX: 120 }, card).defaultPrevented).toBe(false);
+    expect(card.scrollLeft).toBe(0);
+    expect(frames.size).toBe(0);
+  });
+
+  it("drops the tracked SHIFT when the window loses focus", () => {
+    const card = wideSurface();
+    card.style.overflowX = "auto";
+    root.append(card);
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Shift", shiftKey: true }));
+    window.dispatchEvent(new Event("blur"));
+    wheel(100, {}, card);
+    finish();
+    expect(card.scrollLeft).toBe(0);
+    expect(root.scrollTop).toBe(250);
+  });
+
+  it("clamps the sideways gesture at both card edges", () => {
+    const card = wideSurface();
+    card.style.overflowX = "auto";
+    card.scrollLeft = 550;
+    root.append(card);
+
+    wheel(100, { shiftKey: true }, card);
+    finish();
+    expect(card.scrollLeft).toBe(600);
+    wheel(100, { shiftKey: true }, card);
+    expect(frames.size).toBe(0);
+    expect(card.scrollLeft).toBe(600);
+  });
 
   it("smooths explicit wheel input even when the OS disables decorative animations", () => {
     dispose();
