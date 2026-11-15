@@ -2,6 +2,7 @@ package dev.pi.jetbrains.ui
 
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ApplicationInfo
 import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.editor.colors.EditorColorsListener
@@ -145,6 +146,7 @@ class ChatPanel(
     private var backgroundImageCache: BackgroundImageCache? = null
 
     init {
+        configureJcefCompatibility()
         val view: Component = if (JBCefApp.isSupported()) {
             createBrowser() ?: unavailableView()
         } else {
@@ -183,6 +185,26 @@ class ChatPanel(
         startForwarding()
         // Opening the tool window is the M1 trigger for the child process (plan M1 acceptance).
         service.start()
+    }
+
+    private fun configureJcefCompatibility() {
+        val baseline = runCatching { ApplicationInfo.getInstance().build.baselineVersion }.getOrNull() ?: return
+        if (baseline < 251) return
+
+        // IDEA 2025+ may enable JCEF remote/OSR rendering depending on the bundled JCEF
+        // version. Set the equivalent runtime switches before JBCefApp is touched; VM options
+        // remain the reliable fallback when another plugin initializes JCEF earlier in startup.
+        if (System.getProperty("jcef.remote.enabled") == null) {
+            System.setProperty("jcef.remote.enabled", "false")
+        }
+        val extraArgs = System.getProperty("ide.browser.jcef.extra.args").orEmpty()
+        if ("--disable-gpu-compositing" !in extraArgs.split(',')) {
+            System.setProperty(
+                "ide.browser.jcef.extra.args",
+                listOf(extraArgs.trim(), "--disable-gpu-compositing").filter { it.isNotEmpty() }.joinToString(","),
+            )
+        }
+        LOG.info("Applied JCEF compatibility settings: remote=${System.getProperty("jcef.remote.enabled")}")
     }
 
     private fun createBrowser(): Component? {
