@@ -90,21 +90,20 @@ intellijPlatform {
         """.trimIndent()
 
         changeNotes = """
-            <h2>What's New in 0.4.1</h2>
+            <h2>What's New in 0.4.2</h2>
             <h3>Features</h3>
             <ul>
-              <li><b>Custom chat background image:</b> in <b>Settings | Tools | Pi</b> you can pick an optional picture (PNG, JPG, GIF, WebP, BMP, up to 4 MB) to sit behind the chat transcript, with a file chooser, a clear button and an opacity slider (0–100%, default 15) like the IDE's editor background image. The image is encoded into the webview and reapplied immediately when it or the opacity changes; transparent chat surfaces let it show through while the toolbar and composer stay opaque.</li>
-              <li><b>Collapsible session tree:</b> the tree now opens with one row per user message. Assistant replies, tool results, compaction and bookkeeping entries stay collapsed underneath; click a user message to expand or collapse everything that followed from it, with branch indentation preserved on the revealed rows.</li>
-              <li><b>Fork from a row, not by clicking it:</b> forking moved to a <b>fork from here</b> button that appears when you hover a user message. Clicking the row itself only expands it, so browsing a long session no longer forks it by accident.</li>
-              <li>The footer's <b>running</b> indicator now cycles through <code>.</code> → <code>..</code> → <code>...</code> while pi works. The animation is timer-driven rather than CSS-based, so it still plays on machines with Windows animation effects turned off (the webview then drops CSS keyframes).</li>
+              <li><b>Adjustable chat scroll-wheel sensitivity:</b> a new <b>wheel sensitivity (%)</b> option in <b>Settings | Tools | Pi</b> (25–400, default 100) scales how far one wheel notch scrolls the chat transcript and the session/picker lists. The value is pushed to the webview immediately, so it takes effect without restarting or reopening the tool window.</li>
+              <li><b>Horizontal scrolling in tool cards:</b> hold <b>Shift</b> and use the mouse wheel to scroll horizontally inside wide tool output such as code cards. The gesture reuses the same smooth easing as vertical scrolling and falls back to a tracked modifier state when the IDE doesn't report Shift on the wheel event. At either edge the wheel is handed back to the surrounding container, so the card never traps scrolling.</li>
             </ul>
             <h3>Fixes</h3>
             <ul>
-              <li>Bold text placed directly after a bare URL keeps its closing <code>**</code>: <code>**打开：http://localhost:3000/5**（店铺</code> now renders as bold instead of a literal marker followed by an oversized link.</li>
-              <li>Bare URLs followed by full-width or CJK punctuation no longer swallow that punctuation into the link target, where it was percent-encoded into the URL.</li>
-              <li>The session and picker rows now align their badge, <code>default</code> marker and detail text as one right-aligned block, and the rename/delete actions appear as a hover overlay instead of squeezing the row contents.</li>
-              <li>Jumping to a user message — by clicking a dot, stepping through the previous/next navigation, landing on a <code>Ctrl+F</code> hit, or returning to the latest message — now scrolls the left dot track to the matching dot as well. Plain scrolling updates it too, so the track never points at a dot outside its visible window.</li>
-              <li>Selecting a chat background image in settings no longer crashes on IntelliJ IDEA 2026.3, where the file chooser dialog signature changed; the file chooser now uses the stable <code>FileChooser.chooseFile</code> API and filters the dialog to image extensions.</li>
+              <li>Long sessions no longer freeze the session tree: <code>get_tree</code> returns a deeply nested tree that used to overflow the JSON parser with a <code>StackOverflowError</code>, silently dropping the response and then timing out after 30 seconds with a misleading <code>pi did not answer 'get_tree'</code> error. The tree is now built from pi's flat <code>get_entries</code> list, and a malformed response fails the pending request immediately instead of hanging.</li>
+              <li>On IntelliJ IDEA 2025 and newer the chat webview now forces JCEF's remote rendering and GPU compositing off before JCEF initializes, matching the IDE runtime switches so the panel renders correctly even when another plugin touches JCEF earlier at startup. VM options remain a reliable fallback.</li>
+            </ul>
+            <h3>Build</h3>
+            <ul>
+              <li><code>buildPlugin</code> now queues local plugin updates for all discovered JetBrains IDEs (IntelliJ IDEA, PyCharm, WebStorm, GoLand and more), and skips stale configuration directories whose <code>.home</code> marker points at an uninstalled IDE with a hint in the log.</li>
             </ul>
 
         """.trimIndent()
