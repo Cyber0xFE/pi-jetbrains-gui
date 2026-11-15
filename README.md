@@ -84,7 +84,7 @@ While pi is streaming a reply, you can keep typing in the input box: `Enter` que
 
 ### Settings and Keyboard Shortcuts
 
-In `Settings | Tools | Pi` you can configure the Node.js path, network proxy, chat font size (10–32px), accent color (customizes the Pi chat UI accent; emphasized elements such as user message bubbles follow it, and leaving it empty follows the IDE theme), background image (an optional PNG/JPG/GIF/WebP/BMP picture shown behind the chat transcript, with an opacity slider like the IDE's editor background image; files up to 4 MB are encoded into the webview and reapplied immediately), diagnostic log directory, task-completion sound, and all Pi panel shortcuts. Default shortcuts:
+In `Settings | Tools | Pi` you can configure the Node.js path, network proxy, chat font size (10–32px), wheel scroll sensitivity (25–400% of the default speed, applied to the chat transcript and picker lists), accent color (customizes the Pi chat UI accent; emphasized elements such as user message bubbles follow it, and leaving it empty follows the IDE theme), background image (an optional PNG/JPG/GIF/WebP/BMP picture shown behind the chat transcript, with an opacity slider like the IDE's editor background image; files up to 4 MB are encoded into the webview and reapplied immediately), diagnostic log directory, task-completion sound, and all Pi panel shortcuts. Default shortcuts:
 
 | Action | Default shortcut |
 | --- | --- |

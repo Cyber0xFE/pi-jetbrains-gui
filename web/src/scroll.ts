@@ -1,6 +1,13 @@
 import { useEffect, useRef, type RefObject } from "react";
 
 const WHEEL_MULTIPLIER = 2.5;
+/** User-configured wheel sensitivity as a fraction of the default (1 = default). */
+let wheelSensitivity = 1;
+
+/** Applies the chat wheel sensitivity from settings; clamped to 25%–400% of the default. */
+export function setWheelSensitivity(sensitivity: number): void {
+  wheelSensitivity = Math.max(0.25, Math.min(4, sensitivity));
+}
 const RESPONSE_MS = 80;
 // scrollTop/scrollLeft can be fractional while scrollHeight/clientHeight are rounded to whole pixels.
 const SCROLL_EDGE_TOLERANCE = 1;
@@ -77,7 +84,7 @@ function createAxisScroller(axis: Axis) {
     const pageUnit = axis === "y" ? element.clientHeight : element.clientWidth;
     const unit = mode === 1 ? 16 : mode === 2 ? pageUnit : 1;
     const limit = rangeOf(element, axis);
-    target = Math.max(0, Math.min(target + delta * unit * WHEEL_MULTIPLIER, limit));
+    target = Math.max(0, Math.min(target + delta * unit * WHEEL_MULTIPLIER * wheelSensitivity, limit));
     if (target === positionOf(element, axis) && frame === null) return false;
     if (frame === null) {
       lastPosition = positionOf(element, axis);

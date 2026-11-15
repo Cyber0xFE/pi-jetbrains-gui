@@ -145,6 +145,8 @@ export interface WireTheme {
   backgroundImage?: string | null;
   /** Background image opacity as a 0..1 fraction. */
   backgroundImageOpacity?: number;
+  /** Wheel scroll sensitivity as a fraction of the default speed (1 = default). */
+  wheelSensitivity?: number;
 }
 
 export interface WireStatus {

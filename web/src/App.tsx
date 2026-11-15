@@ -11,6 +11,7 @@ import { SessionDialog } from "./components/SessionDialog";
 import { StatusBar } from "./components/StatusBar";
 import { Toolbar } from "./components/Toolbar";
 import { formatTokens } from "./format";
+import { setWheelSensitivity } from "./scroll";
 import { ChatStore } from "./store";
 import { EMPTY_SEARCH, selectedSearchSeed, type SearchState } from "./search";
 import type { Block } from "./state/sessionReducer";
@@ -182,6 +183,8 @@ export function App(): JSX.Element {
     root.style.setProperty("--error", theme.error);
     root.style.setProperty("--error-bg", theme.errorBackground);
     root.style.setProperty("--fs", `${Math.max(10, Math.min(32, theme.fontSize))}px`);
+    // The host sends the configured wheel sensitivity as a fraction of the default speed.
+    setWheelSensitivity(theme.wheelSensitivity ?? 1);
     // The host encodes the background image as a data URI; base64 never contains quotes, so
     // wrapping it in url("...") is safe. Skip the image entirely at zero opacity so the webview
     // does not decode an invisible picture.

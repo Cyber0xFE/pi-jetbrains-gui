@@ -48,6 +48,8 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         var taskCompletionSoundEnabled: Boolean = true,
         /** Base font size in the Pi chat webview, in CSS pixels. */
         var chatFontSize: Int = DEFAULT_CHAT_FONT_SIZE,
+        /** Wheel scroll sensitivity in the Pi chat webview, in percent of the default speed. */
+        var chatWheelSensitivity: Int = DEFAULT_CHAT_WHEEL_SENSITIVITY,
         /** Accent color override for the Pi chat webview as #RRGGBB; empty means follow the IDE. */
         var accentColor: String = "",
         /** Absolute path to an image shown behind the chat transcript; empty means no image. */
@@ -90,6 +92,10 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
 
     fun notifyChatFontSizeChanged() {
         ApplicationManager.getApplication().messageBus.syncPublisher(CHAT_FONT_SIZE_CHANGED).chatFontSizeChanged()
+    }
+
+    fun notifyChatWheelSensitivityChanged() {
+        ApplicationManager.getApplication().messageBus.syncPublisher(CHAT_WHEEL_SENSITIVITY_CHANGED).chatWheelSensitivityChanged()
     }
 
     fun notifyAccentColorChanged() {
@@ -195,6 +201,7 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
     companion object {
         val NETWORK_PROXY_CHANGED = Topic.create("Pi network proxy changed", PiNetworkProxyListener::class.java)
         val CHAT_FONT_SIZE_CHANGED = Topic.create("Pi chat font size changed", PiChatFontSizeListener::class.java)
+        val CHAT_WHEEL_SENSITIVITY_CHANGED = Topic.create("Pi chat wheel sensitivity changed", PiWheelSensitivityListener::class.java)
         val ACCENT_COLOR_CHANGED = Topic.create("Pi accent color changed", PiAccentColorListener::class.java)
         val BACKGROUND_IMAGE_CHANGED = Topic.create("Pi background image changed", PiBackgroundImageListener::class.java)
         const val SHOW_PI_TOOL_WINDOW_ACTION_ID = "dev.pi.jetbrains.ShowPiToolWindow"
@@ -218,6 +225,9 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         const val DEFAULT_CHAT_FONT_SIZE = 14
         const val MIN_CHAT_FONT_SIZE = 10
         const val MAX_CHAT_FONT_SIZE = 32
+        const val DEFAULT_CHAT_WHEEL_SENSITIVITY = 100
+        const val MIN_CHAT_WHEEL_SENSITIVITY = 25
+        const val MAX_CHAT_WHEEL_SENSITIVITY = 400
         const val DEFAULT_BACKGROUND_IMAGE_OPACITY = 15
         const val MIN_BACKGROUND_IMAGE_OPACITY = 0
         const val MAX_BACKGROUND_IMAGE_OPACITY = 100
@@ -242,6 +252,10 @@ private fun String.toKeyStroke(): javax.swing.KeyStroke? = takeIf { it.isNotBlan
 
 fun interface PiChatFontSizeListener {
     fun chatFontSizeChanged()
+}
+
+fun interface PiWheelSensitivityListener {
+    fun chatWheelSensitivityChanged()
 }
 
 fun interface PiAccentColorListener {

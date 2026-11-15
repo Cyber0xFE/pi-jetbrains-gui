@@ -111,6 +111,8 @@ data class HostTheme(
     val backgroundImage: String? = null,
     /** Background image opacity as a 0..1 fraction. */
     val backgroundImageOpacity: Float = 0f,
+    /** Wheel scroll sensitivity as a fraction of the default speed (1 = default). */
+    val wheelSensitivity: Float = 1f,
 )
 
 @Serializable

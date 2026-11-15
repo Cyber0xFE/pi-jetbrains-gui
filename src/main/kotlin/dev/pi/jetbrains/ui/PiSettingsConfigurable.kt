@@ -70,6 +70,17 @@ class PiSettingsConfigurable : Configurable {
         toolTipText = "调整 Pi 聊天面板的基础字体大小"
         accessibleContext.accessibleName = "Pi 聊天字体大小"
     }
+    private val chatWheelSensitivity = JSpinner(
+        SpinnerNumberModel(
+            PiSettings.DEFAULT_CHAT_WHEEL_SENSITIVITY,
+            PiSettings.MIN_CHAT_WHEEL_SENSITIVITY,
+            PiSettings.MAX_CHAT_WHEEL_SENSITIVITY,
+            5,
+        ),
+    ).apply {
+        toolTipText = "调整 Pi 聊天面板的鼠标滚轮滚动速度"
+        accessibleContext.accessibleName = "Pi 滚轮灵敏度"
+    }
     private val accentColorPanel = ColorPanel().apply {
         toolTipText = "覆盖 Pi 聊天界面的强调色；留空时跟随 IDE 主题"
         // ColorPanel 的 peer 在加入组件层级前尚未创建，accessibleContext 为 null，
@@ -322,6 +333,15 @@ class PiSettingsConfigurable : Configurable {
             add(chatFontSize)
         }
         addField("聊天字体大小（px）：", chatFontSizeRow, "调整 Pi 聊天面板的基础字体大小，范围为 10–32px。")
+        val chatWheelSensitivityRow = JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
+            isOpaque = false
+            add(chatWheelSensitivity)
+        }
+        addField(
+            "滚轮灵敏度（%）：",
+            chatWheelSensitivityRow,
+            "调整 Pi 聊天面板的鼠标滚轮滚动速度，100 为默认速度，范围为 25–400%。",
+        )
         val accentColorRow = JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
             isOpaque = false
             add(accentColorPanel)
@@ -394,6 +414,7 @@ class PiSettingsConfigurable : Configurable {
             networkProxy.text.trim() != state.networkProxy ||
             logDirectory.text != state.logDirectory ||
             chatFontSizeValue() != state.chatFontSize ||
+            chatWheelSensitivityValue() != state.chatWheelSensitivity ||
             accentColorHex() != state.accentColor ||
             backgroundImage.text.trim() != state.backgroundImage ||
             backgroundImageOpacityValue() != state.backgroundImageOpacity ||
@@ -413,6 +434,7 @@ class PiSettingsConfigurable : Configurable {
         val settings = PiSettings.get()
         val state = settings.getState()
         val fontSizeChanged = chatFontSizeValue() != state.chatFontSize
+        val wheelSensitivityChanged = chatWheelSensitivityValue() != state.chatWheelSensitivity
         val accentColorChanged = accentColorHex() != state.accentColor
         val backgroundImageChanged = backgroundImage.text.trim() != state.backgroundImage ||
             backgroundImageOpacityValue() != state.backgroundImageOpacity
@@ -424,6 +446,7 @@ class PiSettingsConfigurable : Configurable {
         state.nodePath = nodePath.text.trim()
         state.logDirectory = logDirectory.text.trim()
         state.chatFontSize = chatFontSizeValue()
+        state.chatWheelSensitivity = chatWheelSensitivityValue()
         state.accentColor = accentColorHex()
         state.backgroundImage = backgroundImage.text.trim()
         state.backgroundImageOpacity = backgroundImageOpacityValue()
@@ -440,6 +463,7 @@ class PiSettingsConfigurable : Configurable {
         settings.applyShortcuts()
         if (proxyChanged) settings.notifyNetworkProxyChanged()
         if (fontSizeChanged) settings.notifyChatFontSizeChanged()
+        if (wheelSensitivityChanged) settings.notifyChatWheelSensitivityChanged()
         if (accentColorChanged) settings.notifyAccentColorChanged()
         if (backgroundImageChanged) settings.notifyBackgroundImageChanged()
     }
@@ -452,6 +476,10 @@ class PiSettingsConfigurable : Configurable {
         networkProxy.isEnabled = state.networkProxyEnabled
         logDirectory.text = state.logDirectory
         chatFontSize.value = state.chatFontSize.coerceIn(PiSettings.MIN_CHAT_FONT_SIZE, PiSettings.MAX_CHAT_FONT_SIZE)
+        chatWheelSensitivity.value = state.chatWheelSensitivity.coerceIn(
+            PiSettings.MIN_CHAT_WHEEL_SENSITIVITY,
+            PiSettings.MAX_CHAT_WHEEL_SENSITIVITY,
+        )
         accentColorPanel.selectedColor = PiSettings.parseAccentColor(state.accentColor)
         backgroundImage.text = state.backgroundImage
         backgroundImageOpacity.value = state.backgroundImageOpacity.coerceIn(
@@ -512,6 +540,10 @@ class PiSettingsConfigurable : Configurable {
     private fun chatFontSizeValue(): Int = (chatFontSize.value as? Number)?.toInt()
         ?.coerceIn(PiSettings.MIN_CHAT_FONT_SIZE, PiSettings.MAX_CHAT_FONT_SIZE)
         ?: PiSettings.DEFAULT_CHAT_FONT_SIZE
+
+    private fun chatWheelSensitivityValue(): Int = (chatWheelSensitivity.value as? Number)?.toInt()
+        ?.coerceIn(PiSettings.MIN_CHAT_WHEEL_SENSITIVITY, PiSettings.MAX_CHAT_WHEEL_SENSITIVITY)
+        ?: PiSettings.DEFAULT_CHAT_WHEEL_SENSITIVITY
 
     private fun accentColorHex(): String = accentColorPanel.selectedColor
         ?.let { "#%02x%02x%02x".format(it.red, it.green, it.blue) }

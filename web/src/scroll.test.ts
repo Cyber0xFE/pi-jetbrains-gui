@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { installSmoothWheelScroll } from "./scroll";
+import { installSmoothWheelScroll, setWheelSensitivity } from "./scroll";
 
 let now = 0;
 let nextId = 0;
@@ -64,12 +64,38 @@ beforeEach(() => {
 
 afterEach(() => {
   dispose();
+  setWheelSensitivity(1);
   document.body.replaceChildren();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
 describe("smooth wheel scrolling", () => {
+  it("scales the scroll distance with the configured wheel sensitivity", () => {
+    wheel(100);
+    finish();
+    expect(root.scrollTop).toBe(250);
+
+    setWheelSensitivity(2);
+    root.scrollTop = 0;
+    wheel(100);
+    finish();
+    expect(root.scrollTop).toBe(500);
+
+    setWheelSensitivity(0.5);
+    root.scrollTop = 0;
+    wheel(100);
+    finish();
+    expect(root.scrollTop).toBe(125);
+
+    // Out-of-range values are clamped to 25%–400%.
+    setWheelSensitivity(100);
+    root.scrollTop = 0;
+    wheel(100);
+    finish();
+    expect(root.scrollTop).toBe(1000);
+  });
+
   it("spreads a notch across frames and prevents a second native scroll", () => {
     expect(wheel(100).defaultPrevented).toBe(true);
     expect(root.scrollTop).toBe(0);

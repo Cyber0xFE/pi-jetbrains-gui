@@ -254,7 +254,15 @@ tasks.named<Zip>("buildPlugin") {
                 val ideHome = file(homeFile.readText().trim())
                 val ideLib = ideHome.resolve("lib")
                 val jars = ideLib.listFiles().orEmpty().filter { it.extension == "jar" }
-                check(jars.isNotEmpty()) { "Cannot locate IDE libraries: $ideLib" }
+                if (jars.isEmpty()) {
+                    // A stale `.home` points at an IDE that was uninstalled or moved; skip it
+                    // instead of failing the whole build. Explicitly requested directories
+                    // still fail so typos are not silently ignored.
+                    val message = "Cannot locate IDE libraries: $ideLib. Launch this IDE once first, or remove the stale configuration directory."
+                    if (explicitPluginDirs) throw GradleException(message)
+                    logger.lifecycle("Skipping plugin update for $pluginsDir: $message")
+                    return@forEach
+                }
                 val jbrJava = listOf("jbr/bin/java.exe", "jbr/bin/java")
                     .map { ideHome.resolve(it) }
                     .firstOrNull { it.isFile }

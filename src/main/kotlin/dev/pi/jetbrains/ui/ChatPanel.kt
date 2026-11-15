@@ -20,6 +20,7 @@ import dev.pi.jetbrains.PiChatService
 import dev.pi.jetbrains.PiAccentColorListener
 import dev.pi.jetbrains.PiBackgroundImageListener
 import dev.pi.jetbrains.PiChatFontSizeListener
+import dev.pi.jetbrains.PiWheelSensitivityListener
 import dev.pi.jetbrains.PiModelsJson
 import dev.pi.jetbrains.PiSettings
 import dev.pi.jetbrains.editor.EditorNavigator
@@ -158,6 +159,10 @@ class ChatPanel(
         ApplicationManager.getApplication().messageBus.connect(this).subscribe(
             PiSettings.CHAT_FONT_SIZE_CHANGED,
             PiChatFontSizeListener { bridge?.send(themeMessage()) },
+        )
+        ApplicationManager.getApplication().messageBus.connect(this).subscribe(
+            PiSettings.CHAT_WHEEL_SENSITIVITY_CHANGED,
+            PiWheelSensitivityListener { bridge?.send(themeMessage()) },
         )
         ApplicationManager.getApplication().messageBus.connect(this).subscribe(
             PiSettings.ACCENT_COLOR_CHANGED,
@@ -1261,6 +1266,9 @@ class ChatPanel(
                 fontSize = PiSettings.get().getState().chatFontSize
                     .coerceIn(PiSettings.MIN_CHAT_FONT_SIZE, PiSettings.MAX_CHAT_FONT_SIZE)
                     .toFloat(),
+                wheelSensitivity = PiSettings.get().getState().chatWheelSensitivity
+                    .coerceIn(PiSettings.MIN_CHAT_WHEEL_SENSITIVITY, PiSettings.MAX_CHAT_WHEEL_SENSITIVITY)
+                    / 100f,
                 backgroundImage = backgroundImageDataUri(),
                 backgroundImageOpacity = PiSettings.get().getState().backgroundImageOpacity
                     .coerceIn(
