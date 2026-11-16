@@ -169,12 +169,25 @@ describe("ToolCard", () => {
         callId: "bash:2",
         name: "bash",
         status: "running",
-        args: { command: "sleep 100", excludeFromContext: false },
+        args: { command: "sleep 100", excludeFromContext: false, shellEscape: true },
       }),
     );
 
     fireEvent.click(screen.getByText("Cancel"));
     expect(window.__piSent).toEqual([{ type: "abort_bash" }]);
+  });
+
+  it("omits the cancel button for a running agent-issued bash call", () => {
+    render(
+      card({
+        callId: "bash-4",
+        name: "bash",
+        status: "running",
+        args: { command: "npm build", timeout: 900 },
+      }),
+    );
+
+    expect(screen.queryByText("Cancel")).toBeNull();
   });
 
   it("turns grep output into clickable hits", () => {

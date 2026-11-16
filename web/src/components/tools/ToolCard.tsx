@@ -252,7 +252,7 @@ function bashView(tool: ToolState): ToolView {
             <pre className={`tool-output tool-terminal${failed && !tool.isError ? " tool-output-error" : ""}`}>{truncateToolText(tool.output ?? "")}</pre>
           </details>
         )}
-        {tool.status === "running" && (
+        {shellEscape && tool.status === "running" && (
           <div className="tool-actions tool-actions-end">
             <button type="button" className="tool-cancel" onClick={() => post({ type: "abort_bash" })}>
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
