@@ -90,20 +90,14 @@ intellijPlatform {
         """.trimIndent()
 
         changeNotes = """
-            <h2>What's New in 0.4.2</h2>
+            <h2>What's New in 0.5.0</h2>
             <h3>Features</h3>
             <ul>
-              <li><b>Adjustable chat scroll-wheel sensitivity:</b> a new <b>wheel sensitivity (%)</b> option in <b>Settings | Tools | Pi</b> (25–400, default 100) scales how far one wheel notch scrolls the chat transcript and the session/picker lists. The value is pushed to the webview immediately, so it takes effect without restarting or reopening the tool window.</li>
-              <li><b>Horizontal scrolling in tool cards:</b> hold <b>Shift</b> and use the mouse wheel to scroll horizontally inside wide tool output such as code cards. The gesture reuses the same smooth easing as vertical scrolling and falls back to a tracked modifier state when the IDE doesn't report Shift on the wheel event. At either edge the wheel is handed back to the surrounding container, so the card never traps scrolling.</li>
+              <li><b>Run shell commands from the composer:</b> type <code>! &lt;command&gt;</code> to run a command through pi and keep its output in the LLM context, or <code>!! &lt;command&gt;</code> to keep it out of the context — the same <b>bash mode</b> as the pi TUI. The composer switches to a tinted bash state as soon as the draft starts with <code>!</code>, and <b>Enter</b> executes the command instead of sending a prompt. While the command runs, the transcript shows a terminal-style card with a <b>cancel</b> button; the result arrives once the command finishes (pi's RPC mode does not stream bash output), and the card stays expanded with chips for a non-zero exit code, a cancelled run or excluded context. Persisted <code>!</code> commands are restored from the session history as the same cards after a session switch or IDE restart.</li>
             </ul>
             <h3>Fixes</h3>
             <ul>
-              <li>Long sessions no longer freeze the session tree: <code>get_tree</code> returns a deeply nested tree that used to overflow the JSON parser with a <code>StackOverflowError</code>, silently dropping the response and then timing out after 30 seconds with a misleading <code>pi did not answer 'get_tree'</code> error. The tree is now built from pi's flat <code>get_entries</code> list, and a malformed response fails the pending request immediately instead of hanging.</li>
-              <li>On IntelliJ IDEA 2025 and newer the chat webview now forces JCEF's remote rendering and GPU compositing off before JCEF initializes, matching the IDE runtime switches so the panel renders correctly even when another plugin touches JCEF earlier at startup. VM options remain a reliable fallback.</li>
-            </ul>
-            <h3>Build</h3>
-            <ul>
-              <li><code>buildPlugin</code> now queues local plugin updates for all discovered JetBrains IDEs (IntelliJ IDEA, PyCharm, WebStorm, GoLand and more), and skips stale configuration directories whose <code>.home</code> marker points at an uninstalled IDE with a hint in the log.</li>
+              <li>The JCEF compatibility workaround now runs at application startup instead of only when the Pi tool window is first opened, and registers a required-arguments provider, so it still applies when another plugin initializes JCEF before Pi. On IntelliJ IDEA 2025 and newer the webview turns off JCEF remote rendering, out-of-process rendering and GPU compositing, which fixes the blank or misrendered chat panel on 2026.3.</li>
             </ul>
 
         """.trimIndent()
