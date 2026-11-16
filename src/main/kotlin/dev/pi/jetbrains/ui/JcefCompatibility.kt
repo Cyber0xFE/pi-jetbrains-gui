@@ -14,14 +14,15 @@ import com.intellij.ui.jcef.JBCefAppRequiredArgumentsProvider
 object JcefCompatibility {
     private const val MINIMUM_BASELINE = 251
     private const val GPU_COMPOSITING_ARGUMENT = "--disable-gpu-compositing"
+    private const val REMOTE_PROPERTY = "jcef.remote.enabled"
+    private const val OUT_OF_PROCESS_PROPERTY = "ide.browser.jcef.out-of-process.enabled"
     private val LOG = Logger.getInstance(JcefCompatibility::class.java)
 
     fun apply() {
         if (!isAffectedIde()) return
 
-        if (System.getProperty("jcef.remote.enabled") == null) {
-            System.setProperty("jcef.remote.enabled", "false")
-        }
+        System.setProperty(REMOTE_PROPERTY, "false")
+        System.setProperty(OUT_OF_PROCESS_PROPERTY, "false")
         val extraArgs = System.getProperty("ide.browser.jcef.extra.args").orEmpty()
         if (GPU_COMPOSITING_ARGUMENT !in extraArgs.split(',')) {
             System.setProperty(
@@ -31,7 +32,11 @@ object JcefCompatibility {
                     .joinToString(","),
             )
         }
-        LOG.info("Applied JCEF compatibility settings: remote=${System.getProperty("jcef.remote.enabled")}")
+        LOG.info(
+            "Applied JCEF compatibility settings: " +
+                "remote=${System.getProperty(REMOTE_PROPERTY)}, " +
+                "outOfProcess=${System.getProperty(OUT_OF_PROCESS_PROPERTY)}",
+        )
     }
 
     fun requiredArguments(): List<String> {
