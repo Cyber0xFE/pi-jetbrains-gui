@@ -10,6 +10,8 @@
   --accent-soft: color-mix(in srgb, var(--accent) 12%, var(--bg));
   --error: #b42318;
   --error-bg: #fdecea;
+  /* Bash-mode tint for the composer while the draft starts with `!` (pi TUI bash mode). */
+  --bash-mode: #9a6700;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -33,6 +35,7 @@
     --accent-soft: color-mix(in srgb, var(--accent) 20%, var(--bg));
     --error: #ff8f85;
     --error-bg: #3b2422;
+    --bash-mode: #d29922;
   }
 }
 
@@ -1900,6 +1903,34 @@ mark.search-hit {
 .composer-input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+/* Pi TUI bash mode: a leading `!` tints the composer amber and shows a bash badge. */
+.composer-input-bash {
+  border-color: color-mix(in srgb, var(--bash-mode) 60%, transparent);
+}
+
+.composer-input-bash:focus {
+  border-color: var(--bash-mode);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bash-mode) 16%, transparent);
+}
+
+.bash-mode-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  padding: 1px 8px;
+  border: 1px solid color-mix(in srgb, var(--bash-mode) 55%, transparent);
+  border-radius: 999px;
+  color: var(--bash-mode);
+  background: color-mix(in srgb, var(--bash-mode) 10%, transparent);
+  font-family: var(--mono);
+  font-size: 0.72em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  user-select: none;
 }
 
 /* Semi-transparent send/stop icon pinned to the textarea's bottom-right corner. */
