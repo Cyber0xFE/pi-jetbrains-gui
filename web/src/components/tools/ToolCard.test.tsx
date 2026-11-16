@@ -124,7 +124,7 @@ describe("ToolCard", () => {
         callId: "bash:1",
         name: "bash",
         status: "error",
-        args: { command: "false", excludeFromContext: true },
+        args: { command: "false", excludeFromContext: true, shellEscape: true },
         output: "boom",
         details: { exitCode: 2, cancelled: false },
       }),
@@ -133,6 +133,34 @@ describe("ToolCard", () => {
     expect(screen.getByText("exit 2")).toBeDefined();
     expect(screen.getByText("not in context")).toBeDefined();
     expect(screen.queryByText("Cancel")).toBeNull();
+  });
+
+  it("keeps a user-run shell escape expanded but an agent bash call collapsed by default", () => {
+    const shellEscapeView = render(
+      card({
+        callId: "bash:2",
+        name: "bash",
+        status: "done",
+        args: { command: "ls -la", excludeFromContext: false, shellEscape: true },
+        output: Array.from({ length: 26 }, (_, index) => `line ${index + 1}`).join("\n"),
+        details: { exitCode: 0, cancelled: false },
+      }),
+    );
+    const expanded = shellEscapeView.getByText("output · 26 lines").closest("details");
+    expect(expanded?.open).toBe(true);
+    shellEscapeView.unmount();
+
+    render(
+      card({
+        callId: "bash-3",
+        name: "bash",
+        status: "done",
+        args: { command: "npm build" },
+        output: Array.from({ length: 26 }, (_, index) => `line ${index + 1}`).join("\n"),
+      }),
+    );
+    const collapsed = screen.getByText("output · 26 lines").closest("details");
+    expect(collapsed?.open).toBe(false);
   });
 
   it("offers a cancel button for a running shell escape", () => {

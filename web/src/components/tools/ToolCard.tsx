@@ -223,12 +223,15 @@ function bashView(tool: ToolState): ToolView {
   const command = stringField(tool.args, "command");
   const timeout = numberField(tool.args, "timeout");
   const excludeFromContext = asObject(tool.args)?.excludeFromContext === true;
+  // User-run `!` commands keep their output expanded; agent-issued bash calls stay collapsed
+  // unless they failed or are short.
+  const shellEscape = asObject(tool.args)?.shellEscape === true;
   const exitCode = numberField(tool.details, "exitCode");
   const cancelled = tool.details?.cancelled === true;
   const failed = exitCode !== undefined && exitCode !== 0;
   const hasOutput = (tool.output ?? "").length > 0;
   const outputLines = tool.output === undefined ? 0 : tool.output.split("\n").length;
-  const outputOpen = tool.isError || failed || outputLines <= 3;
+  const outputOpen = tool.isError || failed || shellEscape || outputLines <= 3;
 
   return {
     title: (

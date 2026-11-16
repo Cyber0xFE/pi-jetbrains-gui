@@ -722,7 +722,7 @@ describe("sessionReducer", () => {
     });
 
     expect(sent.tools["bash:1"]).toMatchObject({ name: "bash", status: "running" });
-    expect(sent.tools["bash:1"]?.args).toEqual({ command: "ls -la", excludeFromContext: false });
+    expect(sent.tools["bash:1"]?.args).toEqual({ command: "ls -la", excludeFromContext: false, shellEscape: true });
     expect(sent.messages).toHaveLength(1);
     expect(sent.messages[0]?.blocks).toEqual([{ kind: "tool", callId: "bash:1", name: "bash" }]);
 

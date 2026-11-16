@@ -671,7 +671,7 @@ function onBashResult(state: ChatState, message: Extract<Inbound, { type: "bash_
     callId: message.id,
     name: "bash",
     status,
-    args: { command: message.command, excludeFromContext: message.excludeFromContext === true },
+    args: { command: message.command, excludeFromContext: message.excludeFromContext === true, shellEscape: true },
     output: message.output,
     fullOutputPath: message.fullOutputPath ?? undefined,
     details: {
@@ -691,7 +691,7 @@ function appendBashCard(state: ChatState, id: string, command: string, excludeFr
     callId: id,
     name: "bash",
     status: "running",
-    args: { command, excludeFromContext: excludeFromContext === true },
+    args: { command, excludeFromContext: excludeFromContext === true, shellEscape: true },
   };
   const entry: ChatMessage = {
     id,
@@ -889,7 +889,7 @@ function hydrateBashExecution(state: ChatState, message: WireMessage): ChatState
     callId: id,
     name: "bash",
     status: cancelled || exitCodeFailed ? "error" : "done",
-    args: { command, excludeFromContext: message.excludeFromContext === true },
+    args: { command, excludeFromContext: message.excludeFromContext === true, shellEscape: true },
     output: typeof message.output === "string" ? message.output : undefined,
     details: { exitCode, cancelled },
     isError: cancelled || exitCodeFailed,
