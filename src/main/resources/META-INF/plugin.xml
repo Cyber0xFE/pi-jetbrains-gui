@@ -71,6 +71,7 @@
     <extensions defaultExtensionNs="com.intellij">
         <projectService serviceImplementation="dev.pi.jetbrains.PiChatTabsService"/>
         <applicationConfigurable instance="dev.pi.jetbrains.ui.PiSettingsConfigurable"/>
+        <jcef.appRequiredArgumentsProvider implementation="dev.pi.jetbrains.ui.PiJcefRequiredArgumentsProvider"/>
         <toolWindow
                 id="Pi"
                 anchor="right"
