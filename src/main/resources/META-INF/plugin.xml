@@ -68,6 +68,12 @@
         </action>
     </actions>
 
+    <application-components>
+        <component>
+            <implementation-class>dev.pi.jetbrains.ui.JcefCompatibilityApplicationComponent</implementation-class>
+        </component>
+    </application-components>
+
     <extensions defaultExtensionNs="com.intellij">
         <projectService serviceImplementation="dev.pi.jetbrains.PiChatTabsService"/>
         <applicationConfigurable instance="dev.pi.jetbrains.ui.PiSettingsConfigurable"/>
