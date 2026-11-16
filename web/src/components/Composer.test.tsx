@@ -97,3 +97,57 @@ it("restores queued messages for editing with Alt+Up", () => {
   fireEvent.keyDown(input, { key: "ArrowUp" });
   expect(onDequeue).toHaveBeenCalledTimes(1);
 });
+
+it("tints the composer and shows a bash badge while the draft starts with !", () => {
+  const view = render(
+    <Composer
+      value="! npm"
+      onChange={() => undefined}
+      focusRequest={0}
+      onSend={() => undefined}
+      disabled={false}
+      busy={false}
+      commands={[]}
+      files={[]}
+      onCompact={() => undefined}
+      onOpenTree={() => undefined}
+      pendingContext={null}
+      onClearContext={() => undefined}
+      images={[]}
+      onAddImage={() => undefined}
+      onRemoveImage={() => undefined}
+      onAbort={() => undefined}
+      onDequeue={() => undefined}
+    />,
+  );
+
+  const input = view.getByRole("textbox", { name: "Shell command to run" });
+  expect(input.className).toContain("composer-input-bash");
+  expect(view.container.querySelector(".bash-mode-badge")).not.toBeNull();
+});
+
+it("keeps the normal composer chrome for a mid-text exclamation mark", () => {
+  const view = render(
+    <Composer
+      value="why is this slow!"
+      onChange={() => undefined}
+      focusRequest={0}
+      onSend={() => undefined}
+      disabled={false}
+      busy={false}
+      commands={[]}
+      files={[]}
+      onCompact={() => undefined}
+      onOpenTree={() => undefined}
+      pendingContext={null}
+      onClearContext={() => undefined}
+      images={[]}
+      onAddImage={() => undefined}
+      onRemoveImage={() => undefined}
+      onAbort={() => undefined}
+      onDequeue={() => undefined}
+    />,
+  );
+
+  expect(view.getByRole("textbox", { name: "Message to pi" }).className).not.toContain("composer-input-bash");
+});

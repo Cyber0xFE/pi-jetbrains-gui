@@ -242,6 +242,8 @@ export function Composer({
   const canSend = value.trim().length > 0 || images.length > 0 || Boolean(pendingContext);
   // With room to steer, the corner button queues the message; otherwise it stops the run.
   const showStop = busy && (!steering || !canSend);
+  // Like the pi TUI's bash-mode editor tint: a leading `!` runs as a shell command.
+  const bashMode = value.trimStart().startsWith("!");
   return (
     <div className="composer">
       {pendingContext && (
@@ -313,12 +315,12 @@ export function Composer({
           ))}
         </div>
       )}
-      <div className="composer-input-wrap">
+      <div className={`composer-input-wrap${bashMode ? " composer-bash-mode" : ""}`}>
         <textarea
-          aria-label="Message to pi"
+          aria-label={bashMode ? "Shell command to run" : "Message to pi"}
           aria-multiline="true"
           ref={textarea}
-          className="composer-input"
+          className={`composer-input${bashMode ? " composer-input-bash" : ""}`}
           value={value}
           onChange={(event) => handleChange(event.target.value)}
           onPaste={handlePaste}
@@ -326,13 +328,16 @@ export function Composer({
           placeholder={
             disabled
               ? "pi is not running"
-              : steering
-                ? "pi is streaming — Enter to steer, Alt+Enter to queue a follow-up (/ for commands)"
-                : "Send a message to pi… (Enter to send, Shift+Enter for a newline, / for commands)"
+              : bashMode
+                ? "Run shell command — Enter to execute; ! keeps output in context, !! excludes it"
+                : steering
+                  ? "pi is streaming — Enter to steer, Alt+Enter to queue a follow-up (/ for commands)"
+                  : "Send a message to pi… (Enter to send, Shift+Enter for a newline, / for commands)"
           }
           rows={3}
           spellCheck={false}
         />
+        {bashMode && <span className="bash-mode-badge" aria-hidden="true">bash</span>}
         {showStop ? (
           <button type="button" className="composer-send composer-send-stop" onClick={onAbort} title="Stop" aria-label="Stop">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
