@@ -250,8 +250,11 @@ function bashView(tool: ToolState): ToolView {
           </details>
         )}
         {tool.status === "running" && (
-          <div className="tool-actions">
-            <button type="button" className="button button-secondary" onClick={() => post({ type: "abort_bash" })}>
+          <div className="tool-actions tool-actions-end">
+            <button type="button" className="tool-cancel" onClick={() => post({ type: "abort_bash" })}>
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <rect x="7" y="7" width="10" height="10" rx="2" />
+              </svg>
               Cancel
             </button>
           </div>

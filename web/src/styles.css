@@ -1395,6 +1395,41 @@ mark.search-hit {
   gap: 8px;
 }
 
+.tool-actions-end {
+  justify-content: flex-end;
+}
+
+/** Ghost-style cancel button for a running `!` shell command (bash card). */
+.tool-cancel {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg-dim);
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-size: 0.8em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.tool-cancel svg {
+  width: 11px;
+  height: 11px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.tool-cancel:hover,
+.tool-cancel:focus-visible {
+  color: var(--error);
+  border-color: color-mix(in srgb, var(--error) 55%, transparent);
+  background: color-mix(in srgb, var(--error) 8%, transparent);
+}
+
 .tool-children {
   margin-top: 4px;
   padding-left: 10px;
