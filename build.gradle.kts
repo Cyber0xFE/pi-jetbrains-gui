@@ -97,7 +97,7 @@ intellijPlatform {
             </ul>
             <h3>Fixes</h3>
             <ul>
-              <li>The JCEF compatibility workaround now runs at application startup instead of only when the Pi tool window is first opened, and registers a required-arguments provider, so it still applies when another plugin initializes JCEF before Pi. On IntelliJ IDEA 2025 and newer the webview turns off JCEF remote rendering, out-of-process rendering and GPU compositing, which fixes the blank or misrendered chat panel on 2026.3.</li>
+              <li>The JCEF compatibility workaround now also runs when the application frame is created instead of only when the Pi tool window is first opened, and registers a required-arguments provider, so it still applies when another plugin initializes JCEF before Pi. On IntelliJ IDEA 2025 and newer the webview turns off JCEF remote rendering, out-of-process rendering and GPU compositing, which fixes the blank or misrendered chat panel on 2026.3.</li>
             </ul>
 
         """.trimIndent()

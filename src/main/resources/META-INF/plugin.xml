@@ -68,11 +68,10 @@
         </action>
     </actions>
 
-    <application-components>
-        <component>
-            <implementation-class>dev.pi.jetbrains.ui.JcefCompatibilityApplicationComponent</implementation-class>
-        </component>
-    </application-components>
+    <applicationListeners>
+        <listener class="dev.pi.jetbrains.ui.PiJcefAppLifecycleListener"
+                  topic="com.intellij.ide.AppLifecycleListener"/>
+    </applicationListeners>
 
     <extensions defaultExtensionNs="com.intellij">
         <projectService serviceImplementation="dev.pi.jetbrains.PiChatTabsService"/>

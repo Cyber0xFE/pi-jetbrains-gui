@@ -1,9 +1,9 @@
 package dev.pi.jetbrains.ui
 
+import com.intellij.ide.AppLifecycleListener
 import com.intellij.openapi.application.ApplicationInfo
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.ui.jcef.JBCefAppRequiredArgumentsProvider
-import com.intellij.openapi.components.ApplicationComponent
 
 /**
  * Applies the JCEF rendering workaround before the first browser is initialized.
@@ -50,8 +50,9 @@ object JcefCompatibility {
         runCatching { ApplicationInfo.getInstance().build.baselineVersion >= MINIMUM_BASELINE }.getOrDefault(false)
 }
 
-class JcefCompatibilityApplicationComponent : ApplicationComponent {
-    override fun initComponent() {
+/** Applies the workaround as soon as the application frame exists, before JCEF is initialized. */
+class PiJcefAppLifecycleListener : AppLifecycleListener {
+    override fun appFrameCreated(commandLineArgs: List<String>) {
         JcefCompatibility.apply()
     }
 }
