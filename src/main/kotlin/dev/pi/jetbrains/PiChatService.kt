@@ -469,6 +469,23 @@ class PiChatService(private val project: Project) : Disposable {
     suspend fun abort(): RpcResponse =
         requireClient().send(RpcCommand(type = "abort")).await()
 
+    /**
+     * Runs a shell command through pi's RPC `bash` command (pi TUI `!` / `!!`).
+     *
+     * The response only arrives once the command finished — pi's RPC mode does not stream bash
+     * output — so the deadline must be far above the default request timeout; long-running
+     * commands are still cancelable through [abortBash].
+     */
+    suspend fun bash(command: String, excludeFromContext: Boolean): RpcResponse =
+        requireClient().send(
+            RpcCommand(type = "bash", command = command, excludeFromContext = excludeFromContext.takeIf { it }),
+            timeout = BASH_REQUEST_TIMEOUT,
+        ).await()
+
+    /** Cancels the bash command currently running through [bash], if any. */
+    suspend fun abortBash(): RpcResponse =
+        requireClient().send(RpcCommand(type = "abort_bash")).await()
+
     /** Clears all queued steering/follow-up messages and returns them for editing (TUI Alt+Up). */
     suspend fun clearQueue(): RpcResponse =
         requireClient().send(RpcCommand(type = "clear_queue")).await()
@@ -846,6 +863,7 @@ class PiChatService(private val project: Project) : Disposable {
         private val LOG = Logger.getInstance(PiChatService::class.java)
         private val diagnosticLogLock = Any()
         private val COMPACT_TIMEOUT: Duration = Duration.ofSeconds(300)
+        private val BASH_REQUEST_TIMEOUT: Duration = Duration.ofMinutes(30)
         private val HEARTBEAT_TIMEOUT: Duration = Duration.ofSeconds(10)
         private const val HEARTBEAT_INTERVAL_MS = 30_000L
         private const val HEARTBEAT_FAILURES_BEFORE_RECOVERY = 2

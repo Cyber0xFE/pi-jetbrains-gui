@@ -235,6 +235,22 @@ export function App(): JSX.Element {
         }
         return;
       }
+      // Shell escape like the pi TUI: `! cmd` runs in context, `!! cmd` excludes its output from
+      // the LLM. The result arrives later via `bash_result`; the pending card is seeded locally.
+      if (text.startsWith("!")) {
+        const isExcluded = text.startsWith("!!");
+        const command = (isExcluded ? text.slice(2) : text.slice(1)).trim();
+        if (command.length > 0) {
+          const id = `bash:${Date.now()}`;
+          setDraft("");
+          setScrollToLatestRequest((current) => current + 1);
+          store.dispatch({ kind: "bashSend", id, command, excludeFromContext: isExcluded });
+          window.requestAnimationFrame(() => {
+            post({ type: "bash", id, command, excludeFromContext: isExcluded });
+          });
+        }
+        return;
+      }
       if (pendingPromptTimer.current !== null) window.clearTimeout(pendingPromptTimer.current);
       pendingPromptStartedAt.current = Date.now();
       setPendingPrompt(true);

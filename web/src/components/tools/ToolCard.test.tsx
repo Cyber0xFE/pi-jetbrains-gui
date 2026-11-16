@@ -118,6 +118,37 @@ describe("ToolCard", () => {
     expect(window.__piSent).toEqual([{ type: "open_path", path: "/tmp/pi-bash-1.log" }]);
   });
 
+  it("shows shell escape exit codes, context exclusion and a cancel button while running", () => {
+    render(
+      card({
+        callId: "bash:1",
+        name: "bash",
+        status: "error",
+        args: { command: "false", excludeFromContext: true },
+        output: "boom",
+        details: { exitCode: 2, cancelled: false },
+      }),
+    );
+
+    expect(screen.getByText("exit 2")).toBeDefined();
+    expect(screen.getByText("not in context")).toBeDefined();
+    expect(screen.queryByText("Cancel")).toBeNull();
+  });
+
+  it("offers a cancel button for a running shell escape", () => {
+    render(
+      card({
+        callId: "bash:2",
+        name: "bash",
+        status: "running",
+        args: { command: "sleep 100", excludeFromContext: false },
+      }),
+    );
+
+    fireEvent.click(screen.getByText("Cancel"));
+    expect(window.__piSent).toEqual([{ type: "abort_bash" }]);
+  });
+
   it("turns grep output into clickable hits", () => {
     render(
       card({

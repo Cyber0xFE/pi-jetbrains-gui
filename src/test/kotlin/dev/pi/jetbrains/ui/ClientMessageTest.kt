@@ -3,6 +3,7 @@ package dev.pi.jetbrains.ui
 import dev.pi.jetbrains.rpc.PiJson
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
@@ -54,6 +55,60 @@ class ClientMessageTest {
         assertEquals("send_queued", message.type)
         assertEquals(listOf("first", "next"), message.queued.map { it.text })
         assertEquals(listOf("steering", "followUp"), message.queued.map { it.kind })
+    }
+
+    @Test
+    fun `bash message carries id command and exclusion flag`() {
+        val json = PiJson.parseToJsonElement(
+            """{"type":"bash","id":"bash:1","command":"ls -la","excludeFromContext":true}""",
+        ).jsonObject
+        val message = PiJson.decodeFromJsonElement(ClientMessage.serializer(), json)
+
+        assertEquals("bash", message.type)
+        assertEquals("bash:1", message.id)
+        assertEquals("ls -la", message.command)
+        assertEquals(true, message.excludeFromContext)
+    }
+
+    @Test
+    fun `abort_bash message parses without extra fields`() {
+        val json = PiJson.parseToJsonElement("""{"type":"abort_bash"}""").jsonObject
+        val message = PiJson.decodeFromJsonElement(ClientMessage.serializer(), json)
+
+        assertEquals("abort_bash", message.type)
+    }
+
+    @Test
+    fun `bash_result host message serializes with the documented shape`() {
+        val element: JsonElement = HostMessages.bashResult(
+            id = "bash:1",
+            command = "ls -la",
+            output = "file one\nfile two",
+            exitCode = 2,
+            cancelled = false,
+            truncated = true,
+            fullOutputPath = "/tmp/out.log",
+            excludeFromContext = true,
+        )
+        val json = element.jsonObject
+
+        assertEquals("bash_result", json["type"]?.toString()?.trim('"'))
+        assertEquals("bash:1", json["id"]?.toString()?.trim('"'))
+        assertEquals("ls -la", json["command"]?.toString()?.trim('"'))
+        assertEquals("file one\nfile two", json["output"]?.jsonPrimitive?.content)
+        assertEquals("2", json["exitCode"].toString())
+        assertEquals("true", json["truncated"].toString())
+        assertEquals("/tmp/out.log", json["fullOutputPath"]?.toString()?.trim('"'))
+        assertEquals("true", json["excludeFromContext"].toString())
+    }
+
+    @Test
+    fun `bash_result host message carries a host error without exit code`() {
+        val element: JsonElement = HostMessages.bashResult(id = "bash:2", command = "sleep", output = "", error = "pi did not answer 'bash'")
+        val json = element.jsonObject
+
+        assertEquals("null", json["exitCode"].toString())
+        assertEquals("pi did not answer 'bash'", json["error"]?.toString()?.trim('"'))
     }
 
     @Test

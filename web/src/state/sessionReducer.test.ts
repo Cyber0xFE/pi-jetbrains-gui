@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { WireMessage, WireRecord } from "../types";
+import type { Inbound, WireMessage, WireRecord } from "../types";
 import { initialState, reduce, type Action, type ChatState } from "./sessionReducer";
 
 function apply(state: ChatState, ...actions: Action[]): ChatState {
   return actions.reduce(reduce, state);
+}
+
+function inbound(message: Inbound): Action {
+  return { kind: "inbound", message };
 }
 
 function records(...items: WireRecord[]): Action {
@@ -707,5 +711,101 @@ describe("sessionReducer", () => {
     const assistant = state.messages.find((message) => message.role === "assistant");
     expect(assistant?.blocks).toEqual([{ kind: "text", text: "partial answer" }]);
     expect(state.messages.filter((message) => message.role === "user")).toHaveLength(1);
+  });
+
+  it("seeds a pending card for a shell escape and completes it from bash_result", () => {
+    const sent = apply(initialState, {
+      kind: "bashSend",
+      id: "bash:1",
+      command: "ls -la",
+      excludeFromContext: false,
+    });
+
+    expect(sent.tools["bash:1"]).toMatchObject({ name: "bash", status: "running" });
+    expect(sent.tools["bash:1"]?.args).toEqual({ command: "ls -la", excludeFromContext: false });
+    expect(sent.messages).toHaveLength(1);
+    expect(sent.messages[0]?.blocks).toEqual([{ kind: "tool", callId: "bash:1", name: "bash" }]);
+
+    const completed = apply(
+      sent,
+      inbound({
+        type: "bash_result",
+        id: "bash:1",
+        command: "ls -la",
+        output: "file one\nfile two",
+        exitCode: 0,
+        cancelled: false,
+        truncated: false,
+      }),
+    );
+
+    expect(completed.messages).toHaveLength(1);
+    expect(completed.tools["bash:1"]).toMatchObject({ status: "done", output: "file one\nfile two" });
+    expect(completed.tools["bash:1"]?.details).toMatchObject({ exitCode: 0, cancelled: false });
+  });
+
+  it("marks a shell escape failed on a nonzero exit code and rebuilds a missing card", () => {
+    const completed = apply(
+      initialState,
+      inbound({
+        type: "bash_result",
+        id: "bash:2",
+        command: "false",
+        output: "boom",
+        exitCode: 2,
+        cancelled: false,
+        truncated: false,
+      }),
+    );
+
+    expect(completed.tools["bash:2"]).toMatchObject({ status: "error", output: "boom", isError: true });
+    expect(completed.messages).toHaveLength(1);
+  });
+
+  it("rebuilds a cancelled shell escape with a host error as an errored card", () => {
+    const failed = apply(
+      initialState,
+      inbound({
+        type: "bash_result",
+        id: "bash:3",
+        command: "sleep 100",
+        output: "",
+        exitCode: null,
+        cancelled: false,
+        truncated: false,
+        error: "pi did not answer 'bash' (req-1)",
+      }),
+    );
+
+    expect(failed.tools["bash:3"]).toMatchObject({ status: "error", isError: true });
+  });
+
+  it("hydrates persisted bashExecution history entries as cards", () => {
+    const state = apply(
+      initialState,
+      inbound({
+        type: "history",
+        final: true,
+        messages: [
+          {
+            role: "bashExecution",
+            command: "npm test",
+            output: "all green",
+            exitCode: 0,
+            cancelled: false,
+            truncated: false,
+            timestamp: 42,
+          },
+        ],
+      }),
+    );
+
+    expect(state.messages).toHaveLength(1);
+    expect(state.messages[0]?.blocks).toEqual([{ kind: "tool", callId: state.messages[0]?.id, name: "bash" }]);
+    expect(state.tools[state.messages[0]!.id]).toMatchObject({
+      name: "bash",
+      status: "done",
+      output: "all green",
+    });
   });
 });

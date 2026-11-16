@@ -169,6 +169,16 @@ data class RpcClearQueueResult(
     val followUp: List<String> = emptyList(),
 )
 
+/** `bash` response data (pi's `BashResult`, rpc-schema.json). */
+@Serializable
+data class RpcBashResult(
+    val output: String = "",
+    val exitCode: Int? = null,
+    val cancelled: Boolean = false,
+    val truncated: Boolean = false,
+    val fullOutputPath: String? = null,
+)
+
 /** `fork` response data. */
 @Serializable
 data class RpcForkResult(

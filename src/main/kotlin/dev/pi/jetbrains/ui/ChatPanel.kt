@@ -28,6 +28,7 @@ import dev.pi.jetbrains.rpc.PiEvent
 import dev.pi.jetbrains.rpc.PiJson
 import dev.pi.jetbrains.rpc.RpcClearQueueResult
 import dev.pi.jetbrains.rpc.RpcCommandsData
+import dev.pi.jetbrains.rpc.RpcBashResult
 import dev.pi.jetbrains.rpc.RpcForkResult
 import dev.pi.jetbrains.rpc.RpcModelsData
 import dev.pi.jetbrains.rpc.RpcResponse
@@ -566,6 +567,20 @@ class ChatPanel(
             "list_files" -> refreshProjectFiles()
             "clear_context" -> service.clearEditorContext()
 
+            // ---- `!` shell escape (pi TUI bash mode) -----------------------------------------
+            "bash" -> {
+                val id = message.id.orEmpty()
+                val command = message.command.orEmpty()
+                if (id.isEmpty() || command.isEmpty()) {
+                    LOG.debug("bash message without id or command")
+                    return
+                }
+                scope.launch { runShellCommand(id, command, message.excludeFromContext == true) }
+            }
+            "abort_bash" -> scope.launch {
+                request("failed to cancel the bash command") { service.abortBash() }
+            }
+
             // ---- /btw side questions ---------------------------------------------------------
             "btw" -> {
                 val question = message.question?.trim().orEmpty()
@@ -713,6 +728,44 @@ class ChatPanel(
     // ---------------------------------------------------------------------------------------------
     // M3 data surfaces
     // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Runs a `!` shell command through pi's RPC `bash` command and reports the outcome to the
+     * webview. The result is only sent once the command finished — no streaming in RPC mode —
+     * and never surfaces as a generic notice: the card is the transcript's source of truth.
+     */
+    private suspend fun runShellCommand(id: String, command: String, excludeFromContext: Boolean) {
+        val activeBridge = bridge ?: return
+        val response = try {
+            service.bash(command, excludeFromContext)
+        } catch (t: Throwable) {
+            activeBridge.send(HostMessages.bashResult(id, command, output = "", error = t.message ?: t.javaClass.simpleName))
+            return
+        }
+        if (!response.success) {
+            activeBridge.send(
+                HostMessages.bashResult(id, command, output = "", error = response.error ?: "unknown error"),
+            )
+            return
+        }
+        val result = response.decodeDataAs<RpcBashResult>()
+        if (result == null) {
+            activeBridge.send(HostMessages.bashResult(id, command, output = "", error = "unparseable bash result"))
+            return
+        }
+        activeBridge.send(
+            HostMessages.bashResult(
+                id = id,
+                command = command,
+                output = result.output,
+                exitCode = result.exitCode,
+                cancelled = result.cancelled,
+                truncated = result.truncated,
+                fullOutputPath = result.fullOutputPath,
+                excludeFromContext = excludeFromContext,
+            ),
+        )
+    }
 
     private suspend fun sendSessions() {
         val activeBridge = bridge ?: return

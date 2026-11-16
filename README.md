@@ -19,6 +19,7 @@ The plugin launches a local `pi --mode rpc` subprocess and renders conversations
 - Create, switch, rename, delete, and fork sessions, and view branches in the session tree
 - Browse pi commands with `/` and reference project files with `@`
 - Use `/btw <question>` to ask side questions at any time (inspired by Claude Code): the main task is not interrupted, the answer streams in a dismissible overlay, and the Q&A is not written into the main session history; typing `/btw` alone shows the most recent side Q&A
+- Run shell commands from the input box like the pi TUI: `! <command>` executes it and keeps the output in the LLM context, `!! <command>` keeps the output out of the context; the command and its output render as a terminal-style card once it finishes, with a cancel button while it runs
 - Manually compact context, configure auto-compaction, and abort automatic retries
 - Support pi extension dialogs, notifications, status text, and status bar widgets
 - Jump files, URLs, terminal output, and diff locations directly into the IDE

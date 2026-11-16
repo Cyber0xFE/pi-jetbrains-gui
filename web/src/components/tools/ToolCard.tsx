@@ -12,6 +12,7 @@ import {
 } from "../../tools/result";
 import { DiffView } from "./DiffView";
 import { PathLink } from "./PathLink";
+import { post } from "../../bridge";
 
 const MAX_NESTING = 4;
 
@@ -221,14 +222,21 @@ function writeView(tool: ToolState): ToolView {
 function bashView(tool: ToolState): ToolView {
   const command = stringField(tool.args, "command");
   const timeout = numberField(tool.args, "timeout");
+  const excludeFromContext = asObject(tool.args)?.excludeFromContext === true;
+  const exitCode = numberField(tool.details, "exitCode");
+  const cancelled = tool.details?.cancelled === true;
+  const failed = exitCode !== undefined && exitCode !== 0;
   const hasOutput = (tool.output ?? "").length > 0;
   const outputLines = tool.output === undefined ? 0 : tool.output.split("\n").length;
-  const outputOpen = tool.isError || outputLines <= 3;
+  const outputOpen = tool.isError || failed || outputLines <= 3;
 
   return {
     title: (
       <>
         {timeout !== undefined && <span className="chip">{timeout}s timeout</span>}
+        {excludeFromContext && <span className="chip chip-muted">not in context</span>}
+        {cancelled && <span className="chip">cancelled</span>}
+        {failed && <span className="chip">exit {exitCode}</span>}
         {!hasOutput && tool.status === "running" && <span className="tool-note">waiting for output…</span>}
       </>
     ),
@@ -238,8 +246,15 @@ function bashView(tool: ToolState): ToolView {
         {hasOutput && (
           <details className="tool-section" open={outputOpen}>
             <summary>output · {outputLines} lines</summary>
-            <pre className="tool-output tool-terminal">{truncateToolText(tool.output ?? "")}</pre>
+            <pre className={`tool-output tool-terminal${failed && !tool.isError ? " tool-output-error" : ""}`}>{truncateToolText(tool.output ?? "")}</pre>
           </details>
+        )}
+        {tool.status === "running" && (
+          <div className="tool-actions">
+            <button type="button" className="button button-secondary" onClick={() => post({ type: "abort_bash" })}>
+              Cancel
+            </button>
+          </div>
         )}
         {tool.outputTruncated && <div className="tool-note tool-output-warning">output truncated to keep the UI responsive</div>}
         {tool.fullOutputPath !== undefined && (

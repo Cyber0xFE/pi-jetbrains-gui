@@ -32,7 +32,7 @@ export type WireContent =
   | WireToolCallContent
   | { type: string; [key: string]: unknown };
 
-export type WireRole = "user" | "assistant" | "toolResult" | "system";
+export type WireRole = "user" | "assistant" | "toolResult" | "system" | "bashExecution";
 
 export interface WireMessage {
   role: WireRole;
@@ -48,6 +48,13 @@ export interface WireMessage {
   durationMs?: number;
   usage?: WireUsage;
   details?: unknown;
+  /** `bashExecution` history messages (pi's `!` commands). */
+  command?: string;
+  output?: string;
+  exitCode?: number;
+  cancelled?: boolean;
+  truncated?: boolean;
+  excludeFromContext?: boolean;
 }
 
 /** Streaming delta carried by `message_update.assistantMessageEvent`. */
@@ -244,6 +251,19 @@ export type Inbound =
   | { type: "scroll_to_latest" }
   | { type: "scroll_to_first" }
   | { type: "scroll_to_user_message"; direction: "previous" | "next" }
+  | {
+      type: "bash_result";
+      id: string;
+      command: string;
+      output: string;
+      exitCode: number | null;
+      cancelled: boolean;
+      truncated: boolean;
+      fullOutputPath?: string | null;
+      excludeFromContext?: boolean;
+      /** Set when the host failed to run the command at all (transport error, RPC rejection). */
+      error?: string | null;
+    }
   | { type: "widget"; key: string; lines: string[]; placement: "aboveEditor" | "belowEditor" }
   | { type: "extension_status"; key: string; text: string | null }
   | { type: "dequeue"; steering: string[]; followUp: string[] };
@@ -253,6 +273,9 @@ export type Outbound =
   | { type: "ready" }
   | { type: "start" }
   | { type: "prompt"; message: string; images?: PromptImage[]; streamingBehavior?: "steer" | "followUp" }
+  /** Shell escape like the pi TUI: `! cmd` runs in context, `!! cmd` excludes its output. */
+  | { type: "bash"; id: string; command: string; excludeFromContext?: boolean }
+  | { type: "abort_bash" }
   | { type: "btw"; question: string }
   | { type: "abort" }
   | { type: "request_state" }

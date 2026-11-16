@@ -327,6 +327,21 @@ data class HostScrollToUserMessageMessage(
     val direction: String,
 )
 
+/** Outcome of a `!` shell command (pi TUI bash mode), sent once after the command finished. */
+@Serializable
+data class HostBashResultMessage(
+    val type: String = "bash_result",
+    val id: String,
+    val command: String,
+    val output: String,
+    val exitCode: Int? = null,
+    val cancelled: Boolean = false,
+    val truncated: Boolean = false,
+    val fullOutputPath: String? = null,
+    val excludeFromContext: Boolean = false,
+    val error: String? = null,
+)
+
 /** One message from the webview to Kotlin; see `web/src/types.ts` (`Outbound`). */
 @Serializable
 data class ClientMessage(
@@ -357,6 +372,12 @@ data class ClientMessage(
     val name: String? = null,
     /** `/btw` side question text. */
     val question: String? = null,
+    /** `bash` shell escape: request correlation id echoed back in `bash_result`. */
+    val id: String? = null,
+    /** `bash` shell escape: the command to run (without the `!` prefix). */
+    val command: String? = null,
+    /** `bash` shell escape: `!!` — keep the output out of the LLM context. */
+    val excludeFromContext: Boolean? = null,
     /** Queue behavior for `prompt` while pi is streaming: `steer` or `followUp`. */
     val streamingBehavior: String? = null,
     /** `send_queued`: pending messages re-ordered by the queue editor, posted one by one. */
@@ -500,5 +521,31 @@ object HostMessages {
         PiJson.encodeToJsonElement(
             HostScrollToUserMessageMessage.serializer(),
             HostScrollToUserMessageMessage(direction = direction),
+        )
+
+    fun bashResult(
+        id: String,
+        command: String,
+        output: String,
+        exitCode: Int? = null,
+        cancelled: Boolean = false,
+        truncated: Boolean = false,
+        fullOutputPath: String? = null,
+        excludeFromContext: Boolean = false,
+        error: String? = null,
+    ): JsonElement =
+        PiJson.encodeToJsonElement(
+            HostBashResultMessage.serializer(),
+            HostBashResultMessage(
+                id = id,
+                command = command,
+                output = output,
+                exitCode = exitCode,
+                cancelled = cancelled,
+                truncated = truncated,
+                fullOutputPath = fullOutputPath,
+                excludeFromContext = excludeFromContext,
+                error = error,
+            ),
         )
 }

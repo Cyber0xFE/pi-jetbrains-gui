@@ -165,6 +165,7 @@ export const initialState: ChatState = {
 
 export type Action =
   | { kind: "submit" }
+  | { kind: "bashSend"; id: string; command: string; excludeFromContext?: boolean }
   | { kind: "inbound"; message: Inbound }
   | { kind: "btwSend"; question: string }
   | { kind: "dismissNotice"; id: string };
@@ -180,6 +181,8 @@ export function reduce(state: ChatState, action: Action): ChatState {
   switch (action.kind) {
     case "submit":
       return { ...state, sending: true };
+    case "bashSend":
+      return appendBashCard(state, action.id, action.command, action.excludeFromContext);
     case "btwSend":
       // Optimistic pending state while the host runs the print-mode side question.
       return { ...state, btw: { question: action.question, answer: null, error: null, pending: true } };
@@ -260,6 +263,8 @@ function applyInbound(state: ChatState, message: Inbound): ChatState {
       return state;
     case "scroll_to_user_message":
       return state;
+    case "bash_result":
+      return onBashResult(state, message);
     case "extension_status": {
       const extensionStatuses = { ...state.extensionStatuses };
       if (message.text == null || message.text.trim().length === 0) delete extensionStatuses[message.key];
@@ -653,6 +658,70 @@ function onBashUpdate(state: ChatState, record: WireRecord): ChatState {
   };
 }
 
+/**
+ * Shell escape (`!` / `!!`) result from the host's `bash` RPC command. The webview seeds the
+ * pending card optimistically on `bashSend`; the host only sends `bash_result` after the command
+ * finished, so a missing card (cleared transcript, late result) is rebuilt here.
+ */
+function onBashResult(state: ChatState, message: Extract<Inbound, { type: "bash_result" }>): ChatState {
+  const failed = typeof message.error === "string" && message.error.length > 0;
+  const exitCodeFailed = message.exitCode !== null && message.exitCode !== 0;
+  const status: ToolStatus = failed || message.cancelled || exitCodeFailed ? "error" : "done";
+  const tool: ToolState = {
+    callId: message.id,
+    name: "bash",
+    status,
+    args: { command: message.command, excludeFromContext: message.excludeFromContext === true },
+    output: message.output,
+    fullOutputPath: message.fullOutputPath ?? undefined,
+    details: {
+      exitCode: message.exitCode,
+      cancelled: message.cancelled,
+      truncated: message.truncated,
+      error: message.error ?? undefined,
+    },
+    isError: failed || message.cancelled || exitCodeFailed,
+  };
+  return upsertBashCard(state, tool);
+}
+
+/** Seeds an optimistic pending card for a `!` shell command. */
+function appendBashCard(state: ChatState, id: string, command: string, excludeFromContext?: boolean): ChatState {
+  const tool: ToolState = {
+    callId: id,
+    name: "bash",
+    status: "running",
+    args: { command, excludeFromContext: excludeFromContext === true },
+  };
+  const entry: ChatMessage = {
+    id,
+    role: "system",
+    blocks: [{ kind: "tool", callId: id, name: "bash" }],
+    timestamp: Date.now(),
+    streaming: false,
+  };
+  return {
+    ...state,
+    messages: [...state.messages, entry],
+    tools: { ...state.tools, [id]: tool },
+  };
+}
+
+/** Applies a final bash result; rebuilds message and card when the pending one was reset away. */
+function upsertBashCard(state: ChatState, tool: ToolState): ChatState {
+  const existingMessage = state.messages.some((message) => message.id === tool.callId);
+  const messages = existingMessage
+    ? state.messages
+    : [...state.messages, {
+        id: tool.callId,
+        role: "system",
+        blocks: [{ kind: "tool", callId: tool.callId, name: "bash" }],
+        timestamp: Date.now(),
+        streaming: false,
+      } as ChatMessage];
+  return { ...state, messages, tools: { ...state.tools, [tool.callId]: tool } };
+}
+
 function onExtensionUiRequest(state: ChatState, record: WireRecord): ChatState {
   switch (record.method) {
     case "setHiddenThinkingLabel": {
@@ -780,6 +849,10 @@ function applyHistory(state: ChatState, messages: WireMessage[], final: boolean)
       next = attachToolResult(next, message);
       continue;
     }
+    if (message.role === "bashExecution") {
+      next = hydrateBashExecution(next, message);
+      continue;
+    }
     const id = messageId(message);
     if (existingIds.has(id)) continue;
     existingIds.add(id);
@@ -802,6 +875,33 @@ function applyHistory(state: ChatState, messages: WireMessage[], final: boolean)
     messages: appended.length === 0 ? next.messages : [...next.messages, ...appended],
     historyLoading: !final,
   };
+}
+
+/** Restores a persisted `!` shell command from history as a bash card. */
+function hydrateBashExecution(state: ChatState, message: WireMessage): ChatState {
+  const id = messageId(message);
+  if (state.messages.some((candidate) => candidate.id === id)) return state;
+  const command = typeof message.command === "string" ? message.command : "";
+  const exitCode = typeof message.exitCode === "number" ? message.exitCode : null;
+  const cancelled = message.cancelled === true;
+  const exitCodeFailed = exitCode !== null && exitCode !== 0;
+  const tool: ToolState = {
+    callId: id,
+    name: "bash",
+    status: cancelled || exitCodeFailed ? "error" : "done",
+    args: { command, excludeFromContext: message.excludeFromContext === true },
+    output: typeof message.output === "string" ? message.output : undefined,
+    details: { exitCode, cancelled },
+    isError: cancelled || exitCodeFailed,
+  };
+  const entry: ChatMessage = {
+    id,
+    role: "system",
+    blocks: [{ kind: "tool", callId: id, name: "bash" }],
+    timestamp: message.timestamp ?? Date.now(),
+    streaming: false,
+  };
+  return { ...state, messages: [...state.messages, entry], tools: { ...state.tools, [id]: tool } };
 }
 
 function withNotice(state: ChatState, level: NoticeLevel, message: string): ChatState {
