@@ -6,7 +6,7 @@
 - 插件后端使用 Kotlin/JVM，前端 WebView 使用 React + TypeScript + Vite。
 - Kotlin 代码位于 `src/main/kotlin`，前端代码位于 `web/src`，测试分别位于 `src/test/kotlin` 和 `web/src/**/*.test.tsx` / `web/src/**/*.test.ts`。
 - RPC 协议快照位于 `rpc-schema.json`；协议来源默认是相邻目录 `../pi` 中的 pi 源码，也可通过 `-PpiSourceDir=<目录>` 指定。
-- 详细产品设计和阶段计划见 `JETBRAINS_GUI_PLAN.md`，使用说明和公开构建文档见 `README.md`。
+- 使用说明和公开构建文档见 `README.md`。
 
 ## 技术与环境要求
 

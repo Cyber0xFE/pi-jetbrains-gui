@@ -117,9 +117,11 @@ npm test
 npm run build
 ```
 
-RPC 协议参考 `rpc-schema.json`。项目设计和阶段计划见 `JETBRAINS_GUI_PLAN.md`。
+RPC 协议参考 `rpc-schema.json`。
 前端改动完成后，可在 `web` 目录运行 `npm run typecheck && npm test`；插件产物的最终验证以根目录的 `buildPlugin` 为准。RPC 协议快照由 `rpc-schema.json` 固定，升级 pi 后请先运行 `dumpRpcSchema` 检查协议漂移。
 
 ## 许可证和反馈
+
+采用 [MIT 许可证](LICENSE)。内置的第三方组件及其许可证列于 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 项目地址：[Cyber0xFE/pi-jetbrains-gui](https://github.com/Cyber0xFE/pi-jetbrains-gui)

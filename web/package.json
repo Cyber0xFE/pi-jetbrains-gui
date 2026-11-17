@@ -1,6 +1,7 @@
 {
   "name": "pi-jetbrains-webview",
   "private": true,
+  "license": "MIT",
   "version": "0.1.0-M5",
   "type": "module",
   "scripts": {

@@ -203,6 +203,10 @@ val compileQueuePluginUpdateTool = tasks.register<JavaCompile>("compileQueuePlug
 
 // Local development: deploy only after the ZIP was built successfully (including UP-TO-DATE builds).
 tasks.named<Zip>("buildPlugin") {
+    // Ship the project license and third-party notices with the distributed ZIP.
+    from(layout.projectDirectory.file("LICENSE"))
+    from(layout.projectDirectory.file("THIRD_PARTY_NOTICES.md"))
+
     doLast {
         if (providers.gradleProperty("installLocalPlugin").orElse("true").get() != "false") {
             val configuredDirs = providers.gradleProperty("localIdePluginDirs").orNull

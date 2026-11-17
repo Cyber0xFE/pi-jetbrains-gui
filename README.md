@@ -117,9 +117,11 @@ npm test
 npm run build
 ```
 
-The RPC protocol is referenced by `rpc-schema.json`. See `JETBRAINS_GUI_PLAN.md` for the project design and phased plan.
+The RPC protocol is referenced by `rpc-schema.json`.
 After changing the frontend, run `npm run typecheck && npm test` in the `web` directory; final validation of the plugin artifact is `buildPlugin` at the repository root. The RPC protocol snapshot is pinned by `rpc-schema.json`; after upgrading pi, run `dumpRpcSchema` first to check for protocol drift.
 
 ## License and Feedback
+
+Released under the [MIT License](LICENSE). Bundled third-party components and their licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Project home: [Cyber0xFE/pi-jetbrains-gui](https://github.com/Cyber0xFE/pi-jetbrains-gui)
