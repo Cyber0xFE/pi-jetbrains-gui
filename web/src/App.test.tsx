@@ -389,7 +389,7 @@ describe("App", () => {
     );
 
     fireEvent.click(await screen.findByRole("button", { name: /openai\/gpt-5/ }));
-    const search = await screen.findByPlaceholderText("Filter models by name or provider…");
+    const search = await screen.findByPlaceholderText("Search models…");
     fireEvent.change(search, { target: { value: "claude" } });
 
     expect(screen.queryByText(/GPT-5/)).toBeNull();

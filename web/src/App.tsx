@@ -4,19 +4,18 @@ import { onMessage, post } from "./bridge";
 import { recordPerf } from "./perfLog";
 import { Composer } from "./components/Composer";
 import { MessageList } from "./components/MessageList";
-import { Picker, type PickerItem } from "./components/Picker";
+import { ModelMenu } from "./components/ModelMenu";
 import { AddModelDialog } from "./components/AddModelDialog";
 import { BtwOverlay } from "./components/BtwOverlay";
 import { SessionDialog } from "./components/SessionDialog";
 import { StatusBar } from "./components/StatusBar";
 import { Toolbar } from "./components/Toolbar";
-import { formatTokens } from "./format";
 import { setWheelSensitivity } from "./scroll";
 import { ChatStore } from "./store";
 import { EMPTY_SEARCH, selectedSearchSeed, type SearchState } from "./search";
 import type { Block } from "./state/sessionReducer";
 
-type Dialog = "sessions" | "models" | "thinking" | null;
+type Dialog = "sessions" | null;
 type SessionDialogTab = "sessions" | "tree";
 
 /** One queued message taken back from pi for editing, with the queue it came from. */
@@ -316,51 +315,8 @@ export function App(): JSX.Element {
 
   const closeDialog = useCallback(() => setDialog(null), []);
 
-  const modelItems = useMemo<PickerItem[]>(
-    () => {
-      // Older hosts did not include defaultModel fields. During that transition the active
-      // model is the only useful fallback, so it remains visibly marked as the default.
-      const defaultProvider = state.defaultModelProvider ?? state.status.provider;
-      const defaultModel = state.defaultModel ?? state.status.model;
-      return state.models.map((model) => {
-        const isDefault = model.provider === defaultProvider && model.id === defaultModel;
-        return {
-          key: `${model.provider ?? ""}/${model.id}`,
-          label: model.name?.trim() || model.id,
-          detail: [
-            model.provider ? `${model.provider}/${model.id}` : model.id,
-            model.contextWindow ? `${formatTokens(model.contextWindow)} ctx` : null,
-          ]
-            .filter(Boolean)
-            .join(" · "),
-          badge: model.reasoning ? "thinking" : undefined,
-          active: model.provider === state.status.provider && model.id === state.status.model,
-          default: isDefault,
-          onAction: isDefault
-            ? undefined
-            : () => post({ type: "set_default_model", provider: model.provider ?? "", modelId: model.id }),
-          actionLabel: "Set as default",
-        };
-      });
-    },
-    [
-      state.models,
-      state.status.provider,
-      state.status.model,
-      state.defaultModelProvider,
-      state.defaultModel,
-    ],
-  );
-
-  const thinkingItems = useMemo<PickerItem[]>(
-    () =>
-      state.thinkingLevels.map((level) => ({
-        key: level,
-        label: level,
-        active: level === state.status.thinkingLevel,
-      })),
-    [state.thinkingLevels, state.status.thinkingLevel],
-  );
+  const defaultProvider = state.defaultModelProvider ?? state.status.provider;
+  const defaultModelId = state.defaultModel ?? state.status.model;
 
   const ready = phase === "running";
   const busy = state.busy || state.sending;
@@ -557,14 +513,29 @@ export function App(): JSX.Element {
         modelCount={state.models.length}
         cacheHitRate={state.cacheHitRate}
         extensionStatuses={state.extensionStatuses}
-        onOpenModels={() => {
-          post({ type: "get_models" });
-          setDialog("models");
-        }}
-        onOpenThinking={() => {
-          post({ type: "get_thinking_levels" });
-          setDialog("thinking");
-        }}
+        thinkingLevels={state.thinkingLevels}
+        renderModelsMenu={(close) => (
+          <ModelMenu
+            models={state.models}
+            ready={ready}
+            activeProvider={state.status.provider}
+            activeModel={state.status.model}
+            defaultProvider={defaultProvider}
+            defaultModel={defaultModelId}
+            onSelect={(model) => {
+              close();
+              post({ type: "set_model", provider: model.provider ?? "", modelId: model.id });
+            }}
+            onSetDefault={(model) => post({ type: "set_default_model", provider: model.provider ?? "", modelId: model.id })}
+            onAddModel={() => {
+              close();
+              setAddModelOpen(true);
+            }}
+          />
+        )}
+        onOpenModels={() => post({ type: "get_models" })}
+        onOpenThinking={() => post({ type: "get_thinking_levels" })}
+        onSelectThinking={(level) => post({ type: "set_thinking_level", level })}
         onToggleAutoCompaction={() =>
           post({ type: "set_auto_compaction", enabled: state.status.autoCompaction === false })
         }
@@ -614,34 +585,6 @@ export function App(): JSX.Element {
           }}
         />
       )}
-      {dialog === "models" && (
-        <Picker
-          title="Models"
-          items={modelItems}
-          placeholder="Filter models by name or provider…"
-          emptyText={ready ? "loading models…" : "pi is not running"}
-          actions={
-            <button
-              type="button"
-              className="button button-icon"
-              onClick={() => setAddModelOpen(true)}
-              aria-label="Add model"
-              title="Add model"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-            </button>
-          }
-          onClose={closeDialog}
-          onSelect={(item) => {
-            const model = state.models.find((candidate) => `${candidate.provider ?? ""}/${candidate.id}` === item.key);
-            if (!model) return;
-            post({ type: "set_model", provider: model.provider ?? "", modelId: model.id });
-            closeDialog();
-          }}
-        />
-      )}
       {addModelOpen && (
         <AddModelDialog
           knownProviders={
@@ -663,19 +606,6 @@ export function App(): JSX.Element {
               reasoning: draft.reasoning,
               input: draft.input,
             });
-          }}
-        />
-      )}
-      {dialog === "thinking" && (
-        <Picker
-          title="Thinking level"
-          items={thinkingItems}
-          placeholder="Filter thinking levels…"
-          emptyText={ready ? "this model has no thinking levels" : "pi is not running"}
-          onClose={closeDialog}
-          onSelect={(item) => {
-            post({ type: "set_thinking_level", level: item.key });
-            closeDialog();
           }}
         />
       )}

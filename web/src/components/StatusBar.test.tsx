@@ -14,8 +14,10 @@ function footer(status: WireStatus, overrides: Partial<Parameters<typeof StatusB
       modelCount={0}
       cacheHitRate={null}
       extensionStatuses={{}}
+      thinkingLevels={[]}
       onOpenModels={() => undefined}
       onOpenThinking={() => undefined}
+      onSelectThinking={() => undefined}
       onToggleAutoCompaction={() => undefined}
       {...overrides}
     />
@@ -76,6 +78,47 @@ describe("StatusBar", () => {
     expect(thinkingButton.getAttribute("title")).toBe("Thinking level");
     fireEvent.click(thinkingButton);
     expect(onOpenThinking).toHaveBeenCalledTimes(1);
+  });
+
+  it("lists thinking levels above the footer entry and reports the chosen level", () => {
+    const onOpenThinking = vi.fn();
+    const onSelectThinking = vi.fn();
+    render(
+      footer(
+        { phase: "running", message: "ready", model: "m", reasoning: true, thinkingLevel: "high" },
+        { thinkingLevels: ["off", "low", "high"], onOpenThinking, onSelectThinking },
+      ),
+    );
+
+    const thinkingButton = screen.getByRole("button", { name: "high ▾" });
+    expect(screen.queryByRole("listbox", { name: "Thinking level" })).toBeNull();
+    fireEvent.click(thinkingButton);
+    expect(thinkingButton.getAttribute("aria-expanded")).toBe("true");
+    const listbox = screen.getByRole("listbox", { name: "Thinking level" });
+    expect(listbox.querySelectorAll("button")).toHaveLength(3);
+
+    fireEvent.click(screen.getByRole("option", { name: "low" }));
+    expect(onSelectThinking).toHaveBeenCalledWith("low");
+    expect(screen.queryByRole("listbox", { name: "Thinking level" })).toBeNull();
+
+    fireEvent.click(thinkingButton);
+    expect(onOpenThinking).toHaveBeenCalledTimes(2);
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByRole("listbox", { name: "Thinking level" })).toBeNull();
+  });
+
+  it("closes the thinking level list on Escape", () => {
+    render(
+      footer(
+        { phase: "running", message: "ready", model: "m", reasoning: true, thinkingLevel: "high" },
+        { thinkingLevels: ["low", "high"] },
+      ),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "high ▾" }));
+    expect(screen.getByRole("listbox", { name: "Thinking level" })).toBeDefined();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("listbox", { name: "Thinking level" })).toBeNull();
   });
 
   it("hides the thinking entry when reasoning is off or no level exists", () => {

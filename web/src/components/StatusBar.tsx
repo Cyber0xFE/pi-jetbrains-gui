@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { formatCost, formatTokens } from "../format";
 import type { WireStatus } from "../types";
 
@@ -11,9 +11,15 @@ interface Props {
   cacheHitRate: number | null;
   /** `ctx.ui.setStatus()` texts, keyed by extension key. */
   extensionStatuses: Record<string, string>;
+  /** Renders the model popup above the footer model entry; the argument closes it. */
+  renderModelsMenu?: (close: () => void) => JSX.Element;
   onOpenModels: () => void;
-  /** Footer thinking-level entry, opening the thinking picker. */
+  /** Available thinking levels for the footer popup. */
+  thinkingLevels: string[];
+  /** Footer thinking-level entry, opening the popup (and asking the host for fresh levels). */
   onOpenThinking: () => void;
+  /** Choosing a level in the footer popup. */
+  onSelectThinking: (level: string) => void;
   /** Footer icon, toggling automatic context compaction. */
   onToggleAutoCompaction: () => void;
 }
@@ -34,14 +40,41 @@ export function StatusBar({
   modelCount,
   cacheHitRate,
   extensionStatuses,
+  thinkingLevels,
+  renderModelsMenu,
   onOpenModels,
   onOpenThinking,
+  onSelectThinking,
   onToggleAutoCompaction,
 }: Props): JSX.Element {
   const autoCompactionTooltipId = useId();
   const [autoCompactionHovered, setAutoCompactionHovered] = useState(false);
   const [autoCompactionFocused, setAutoCompactionFocused] = useState(false);
   const showAutoCompactionTooltip = autoCompactionHovered || autoCompactionFocused;
+  // The thinking and model entries open small popups above the footer instead of the full
+  // picker overlay; only one is open at a time and both close on an outside click/Escape.
+  const [openPopup, setOpenPopup] = useState<"models" | "thinking" | null>(null);
+  const thinkingControlRef = useRef<HTMLDivElement>(null);
+  const modelsControlRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!openPopup) return;
+    const closeOnOutsidePointer = (event: MouseEvent): void => {
+      const target = event.target as Node;
+      if (modelsControlRef.current?.contains(target) || thinkingControlRef.current?.contains(target)) return;
+      setOpenPopup(null);
+    };
+    const closeOnEscape = (event: KeyboardEvent): void => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setOpenPopup(null);
+    };
+    document.addEventListener("mousedown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [openPopup]);
   // The footer's running indicator cycles "." -> ".." -> "..." on a timer instead of a CSS
   // animation: the IDE webview inherits the OS "show animations" setting, so keyframes are
   // dropped (prefers-reduced-motion) on machines with Windows animation effects off.
@@ -150,25 +183,74 @@ export function StatusBar({
           )}
         </div>
         <div className="status-right">
-          <button
-            type="button"
-            className="status-model"
-            onClick={onOpenModels}
-            disabled={disabled}
-            title={modelCount > 0 ? `${modelCount} available models` : "Open the model picker"}
-          >
-            {modelLabel} ▾
-          </button>
-          {thinkingLabel && (
+          <div className="status-model-control" ref={modelsControlRef}>
             <button
               type="button"
-              className="status-model status-thinking"
-              onClick={onOpenThinking}
+              className="status-model"
+              onClick={() => {
+                if (openPopup === "models") {
+                  setOpenPopup(null);
+                  return;
+                }
+                onOpenModels();
+                setOpenPopup("models");
+              }}
               disabled={disabled}
-              title="Thinking level"
+              title={modelCount > 0 ? `${modelCount} available models` : "Open the model picker"}
+              aria-haspopup="dialog"
+              aria-expanded={openPopup === "models"}
             >
-              {thinkingLabel} ▾
+              {modelLabel} ▾
             </button>
+            {openPopup === "models" && renderModelsMenu?.(() => setOpenPopup(null))}
+          </div>
+          {thinkingLabel && (
+            <div className="status-thinking-control" ref={thinkingControlRef}>
+              <button
+                type="button"
+                className="status-model status-thinking"
+                onClick={() => {
+                  if (openPopup === "thinking") {
+                    setOpenPopup(null);
+                    return;
+                  }
+                  onOpenThinking();
+                  setOpenPopup("thinking");
+                }}
+                disabled={disabled}
+                title="Thinking level"
+                aria-haspopup="listbox"
+                aria-expanded={openPopup === "thinking"}
+              >
+                {thinkingLabel} ▾
+              </button>
+              {openPopup === "thinking" && (
+                <div className="status-thinking-menu" role="listbox" aria-label="Thinking level">
+                  {thinkingLevels.length === 0 ? (
+                    <span className="status-thinking-empty">no thinking levels</span>
+                  ) : (
+                    thinkingLevels.map((level) => (
+                      <button
+                        key={level}
+                        type="button"
+                        role="option"
+                        aria-selected={level === status.thinkingLevel}
+                        className={`status-thinking-item ${level === status.thinkingLevel ? "status-thinking-item-active" : ""}`}
+                        onClick={() => {
+                          setOpenPopup(null);
+                          onSelectThinking(level);
+                        }}
+                      >
+                        <span className="status-thinking-marker" aria-hidden="true">
+                          {level === status.thinkingLevel ? "●" : ""}
+                        </span>
+                        {level}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
