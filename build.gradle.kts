@@ -90,14 +90,18 @@ intellijPlatform {
         """.trimIndent()
 
         changeNotes = """
-            <h2>What's New in 0.5.0</h2>
+            <h2>What's New in 0.5.1</h2>
             <h3>Features</h3>
             <ul>
-              <li><b>Run shell commands from the composer:</b> type <code>! &lt;command&gt;</code> to run a command through pi and keep its output in the LLM context, or <code>!! &lt;command&gt;</code> to keep it out of the context — the same <b>bash mode</b> as the pi TUI. The composer switches to a tinted bash state as soon as the draft starts with <code>!</code>, and <b>Enter</b> executes the command instead of sending a prompt. While the command runs, the transcript shows a terminal-style card with a <b>cancel</b> button; the result arrives once the command finishes (pi's RPC mode does not stream bash output), and the card stays expanded with chips for a non-zero exit code, a cancelled run or excluded context. Persisted <code>!</code> commands are restored from the session history as the same cards after a session switch or IDE restart.</li>
+              <li><b>Model and thinking pickers are now footer popups:</b> clicking the model or thinking-level entry in the footer opens a compact panel right above it instead of replacing the whole transcript with a full-screen picker. The model panel groups models by provider, stays virtualized for very long model lists, supports search and keyboard navigation, and shows a <b>Set as default</b> pill on hovered rows only, with an <b>Add model</b> button in its footer. The thinking popup is exactly as wide as its content, without reserved blank space. Click outside or press <b>Escape</b> to close, and only one of the two popups is open at a time.</li>
             </ul>
             <h3>Fixes</h3>
             <ul>
-              <li>The JCEF compatibility workaround now also runs when the application frame is created instead of only when the Pi tool window is first opened, and registers a required-arguments provider, so it still applies when another plugin initializes JCEF before Pi. On IntelliJ IDEA 2025 and newer the webview turns off JCEF remote rendering, out-of-process rendering and GPU compositing, which fixes the blank or misrendered chat panel on 2026.3.</li>
+              <li><b>Deleting a session now asks for a second click in place:</b> the first click on the trash icon swaps it for a red confirmation button in the same spot, and only the second click removes the session. Moving the pointer away from that button, changing the filter text, selecting another row, or refreshing the list cancels the pending confirmation, so a stray click can no longer delete a session.</li>
+            </ul>
+            <h3>Other</h3>
+            <ul>
+              <li>The plugin is now licensed under <b>MIT</b>, with third-party notices collected in <code>THIRD_PARTY_NOTICES.md</code>.</li>
             </ul>
 
         """.trimIndent()
