@@ -52,6 +52,13 @@ describe("Picker row metadata", () => {
     expect(onDelete).not.toHaveBeenCalled();
     expect(onSelect).not.toHaveBeenCalled();
 
+    // Moving the pointer off the confirm button abandons the pending delete.
+    fireEvent.mouseLeave(screen.getByLabelText("Confirm delete"));
+    expect(screen.queryByLabelText("Confirm delete")).toBeNull();
+    expect(screen.getByLabelText("Delete session")).toBeTruthy();
+    expect(onDelete).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByLabelText("Delete session"));
     const confirm = screen.getByLabelText("Confirm delete");
     expect(confirm.textContent).toBe("确认删除");
     fireEvent.click(confirm);

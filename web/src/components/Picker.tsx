@@ -248,6 +248,7 @@ export function Picker({ title, items, placeholder, emptyText, actions, scrollPo
                       tabIndex={0}
                       aria-label="Confirm delete"
                       title="Confirm delete"
+                      onMouseLeave={() => setConfirmDelete(null)}
                       onClick={(event) => {
                         event.stopPropagation();
                         setConfirmDelete(null);
