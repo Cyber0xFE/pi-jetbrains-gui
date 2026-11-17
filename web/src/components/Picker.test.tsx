@@ -47,9 +47,37 @@ describe("Picker row metadata", () => {
     expect(onRename).toHaveBeenCalledTimes(1);
     expect(onSelect).not.toHaveBeenCalled();
 
+    // Deleting needs an explicit confirmation: the icon becomes an in-place confirm button.
     fireEvent.click(screen.getByLabelText("Delete session"));
+    expect(onDelete).not.toHaveBeenCalled();
+    expect(onSelect).not.toHaveBeenCalled();
+
+    const confirm = screen.getByLabelText("Confirm delete");
+    expect(confirm.textContent).toBe("确认删除");
+    fireEvent.click(confirm);
     expect(onDelete).toHaveBeenCalledTimes(1);
     expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("Confirm delete")).toBeNull();
+    expect(screen.getByLabelText("Delete session")).toBeTruthy();
+  });
+
+  it("drops the pending confirmation when the filter changes", () => {
+    const onDelete = vi.fn();
+    render(
+      <Picker
+        title="Sessions"
+        items={[{ key: "/a", label: "session a", onDelete }]}
+        onSelect={() => {}}
+        onClose={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("Delete session"));
+    expect(screen.getByLabelText("Confirm delete")).toBeTruthy();
+
+    fireEvent.change(screen.getByPlaceholderText("Filter…"), { target: { value: "a" } });
+    expect(screen.queryByLabelText("Confirm delete")).toBeNull();
+    expect(onDelete).not.toHaveBeenCalled();
   });
 });
 

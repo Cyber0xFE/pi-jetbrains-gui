@@ -13,7 +13,11 @@ export interface PickerItem {
   depth?: number;
   /** Optional trailing rename affordance (session list); stop propagation so the row is not selected. */
   onRename?: () => void;
-  /** Optional trailing delete affordance (session list); stop propagation so the row is not selected. */
+  /**
+   * Optional trailing delete affordance (session list); the first click swaps it for an inline
+   * confirmation button and only the second click calls this. Stops propagation so the row is
+   * not selected.
+   */
   onDelete?: () => void;
   /** Optional trailing action shown when the row is hovered; stop propagation so the row is not selected. */
   onAction?: () => void;
@@ -47,6 +51,8 @@ export function Picker({ title, items, placeholder, emptyText, actions, scrollPo
   const [query, setQuery] = useState("");
   const [scrollTop, setScrollTop] = useState(0);
   const [selected, setSelected] = useState(0);
+  /** Row whose delete button is awaiting a second confirming click. */
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -67,6 +73,7 @@ export function Picker({ title, items, placeholder, emptyText, actions, scrollPo
   useEffect(() => {
     setSelected(firstEnabled(filtered));
     setScrollTop(0);
+    setConfirmDelete(null);
     if (listRef.current) listRef.current.scrollTop = 0;
   }, [query]);
 
@@ -75,6 +82,7 @@ export function Picker({ title, items, placeholder, emptyText, actions, scrollPo
     const bottom = scrollPosition === "bottom" && list ? Math.max(0, list.scrollHeight - list.clientHeight) : 0;
     setSelected(scrollPosition === "bottom" ? lastEnabled(filtered) : firstEnabled(filtered));
     setScrollTop(bottom);
+    setConfirmDelete(null);
     if (list) list.scrollTop = bottom;
   }, [scrollPosition, items]);
 
@@ -94,6 +102,7 @@ export function Picker({ title, items, placeholder, emptyText, actions, scrollPo
 
   const choose = (item: PickerItem | undefined): void => {
     if (!item || item.disabled) return;
+    setConfirmDelete(null);
     onSelect(item);
   };
 
@@ -229,30 +238,60 @@ export function Picker({ title, items, placeholder, emptyText, actions, scrollPo
                     </svg>
                   </span>
                 )}
-                {item.onDelete && (
-                  <span
-                    className="picker-delete"
-                    role="button"
-                    tabIndex={0}
-                    aria-label="Delete session"
-                    title="Delete session"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      item.onDelete?.();
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
+                {item.onDelete &&
+                  (confirmDelete === item.key ? (
+                    // The confirming button replaces the icon in place, so the second click is
+                    // aimed at the same spot and cannot be a stray click elsewhere on the row.
+                    <span
+                      className="picker-delete picker-delete-confirm"
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Confirm delete"
+                      title="Confirm delete"
+                      onClick={(event) => {
                         event.stopPropagation();
-                        event.preventDefault();
+                        setConfirmDelete(null);
                         item.onDelete?.();
-                      }
-                    }}
-                  >
-                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                      <path d="M4 7h16M9 7V4h6v3m-9 0 1 13h8l1-13M10 11v5m4-5v5" />
-                    </svg>
-                  </span>
-                )}
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Escape") {
+                          event.stopPropagation();
+                          event.preventDefault();
+                          setConfirmDelete(null);
+                        } else if (event.key === "Enter" || event.key === " ") {
+                          event.stopPropagation();
+                          event.preventDefault();
+                          setConfirmDelete(null);
+                          item.onDelete?.();
+                        }
+                      }}
+                    >
+                      确认删除
+                    </span>
+                  ) : (
+                    <span
+                      className="picker-delete"
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Delete session"
+                      title="Delete session"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setConfirmDelete(item.key);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.stopPropagation();
+                          event.preventDefault();
+                          setConfirmDelete(item.key);
+                        }
+                      }}
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M4 7h16M9 7V4h6v3m-9 0 1 13h8l1-13M10 11v5m4-5v5" />
+                      </svg>
+                    </span>
+                  ))}
               </button>
             );
           })}
