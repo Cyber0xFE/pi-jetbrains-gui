@@ -467,15 +467,37 @@ function AppContent({ store, state }: { store: ChatStore; state: ChatState }): J
             );
           })}
           <div className="message-queue-editor-actions">
-            <button type="button" className="message-queue-action" onClick={cancelQueueEdit}>
-              {t("cancel")}
+            <button
+              type="button"
+              className="message-queue-icon"
+              onClick={cancelQueueEdit}
+              title={t("cancel")}
+              aria-label={t("cancel")}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="15"
+                height="15"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
             </button>
             <button
               type="button"
-              className="message-queue-action message-queue-action-primary"
+              className="message-queue-icon message-queue-icon-primary"
               onClick={submitQueueEdit}
+              title={t("sendAll")}
+              aria-label={t("sendAll")}
             >
-              {t("sendAll")}
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true" focusable="false">
+                <path d="M3.4 20.4 22 12 3.4 3.6v6.53L15 12 3.39 13.87z" />
+              </svg>
             </button>
           </div>
         </div>
