@@ -85,12 +85,19 @@ export interface Notice {
   message: string;
 }
 
+/** Waiting stage of a pending side question: process not ready, then model reasoning, then text. */
+export type BtwStage = "connecting" | "thinking" | "streaming";
+
 /** One `/btw` side question; never enters the main transcript. */
 export interface BtwState {
   question: string;
   answer: string | null;
+  /** Streamed reasoning, shown in a collapsed block until the user expands it. */
+  thinking: string | null;
   error: string | null;
   pending: boolean;
+  /** Only meaningful while [pending]; drives the overlay's waiting label. */
+  stage: BtwStage;
 }
 
 export interface ChatState {
@@ -185,7 +192,7 @@ export function reduce(state: ChatState, action: Action): ChatState {
       return appendBashCard(state, action.id, action.command, action.excludeFromContext);
     case "btwSend":
       // Optimistic pending state while the host runs the print-mode side question.
-      return { ...state, btw: { question: action.question, answer: null, error: null, pending: true } };
+      return { ...state, btw: { question: action.question, answer: null, thinking: null, error: null, pending: true, stage: "connecting" } };
     case "dismissNotice":
       return { ...state, notices: state.notices.filter((notice) => notice.id !== action.id) };
     case "inbound":
@@ -223,21 +230,70 @@ function applyInbound(state: ChatState, message: Inbound): ChatState {
     case "files":
       return { ...state, files: message.files };
     case "btw":
+      if (message.state === "thinking") {
+        const current = state.btw;
+        if (current?.question !== message.question) {
+          return { ...state, btw: { question: message.question, answer: null, thinking: null, error: null, pending: true, stage: "thinking" } };
+        }
+        // Late thinking updates must not resurrect a finished or failed question.
+        if (!current.pending) return state;
+        return {
+          ...state,
+          btw: { ...current, error: null, stage: current.answer === null ? "thinking" : "streaming" },
+        };
+      }
+      if (message.state === "thinking_delta") {
+        const current = state.btw;
+        if (current?.question !== message.question) {
+          return { ...state, btw: { question: message.question, answer: null, thinking: message.thinkingDelta ?? "", error: null, pending: true, stage: "thinking" } };
+        }
+        if (!current.pending) return state;
+        return {
+          ...state,
+          btw: {
+            ...current,
+            thinking: (current.thinking ?? "") + (message.thinkingDelta ?? ""),
+            error: null,
+            stage: current.answer === null ? "thinking" : "streaming",
+          },
+        };
+      }
       if (message.state === "delta") {
         const current = state.btw;
         if (current?.question !== message.question) {
           // Deltas for a question we did not seed locally (host restarted, etc.): start fresh.
-          return { ...state, btw: { question: message.question, answer: message.delta ?? "", error: null, pending: true } };
+          return { ...state, btw: { question: message.question, answer: message.delta ?? "", thinking: null, error: null, pending: true, stage: "streaming" } };
         }
         return {
           ...state,
-          btw: { question: message.question, answer: (current.answer ?? "") + (message.delta ?? ""), error: null, pending: true },
+          btw: { ...current, answer: (current.answer ?? "") + (message.delta ?? ""), error: null, pending: true, stage: "streaming" },
         };
       }
       if (message.state === "answer") {
         return {
           ...state,
-          btw: { question: message.question, answer: message.answer ?? null, error: null, pending: false },
+          btw: {
+            question: message.question,
+            answer: message.answer ?? null,
+            thinking: state.btw?.question === message.question ? state.btw.thinking : null,
+            error: null,
+            pending: false,
+            stage: "streaming",
+          },
+        };
+      }
+      if (message.state === "stopped") {
+        // Keep the partial streamed text; stopping is not an error.
+        return {
+          ...state,
+          btw: {
+            question: message.question,
+            answer: message.answer ?? (state.btw?.question === message.question ? state.btw.answer : null),
+            thinking: state.btw?.question === message.question ? state.btw.thinking : null,
+            error: null,
+            pending: false,
+            stage: state.btw?.question === message.question ? state.btw.stage : "connecting",
+          },
         };
       }
       return {
@@ -245,8 +301,10 @@ function applyInbound(state: ChatState, message: Inbound): ChatState {
         btw: {
           question: message.question,
           answer: state.btw?.question === message.question ? state.btw.answer : null,
+          thinking: state.btw?.question === message.question ? state.btw.thinking : null,
           error: message.error ?? "/btw failed",
           pending: false,
+          stage: state.btw?.question === message.question ? state.btw.stage : "connecting",
         },
       };
     case "reset":

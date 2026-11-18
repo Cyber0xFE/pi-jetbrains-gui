@@ -608,7 +608,7 @@ describe("sessionReducer", () => {
       { kind: "btwSend", question: "what config file was that?" },
     );
 
-    expect(asked.btw).toEqual({ question: "what config file was that?", answer: null, error: null, pending: true });
+    expect(asked.btw).toEqual({ question: "what config file was that?", answer: null, thinking: null, error: null, pending: true, stage: "connecting" });
     expect(asked.messages).toHaveLength(1);
     expect(asked.sending).toBe(false);
 
@@ -617,14 +617,49 @@ describe("sessionReducer", () => {
       kind: "inbound",
       message: { type: "btw", state: "delta", question: "what config file was that?", delta: "it is " },
     });
-    expect(streaming.btw).toEqual({ question: "what config file was that?", answer: "it is ", error: null, pending: true });
+    expect(streaming.btw).toEqual({ question: "what config file was that?", answer: "it is ", thinking: null, error: null, pending: true, stage: "streaming" });
 
     const answered = apply(streaming, {
       kind: "inbound",
       message: { type: "btw", state: "answer", question: "what config file was that?", answer: "**app.json**" },
     });
-    expect(answered.btw).toEqual({ question: "what config file was that?", answer: "**app.json**", error: null, pending: false });
+    expect(answered.btw).toEqual({ question: "what config file was that?", answer: "**app.json**", thinking: null, error: null, pending: false, stage: "streaming" });
     expect(answered.messages).toEqual(asked.messages);
+  });
+
+  it("moves /btw from connecting to thinking and never regresses after text", () => {
+    const asked = apply(initialState, { kind: "btwSend", question: "q" });
+    const thinking = apply(asked, { kind: "inbound", message: { type: "btw", state: "thinking", question: "q" } });
+    expect(thinking.btw).toEqual({ question: "q", answer: null, thinking: null, error: null, pending: true, stage: "thinking" });
+
+    const reasoning = apply(
+      thinking,
+      { kind: "inbound", message: { type: "btw", state: "thinking_delta", question: "q", thinkingDelta: "step" } },
+      { kind: "inbound", message: { type: "btw", state: "thinking_delta", question: "q", thinkingDelta: " two" } },
+    );
+    expect(reasoning.btw).toEqual({ question: "q", answer: null, thinking: "step two", error: null, pending: true, stage: "thinking" });
+
+    const streaming = apply(reasoning, { kind: "inbound", message: { type: "btw", state: "delta", question: "q", delta: "hi" } });
+    const lateThinking = apply(streaming, { kind: "inbound", message: { type: "btw", state: "thinking", question: "q" } });
+    const lateThinkingAfterAnswer = apply(
+      streaming,
+      { kind: "inbound", message: { type: "btw", state: "answer", question: "q", answer: "hi" } },
+      { kind: "inbound", message: { type: "btw", state: "thinking", question: "q" } },
+    );
+
+    expect(lateThinking.btw).toEqual({ question: "q", answer: "hi", thinking: "step two", error: null, pending: true, stage: "streaming" });
+    expect(lateThinkingAfterAnswer.btw).toEqual({ question: "q", answer: "hi", thinking: "step two", error: null, pending: false, stage: "streaming" });
+  });
+
+  it("keeps the streamed partial answer when a side question is stopped", () => {
+    const stopped = apply(
+      initialState,
+      { kind: "btwSend", question: "why?" },
+      { kind: "inbound", message: { type: "btw", state: "delta", question: "why?", delta: "partial" } },
+      { kind: "inbound", message: { type: "btw", state: "stopped", question: "why?", answer: "partial" } },
+    );
+
+    expect(stopped.btw).toEqual({ question: "why?", answer: "partial", thinking: null, error: null, pending: false, stage: "streaming" });
   });
 
   it("reports /btw errors and keeps the partial streamed answer visible", () => {
@@ -635,7 +670,7 @@ describe("sessionReducer", () => {
       { kind: "inbound", message: { type: "btw", state: "error", question: "why?", error: "quota exceeded" } },
     );
 
-    expect(state.btw).toEqual({ question: "why?", answer: "partial", error: "quota exceeded", pending: false });
+    expect(state.btw).toEqual({ question: "why?", answer: "partial", thinking: null, error: "quota exceeded", pending: false, stage: "streaming" });
   });
 
   it("accepts /btw deltas for a question it did not seed locally", () => {
@@ -644,7 +679,7 @@ describe("sessionReducer", () => {
       { kind: "inbound", message: { type: "btw", state: "delta", question: "external", delta: "hi" } },
     );
 
-    expect(state.btw).toEqual({ question: "external", answer: "hi", error: null, pending: true });
+    expect(state.btw).toEqual({ question: "external", answer: "hi", thinking: null, error: null, pending: true, stage: "streaming" });
   });
 
   it("fills a missing /btw answer with null and keeps pending until the host replies", () => {
@@ -654,7 +689,7 @@ describe("sessionReducer", () => {
       { kind: "inbound", message: { type: "btw", state: "answer", question: "hm?" } },
     );
 
-    expect(state.btw).toEqual({ question: "hm?", answer: null, error: null, pending: false });
+    expect(state.btw).toEqual({ question: "hm?", answer: null, thinking: null, error: null, pending: false, stage: "streaming" });
   });
 
   it("keeps two user messages that share a timestamp but differ in content", () => {

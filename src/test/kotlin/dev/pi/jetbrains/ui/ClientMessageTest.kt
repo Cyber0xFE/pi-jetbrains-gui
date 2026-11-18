@@ -19,6 +19,14 @@ class ClientMessageTest {
     }
 
     @Test
+    fun `btw abort is a standalone request without a question`() {
+        val json = PiJson.parseToJsonElement("""{"type":"btw_abort"}""").jsonObject
+        val message = PiJson.decodeFromJsonElement(ClientMessage.serializer(), json)
+
+        assertEquals("btw_abort", message.type)
+    }
+
+    @Test
     fun `legacy messages keep parsing with unknown fields ignored`() {
         val json = PiJson.parseToJsonElement("""{"type":"prompt","message":"hi","question":null}""").jsonObject
         val message = PiJson.decodeFromJsonElement(ClientMessage.serializer(), json)

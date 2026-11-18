@@ -148,6 +148,10 @@ class PiChatService(private val project: Project) : Disposable {
     /** Only one `/btw` side question runs per tab at a time. */
     private val btwRunning = AtomicBoolean(false)
 
+    /** The side question process currently running, so the overlay can stop it. */
+    @Volatile
+    private var activeSideQuestion: SideQuestionRunner? = null
+
     private data class ResolvedRuntime(
         val nodeExecutable: Path,
         val cliEntry: Path,
@@ -629,6 +633,8 @@ class PiChatService(private val project: Project) : Disposable {
     suspend fun sideQuestion(
         question: String,
         onDelta: (String) -> Unit = {},
+        onStage: (String) -> Unit = {},
+        onThinking: (String) -> Unit = {},
     ): SideQuestionRunner.Result = withContext(Dispatchers.IO) {
         val runtime = resolvedRuntime.get()
             ?: return@withContext SideQuestionRunner.Result(answer = null, error = "pi runtime is not resolved yet")
@@ -650,6 +656,7 @@ class PiChatService(private val project: Project) : Disposable {
                 environment = PiSettings.get().processEnvironment(),
                 log = { diagnosticLog("[${project.name}] $it") },
             )
+            activeSideQuestion = runner
             val status = _status.value
             runner.ask(
                 sessionFile = Paths.get(sessionFile!!),
@@ -657,10 +664,20 @@ class PiChatService(private val project: Project) : Disposable {
                 model = status.model,
                 question = question,
                 onDelta = onDelta,
+                onStage = onStage,
+                onThinking = onThinking,
             )
         } finally {
+            activeSideQuestion = null
             btwRunning.set(false)
         }
+    }
+
+    /** Stops the running `/btw` question; returns false when nothing was running. */
+    fun abortSideQuestion(): Boolean {
+        val runner = activeSideQuestion ?: return false
+        runner.cancel()
+        return true
     }
 
     override fun dispose() {

@@ -248,7 +248,7 @@ export type Inbound =
   | { type: "files"; files: string[] }
   | { type: "reset"; reason: string }
   | { type: "prefill"; text: string; images?: PromptImage[] }
-  | { type: "btw"; state: "delta" | "answer" | "error"; question: string; delta?: string | null; answer?: string | null; error?: string | null }
+  | { type: "btw"; state: "delta" | "thinking" | "thinking_delta" | "answer" | "stopped" | "error"; question: string; delta?: string | null; thinkingDelta?: string | null; answer?: string | null; error?: string | null }
   | { type: "focus_composer" }
   | { type: "scroll_to_latest" }
   | { type: "scroll_to_first" }
@@ -279,6 +279,7 @@ export type Outbound =
   | { type: "bash"; id: string; command: string; excludeFromContext?: boolean }
   | { type: "abort_bash" }
   | { type: "btw"; question: string }
+  | { type: "btw_abort" }
   | { type: "abort" }
   | { type: "request_state" }
   | { type: "open_path"; path: string; line?: number; endLine?: number }

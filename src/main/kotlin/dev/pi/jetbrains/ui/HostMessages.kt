@@ -294,13 +294,14 @@ data class HostPrefillMessage(
     val images: List<ClientImage> = emptyList(),
 )
 
-/** `/btw` side-question outcome: `answer` or `error` for a previously posted question. */
+/** `/btw` side-question events: stages, answer/thinking deltas, then `answer`/`stopped`/`error`. */
 @Serializable
 data class HostBtwMessage(
     val type: String = "btw",
     val state: String,
     val question: String,
     val delta: String? = null,
+    val thinkingDelta: String? = null,
     val answer: String? = null,
     val error: String? = null,
 )
@@ -498,10 +499,17 @@ object HostMessages {
             HostPrefillMessage(text = text, images = images),
         )
 
-    fun btw(state: String, question: String, delta: String? = null, answer: String? = null, error: String? = null): JsonElement =
+    fun btw(
+        state: String,
+        question: String,
+        delta: String? = null,
+        thinkingDelta: String? = null,
+        answer: String? = null,
+        error: String? = null,
+    ): JsonElement =
         PiJson.encodeToJsonElement(
             HostBtwMessage.serializer(),
-            HostBtwMessage(state = state, question = question, delta = delta, answer = answer, error = error),
+            HostBtwMessage(state = state, question = question, delta = delta, thinkingDelta = thinkingDelta, answer = answer, error = error),
         )
 
     fun focusComposer(): JsonElement =

@@ -609,23 +609,60 @@ class ChatPanel(
                         activeBridge.send(HostMessages.btw("delta", question, delta = delta))
                         lastFlushAt = System.nanoTime()
                     }
-                    val result = try {
-                        service.sideQuestion(question) { delta ->
-                            synchronized(deltaBuffer) { deltaBuffer.append(delta) }
-                            if (System.nanoTime() - lastFlushAt >= BTW_DELTA_FLUSH_INTERVAL_NS) {
-                                flushDelta()
-                            }
+                    // Reasoning streams faster than useful renders; coalesce it like answer text.
+                    val thinkingBuffer = StringBuilder()
+                    var lastThinkingFlushAt = 0L
+                    val thinkingTotal = java.util.concurrent.atomic.AtomicLong()
+                    fun flushThinking() {
+                        val text = synchronized(thinkingBuffer) {
+                            if (thinkingBuffer.isEmpty()) return
+                            val buffered = thinkingBuffer.toString()
+                            thinkingBuffer.setLength(0)
+                            buffered
                         }
+                        activeBridge.send(HostMessages.btw("thinking_delta", question, thinkingDelta = text))
+                        lastThinkingFlushAt = System.nanoTime()
+                    }
+                    val result = try {
+                        service.sideQuestion(
+                            question,
+                            onDelta = { delta ->
+                                synchronized(deltaBuffer) { deltaBuffer.append(delta) }
+                                if (System.nanoTime() - lastFlushAt >= BTW_DELTA_FLUSH_INTERVAL_NS) {
+                                    flushDelta()
+                                }
+                            },
+                            onStage = { stage ->
+                                // `thinking` / `streaming` drive the overlay's waiting label.
+                                activeBridge.send(HostMessages.btw(stage, question))
+                            },
+                            onThinking = { delta ->
+                                thinkingTotal.addAndGet(delta.length.toLong())
+                                synchronized(thinkingBuffer) { thinkingBuffer.append(delta) }
+                                if (System.nanoTime() - lastThinkingFlushAt >= BTW_DELTA_FLUSH_INTERVAL_NS) {
+                                    flushThinking()
+                                }
+                            },
+                        )
                     } catch (t: Throwable) {
                         SideQuestionRunner.Result(answer = null, error = t.message ?: t.javaClass.simpleName)
                     }
+                    flushThinking()
                     flushDelta()
-                    if (result.error != null) {
+                    // Diagnostic aid: confirms whether the model actually streamed reasoning.
+                    service.logDiagnostic("[btw] run finished: stopped=${result.stopped} error=${result.error != null} thinkingChars=${thinkingTotal.get()}")
+                    if (result.stopped) {
+                        activeBridge.send(HostMessages.btw("stopped", question, answer = result.answer))
+                    } else if (result.error != null) {
                         activeBridge.send(HostMessages.btw("error", question, error = result.error))
                     } else {
                         activeBridge.send(HostMessages.btw("answer", question, answer = result.answer))
                     }
                 }
+            }
+
+            "btw_abort" -> {
+                if (!service.abortSideQuestion()) LOG.debug("btw_abort without a running side question")
             }
 
             else -> LOG.debug("unknown webview message: ${message.type}")

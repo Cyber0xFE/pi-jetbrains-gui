@@ -11,6 +11,10 @@ import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.thread
 
 /**
  * Unit tests for the `/btw` print-mode runner. Uses the local node installation plus a scripted
@@ -91,6 +95,7 @@ class SideQuestionRunnerTest {
             // Mirror pi's readPipedStdin: block until stdin EOF, then emit a JSON event stream.
             await new Promise((resolve) => { process.stdin.resume(); process.stdin.on("end", resolve); });
             const events = [
+            { type: "agent_start" },
             { type: "message_update", assistantMessageEvent: { type: "thinking_delta", delta: "hmm" } },
             { type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "he" } },
             { type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "llo" } },
@@ -101,16 +106,22 @@ class SideQuestionRunnerTest {
             """.trimIndent(),
         )
         val deltas = mutableListOf<String>()
+        val stages = mutableListOf<String>()
+        val thinking = mutableListOf<String>()
         val before = btwCopiesInTempDir()
 
         val result = runner(cli).ask(
             sessionFile(), provider = null, model = null, question = "why?",
             onDelta = { deltas.add(it) },
+            onStage = { stages.add(it) },
+            onThinking = { thinking.add(it) },
         )
 
         assertNull(result.error)
         assertEquals("hello world", result.answer)
         assertEquals(listOf("he", "llo"), deltas)
+        assertEquals(listOf("hmm"), thinking)
+        assertEquals(listOf("thinking", "streaming"), stages)
         assertEquals(before, btwCopiesInTempDir(), "session copy must be cleaned up")
     }
 
@@ -189,6 +200,42 @@ class SideQuestionRunnerTest {
         assertNull(result.answer)
         assertNotNull(result.error)
         assertTrue(result.error!!.contains("no answer"), "unexpected error: ${result.error}")
+    }
+
+    @Test
+    fun `cancel stops the process and keeps the streamed partial answer`() {
+        val cli = script(
+            "slow.mjs",
+            """
+            await new Promise((resolve) => { process.stdin.resume(); process.stdin.on("end", resolve); });
+            process.stdout.write(JSON.stringify({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "partial" } }) + "\n");
+            // Keep the child alive until the runner kills it.
+            setInterval(() => {}, 1000);
+            """.trimIndent(),
+        )
+        val runner = runner(cli)
+        val partial = CountDownLatch(1)
+        val done = CountDownLatch(1)
+        val result = AtomicReference<SideQuestionRunner.Result?>(null)
+        thread(name = "btw-cancel-test") {
+            result.set(
+                runner.ask(
+                    sessionFile(), provider = null, model = null, question = "why?",
+                    onDelta = { if (it == "partial") partial.countDown() },
+                ),
+            )
+            done.countDown()
+        }
+
+        assertTrue(partial.await(10, TimeUnit.SECONDS), "the child never streamed a delta")
+        runner.cancel()
+        assertTrue(done.await(10, TimeUnit.SECONDS), "cancel did not end the side question")
+
+        val outcome = result.get()
+        assertNotNull(outcome)
+        assertTrue(outcome!!.stopped)
+        assertNull(outcome.error)
+        assertEquals("partial", outcome.answer)
     }
 
     private fun btwCopiesInTempDir(): List<String> =

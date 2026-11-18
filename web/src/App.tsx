@@ -30,11 +30,6 @@ interface QueuedEntry {
  * Re-posts the queue editor's messages. The host sends them one by one and waits for pi to start
  * streaming in between, so they are queued instead of merging into a single run.
  */
-/** Editor label for a queued message; matches the wording of the queue bar. */
-function queueKindLabel(kind: QueuedEntry["kind"]): string {
-  return kind === "steering" ? "steering" : "follow-up";
-}
-
 function repostQueue(entries: QueuedEntry[]): void {
   const queued = entries
     .map((entry) => ({ text: entry.text.trim(), kind: entry.kind }))
@@ -562,6 +557,7 @@ function AppContent({ store, state }: { store: ChatStore; state: ChatState }): J
             setBtwOpen(false);
             setBtwCollapsed(false);
           }}
+          onAbort={() => post({ type: "btw_abort" })}
         />
       )}
       {dialog === "sessions" && (

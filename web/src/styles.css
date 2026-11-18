@@ -3211,7 +3211,7 @@ mark.search-hit {
   border-radius: 8px;
   background: var(--bg-raised);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-  overflow-y: auto;
+  overflow: hidden;
   transform: translateX(0);
   opacity: 1;
   transition: transform 200ms ease, opacity 200ms ease;
@@ -3295,6 +3295,15 @@ mark.search-hit {
   align-items: center;
   gap: 8px;
   margin-bottom: 6px;
+  flex: 0 0 auto;
+}
+
+/* The body owns the scroll so the header's buttons stay reachable while reading long answers. */
+.btw-overlay-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
 .btw-overlay-title {
@@ -3303,6 +3312,29 @@ mark.search-hit {
   font-weight: 600;
   color: var(--accent);
   letter-spacing: 0.02em;
+}
+
+.btw-overlay-thinking {
+  margin-bottom: 6px;
+}
+
+.btw-overlay-stop {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+
+.btw-overlay-stop:hover {
+  color: var(--error);
+  background: var(--bg-soft);
 }
 
 .btw-overlay-close {
