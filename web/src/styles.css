@@ -3318,6 +3318,20 @@ mark.search-hit {
   margin-bottom: 6px;
 }
 
+/* The transcript's thinking arrow is sized for full-width messages; keep the overlay's compact. */
+.btw-overlay-thinking summary::after {
+  width: 6px;
+  height: 6px;
+  margin-right: 1px;
+  border-right-width: 1.5px;
+  border-bottom-width: 1.5px;
+  transform: rotate(45deg) translateY(-1px);
+}
+
+.btw-overlay-thinking[open] summary::after {
+  transform: rotate(225deg) translate(-1px, -1px);
+}
+
 .btw-overlay-stop {
   display: inline-flex;
   align-items: center;
