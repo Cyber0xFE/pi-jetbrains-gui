@@ -329,6 +329,24 @@ function AppContent({ store, state }: { store: ChatStore; state: ChatState }): J
   const needsStart = phase === "stopped" || phase === "failed";
   const retry = state.status.retry ?? null;
 
+  // Prompt history for ↑/↓ recall in the composer, like the pi TUI editor: the text of every user
+  // message in the session, newest first, capped at 100 entries and without consecutive repeats.
+  const promptHistory = useMemo<string[]>(() => {
+    const entries: string[] = [];
+    for (const message of state.messages) {
+      if (message.role !== "user") continue;
+      const text = message.blocks
+        .filter((block): block is Extract<Block, { kind: "text" }> => block.kind === "text")
+        .map((block) => block.text)
+        .join("\n")
+        .trim();
+      if (text.length === 0) continue;
+      if (entries.length > 0 && entries[entries.length - 1] === text) continue;
+      entries.push(text);
+    }
+    return entries.reverse().slice(0, 100);
+  }, [state.messages]);
+
   // Toolbar label fallback: the first user message of the live transcript wins so a brand-new
   // session updates the moment the user sends, then falls back to the disk index.
   const sessionFallback = useMemo<string | null>(() => {
@@ -508,6 +526,7 @@ function AppContent({ store, state }: { store: ChatStore; state: ChatState }): J
         onAddImage={(image) => setImages((current) => [...current, image].slice(-4))}
         onRemoveImage={(index) => setImages((current) => current.filter((_, imageIndex) => imageIndex !== index))}
         onAbort={abort}
+        history={promptHistory}
       />
       {Object.values(state.widgets).filter((widget) => widget.placement === "belowEditor").map((widget, index) => (
         <div className="extension-widget" key={`below:${index}`}>{widget.lines.map((line, lineIndex) => <div key={lineIndex}>{line}</div>)}</div>

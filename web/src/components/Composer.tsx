@@ -29,6 +29,8 @@ interface Props {
   onAbort: () => void;
   /** Restores all queued steering/follow-up messages to the composer (pi TUI Alt+Up). */
   onDequeue: () => void;
+  /** Recent user prompts of the current session for ↑/↓ recall, newest first (pi TUI editor history). */
+  history?: string[];
 }
 
 const MAX_SUGGESTIONS = 8;
@@ -58,10 +60,15 @@ export function Composer({
   onRemoveImage,
   onAbort,
   onDequeue,
+  history = [],
 }: Props): JSX.Element {
   const { t } = useI18n();
   const [highlight, setHighlight] = useState(0);
   const [dismissed, setDismissed] = useState(false);
+  // Prompt history browsing like the pi TUI editor: -1 = not browsing, 0 = most recent,
+  // 1 = older, etc. `historyDraft` keeps the in-progress text so ↓ can restore it.
+  const historyIndex = useRef(-1);
+  const historyDraft = useRef<string | null>(null);
   const rows = useRef<Array<HTMLButtonElement | null>>([]);
   const fileRows = useRef<Array<HTMLButtonElement | null>>([]);
   const textarea = useRef<HTMLTextAreaElement>(null);
@@ -135,6 +142,19 @@ export function Composer({
     element.setSelectionRange(element.value.length, element.value.length);
   }, [focusRequest]);
 
+  // Leaving history browsing whenever the composer returns to empty (send, dequeue edit) or the
+  // session's messages change (new send, fork, session switch) — mirrors the TUI's resets.
+  useEffect(() => {
+    if (value === "") {
+      historyIndex.current = -1;
+      historyDraft.current = null;
+    }
+  }, [value]);
+  useEffect(() => {
+    historyIndex.current = -1;
+    historyDraft.current = null;
+  }, [history]);
+
   const handlePaste = (event: ClipboardEvent<HTMLTextAreaElement>): void => {
     for (const item of Array.from(event.clipboardData.items)) {
       if (!item.type.startsWith("image/")) continue;
@@ -153,6 +173,9 @@ export function Composer({
 
   const handleChange = (next: string): void => {
     setDismissed(false);
+    // Editing the draft exits history browsing, like the TUI editor's editing operations.
+    historyIndex.current = -1;
+    historyDraft.current = null;
     onChange(next);
   };
 
@@ -165,6 +188,27 @@ export function Composer({
     if (!fileQuery) return;
     onChange(`${value.slice(0, fileQuery.start)}@${file} ${value.slice(fileQuery.end)}`);
     setDismissed(true);
+  };
+
+  /** Walks the prompt history; ↑ (direction -1) goes older, ↓ goes newer or restores the draft. */
+  const navigateHistory = (direction: 1 | -1): void => {
+    if (history.length === 0) return;
+    const newIndex = historyIndex.current - direction;
+    if (newIndex < -1 || newIndex >= history.length) return;
+    if (historyIndex.current === -1 && newIndex >= 0) {
+      historyDraft.current = value;
+    }
+    historyIndex.current = newIndex;
+    const next = newIndex === -1 ? historyDraft.current ?? "" : history[newIndex] ?? "";
+    if (newIndex === -1) historyDraft.current = null;
+    onChange(next);
+    // Like the TUI: caret to the start when walking to older prompts, the end otherwise.
+    const caret = direction === -1 ? 0 : next.length;
+    window.requestAnimationFrame(() => {
+      const element = textarea.current;
+      if (!element) return;
+      element.setSelectionRange(caret, caret);
+    });
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
@@ -233,6 +277,20 @@ export function Composer({
         event.preventDefault();
         const chosen = matches[highlight];
         if (chosen) accept(chosen);
+        return;
+      }
+    }
+    // Prompt history recall like the pi TUI editor: ↑ at the very start of the text (or while
+    // already browsing) walks to older prompts, ↓ at the very end walks back toward the draft.
+    if (!event.altKey && !event.ctrlKey && !event.metaKey) {
+      if (event.key === "ArrowUp" && (historyIndex.current > -1 || (textarea.current?.selectionStart ?? value.length) === 0)) {
+        event.preventDefault();
+        navigateHistory(-1);
+        return;
+      }
+      if (event.key === "ArrowDown" && historyIndex.current > -1 && (textarea.current?.selectionEnd ?? 0) >= value.length) {
+        event.preventDefault();
+        navigateHistory(1);
         return;
       }
     }
