@@ -9,3 +9,10 @@ node_modules/
 web/node_modules/
 web/dist/
 JETBRAINS_GUI_PLAN.md
+__pycache__/
+# 本地素材标注工具，不入库
+scripts/annotate-media.py
+# 营销素材与策划文档，仅在本地保留
+docs/marketing/
+# Marketplace 截图素材（README 不引用），本地保留
+docs/assets/screenshots/

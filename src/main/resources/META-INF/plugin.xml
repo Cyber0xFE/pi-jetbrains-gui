@@ -3,29 +3,46 @@
     <name>Pi Coding Agent GUI</name>
     <vendor url="https://github.com/Cyber0xFE/pi-jetbrains-gui">Cyber0xFE</vendor>
     <description><![CDATA[
-        Pi Coding Agent brings the pi coding agent to JetBrains IDEs with a focused, streaming chat tool window, session persistence, protected tool output, editor and console context sharing, and configurable runtime settings.<br><br>
+        <b>pi</b> inside your IDE - a real chat panel for the pi coding agent, not another terminal tab.<br><br>
 
-        <b>Features</b>
+        This plugin runs your local <code>pi --mode rpc</code> and renders the conversation, tool calls, diffs and sessions in the <b>Pi</b> tool window. It works in <b>IntelliJ IDEA, PyCharm, WebStorm, GoLand, PhpStorm, CLion, Rider and RubyMine 2024.2+</b> - one plugin for the whole JetBrains family. Sessions stay in pi's own <code>~/.pi</code> format, models and extensions are the ones you already configured for the CLI, and nothing runs behind a proprietary backend: it is a focused alternative to heavyweight multi-engine AI plugins for people who already live in pi.<br><br>
+
+        <b>What makes it different</b>
         <ul>
-            <li>Chat with pi directly inside the IDE and receive streamed responses.</li>
-            <li>Persist and restore pi sessions across IDE restarts.</li>
-            <li>Create, switch, rename, delete, fork, and inspect sessions in a session tree.</li>
-            <li>Choose the active model and thinking level, and view token usage and context information.</li>
-            <li>Display protected tool output, including files, terminals, patches, and large-result summaries.</li>
-            <li>Open referenced files, URLs, and diff lines directly in the IDE.</li>
-            <li>Browse slash commands and reference project files with <code>/</code> and <code>@</code> completion.</li>
-            <li>Compact context manually, configure automatic compaction, and abort automatic retries.</li>
-            <li>Attach selected editor text or selected console output as conversation context.</li>
-            <li>Paste images into the composer and send them with a prompt.</li>
-            <li>Support pi extension dialogs, notifications, status text, and widgets.</li>
-            <li>Follow the IDE light and dark themes automatically.</li>
-            <li>Configure the pi CLI path, Node.js runtime, diagnostic log directory, and panel shortcut.</li>
-            <li>Optionally play a sound when a task is completed.</li>
+            <li><b>Parallel task tabs</b> - every tab owns its own pi process, so several tasks can run at once and switching tabs never interrupts background work.</li>
+            <li><b>Steering and follow-up queues</b> - keep typing while pi streams: <code>Enter</code> queues steering (delivered after the current tool call), <code>Alt+Enter</code> queues a follow-up, exactly like the pi TUI.</li>
+            <li><b><code>/btw</code> side questions</b> - ask something without interrupting the main task; the answer streams in a dismissible overlay and is not written into the session history.</li>
+            <li><b>Session tree with fork</b> - create, switch, rename, delete, fork and inspect branches, one row per user message.</li>
+            <li><b>IDE-native tool output</b> - tool cards for file reads, edits and terminal runs; click a diff to jump to the exact editor line.</li>
+            <li><b>Shell in the composer</b> - <code>! cmd</code> keeps the output in the LLM context, <code>!! cmd</code> keeps it out, rendered as a terminal-style card.</li>
         </ul>
 
-        <p><b>Requirement:</b> Install the pi CLI before use, for example with <code>npm install -g @earendil-works/pi-coding-agent</code>.</p>
+        <b>Everything else</b>
+        <ul>
+            <li>Streaming replies, thinking blocks, token usage and a context meter.</li>
+            <li>Model and thinking-level pickers in the footer: search, provider grouping, <b>Set as default</b>, and custom models appended to <code>~/.pi/agent/models.json</code> without touching existing fields.</li>
+            <li>Manual and automatic compaction, aborting automatic retries.</li>
+            <li>Slash commands and project-file completion with <code>/</code> and <code>@</code>.</li>
+            <li>Editor selection and console output attached as context; files, URLs, terminal output and diff lines open straight in the IDE.</li>
+            <li>Image paste in the composer.</li>
+            <li>Chat panel in English (default) and Simplified Chinese, switchable in settings.</li>
+            <li>Full-text search in the transcript (<code>Ctrl+F</code>), with case, whole-word and regex modes.</li>
+            <li>pi extension dialogs, notifications, status text and status-bar widgets.</li>
+            <li>Light and dark IDE themes, accent color, chat font size, wheel sensitivity, optional chat background image.</li>
+            <li>pi CLI path, Node.js runtime, proxy injection (subprocess only), diagnostic log directory, completion sound, and all panel shortcuts rebindable in the IDE keymap.</li>
+        </ul>
 
-        <p>Source code and issue tracker: <a href="https://github.com/Cyber0xFE/pi-jetbrains-gui">https://github.com/Cyber0xFE/pi-jetbrains-gui</a></p>
+        <b>Install in three steps:</b><br>
+        1. <code>npm install -g @earendil-works/pi-coding-agent</code> (or use the official installer at pi.dev).<br>
+        2. Install this plugin from the Marketplace.<br>
+        3. Open the <b>Pi</b> tool window (<code>Ctrl+Alt+K</code>) and start a task.<br><br>
+
+        <b>Requirements:</b> Node.js 22.19.0 or later, and the pi CLI installed separately. The plugin finds pi in your configured path, the bundled copy, <code>~/.pi/agent/install</code>, or the npm global prefix, and Node.js from settings/PATH with a fallback to pi's standalone Node.<br><br>
+
+        <b>中文：</b>把 pi coding agent 接进 JetBrains IDE 的图形面板 - 多任务标签并行、会话树 fork、<code>/btw</code> 侧问、steering 队列、diff 一键跳转编辑器、模型与思考级别切换，会话保持 pi 原生格式。<br><br>
+
+        Source code, issue tracker and full documentation: <a href="https://github.com/Cyber0xFE/pi-jetbrains-gui">github.com/Cyber0xFE/pi-jetbrains-gui</a>
+
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>

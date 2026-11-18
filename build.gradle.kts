@@ -67,43 +67,55 @@ intellijPlatform {
         }
 
         description = """
-            Pi Coding Agent brings the pi coding agent to JetBrains IDEs with a focused, streaming chat tool window, session persistence, protected tool output, editor and console context sharing, and configurable runtime settings.<br><br>
-            <b>Features</b>
+            <b>pi</b> inside your IDE - a real chat panel for the pi coding agent, not another terminal tab.<br><br>
+            This plugin runs your local <code>pi --mode rpc</code> and renders the conversation, tool calls, diffs and sessions in the <b>Pi</b> tool window. It works in <b>IntelliJ IDEA, PyCharm, WebStorm, GoLand, PhpStorm, CLion, Rider and RubyMine 2024.2+</b> - one plugin for the whole JetBrains family. Sessions stay in pi's own <code>~/.pi</code> format, models and extensions are the ones you already configured for the CLI, and nothing runs behind a proprietary backend: it is a focused alternative to heavyweight multi-engine AI plugins for people who already live in pi.<br><br>
+            <b>What makes it different</b>
             <ul>
-              <li>Chat with pi directly inside the IDE and receive streamed responses.</li>
-              <li>Persist and restore pi sessions across IDE restarts.</li>
-              <li>Create, switch, rename, delete, fork, and inspect sessions in a session tree.</li>
-              <li>Choose the active model and thinking level, and view token usage and context information.</li>
-              <li>Display protected tool output, including files, terminals, patches, and large-result summaries.</li>
-              <li>Open referenced files, URLs, and diff lines directly in the IDE.</li>
-              <li>Browse slash commands and reference project files with <code>/</code> and <code>@</code> completion.</li>
-              <li>Compact context manually, configure automatic compaction, and abort automatic retries.</li>
-              <li>Attach selected editor text or selected console output as conversation context.</li>
-              <li>Paste images into the composer and send them with a prompt.</li>
-              <li>Support pi extension dialogs, notifications, status text, and widgets.</li>
-              <li>Follow the IDE light and dark themes automatically.</li>
-              <li>Configure the pi CLI path, Node.js runtime, diagnostic log directory, and panel shortcut.</li>
-              <li>Optionally play a sound when a task is completed.</li>
+              <li><b>Parallel task tabs</b> - every tab owns its own pi process, so several tasks can run at once and switching tabs never interrupts background work.</li>
+              <li><b>Steering and follow-up queues</b> - keep typing while pi streams: <code>Enter</code> queues steering (delivered after the current tool call), <code>Alt+Enter</code> queues a follow-up, exactly like the pi TUI.</li>
+              <li><b><code>/btw</code> side questions</b> - ask something without interrupting the main task; the answer streams in a dismissible overlay and is not written into the session history.</li>
+              <li><b>Session tree with fork</b> - create, switch, rename, delete, fork and inspect branches, one row per user message.</li>
+              <li><b>IDE-native tool output</b> - tool cards for file reads, edits and terminal runs; click a diff to jump to the exact editor line.</li>
+              <li><b>Shell in the composer</b> - <code>! cmd</code> keeps the output in the LLM context, <code>!! cmd</code> keeps it out, rendered as a terminal-style card.</li>
             </ul>
-            <p><b>Requirement:</b> Install the pi CLI before use, for example with <code>npm install -g @earendil-works/pi-coding-agent</code>.</p>
-            <p>Source code and issue tracker: <a href="https://github.com/Cyber0xFE/pi-jetbrains-gui">https://github.com/Cyber0xFE/pi-jetbrains-gui</a></p>
+            <b>Everything else</b>
+            <ul>
+              <li>Streaming replies, thinking blocks, token usage and a context meter.</li>
+              <li>Model and thinking-level pickers in the footer: search, provider grouping, <b>Set as default</b>, and custom models appended to <code>~/.pi/agent/models.json</code> without touching existing fields.</li>
+              <li>Manual and automatic compaction, aborting automatic retries.</li>
+              <li>Slash commands and project-file completion with <code>/</code> and <code>@</code>.</li>
+              <li>Editor selection and console output attached as context; files, URLs, terminal output and diff lines open straight in the IDE.</li>
+              <li>Image paste in the composer.</li>
+              <li>Chat panel in English (default) and Simplified Chinese, switchable in settings.</li>
+              <li>Full-text search in the transcript (<code>Ctrl+F</code>), with case, whole-word and regex modes.</li>
+              <li>pi extension dialogs, notifications, status text and status-bar widgets.</li>
+              <li>Light and dark IDE themes, accent color, chat font size, wheel sensitivity, optional chat background image.</li>
+              <li>pi CLI path, Node.js runtime, proxy injection (subprocess only), diagnostic log directory, completion sound, and all panel shortcuts rebindable in the IDE keymap.</li>
+            </ul>
+            <b>Install in three steps:</b><br>
+            1. <code>npm install -g @earendil-works/pi-coding-agent</code> (or use the official installer at pi.dev).<br>
+            2. Install this plugin from the Marketplace.<br>
+            3. Open the <b>Pi</b> tool window (<code>Ctrl+Alt+K</code>) and start a task.<br><br>
+            <b>Requirements:</b> Node.js 22.19.0 or later, and the pi CLI installed separately. The plugin finds pi in your configured path, the bundled copy, <code>~/.pi/agent/install</code>, or the npm global prefix, and Node.js from settings/PATH with a fallback to pi's standalone Node.<br><br>
+            <b>中文：</b>把 pi coding agent 接进 JetBrains IDE 的图形面板 - 多任务标签并行、会话树 fork、<code>/btw</code> 侧问、steering 队列、diff 一键跳转编辑器、模型与思考级别切换，会话保持 pi 原生格式。<br><br>
+            Source code, issue tracker and full documentation: <a href="https://github.com/Cyber0xFE/pi-jetbrains-gui">github.com/Cyber0xFE/pi-jetbrains-gui</a>
         """.trimIndent()
 
+        // 写法与结构见 docs/marketing/marketplace-listing.md 第 5 节。
         changeNotes = """
-            <h2>What's New in 0.5.1</h2>
+            <h2>What's New in 0.6.0</h2>
             <h3>Features</h3>
             <ul>
-              <li><b>Model and thinking pickers are now footer popups:</b> clicking the model or thinking-level entry in the footer opens a compact panel right above it instead of replacing the whole transcript with a full-screen picker. The model panel groups models by provider, stays virtualized for very long model lists, supports search and keyboard navigation, and shows a <b>Set as default</b> pill on hovered rows only, with an <b>Add model</b> button in its footer. The thinking popup is exactly as wide as its content, without reserved blank space. Click outside or press <b>Escape</b> to close, and only one of the two popups is open at a time.</li>
+              <li><b>The chat panel now speaks English and Simplified Chinese:</b> a new interface-language option in the plugin settings localizes the whole panel - session list, model picker, search bar, tool cards, dialogs, empty and error states, composer hints and keyboard hints - and already open tabs switch as soon as you apply the setting. English is the new default, so existing setups come up in English after the update and switch back with this one setting. The settings page itself is localized too, and model-list <b>thinking</b> badges stay in English because that is how pi names them.</li>
+              <li><b><code>/btw</code> side questions can be stopped and now show their reasoning:</b> a stop button in the overlay header aborts the side question and keeps the partial answer instead of reporting it as an error. The overlay walks through <b>connecting</b> → <b>thinking</b> → <b>streaming</b> instead of a blank wait, streams the model's reasoning into a collapsible thinking block (collapsed by default and labelled "done" once finished), and keeps its header and buttons fixed while long answers scroll in the body.</li>
+              <li><b>Prompt history recall with <code>↑</code> / <code>↓</code> in the composer:</b> press <code>↑</code> to walk back through the user messages of the current session and <code>↓</code> to come forward again; the draft you had before browsing is restored when you leave history. Editing, sending, or switching sessions exits history browsing, and the <code>/</code> and <code>@</code> menu arrow-key navigation is untouched.</li>
             </ul>
             <h3>Fixes</h3>
             <ul>
-              <li><b>Deleting a session now asks for a second click in place:</b> the first click on the trash icon swaps it for a red confirmation button in the same spot, and only the second click removes the session. Moving the pointer away from that button, changing the filter text, selecting another row, or refreshing the list cancels the pending confirmation, so a stray click can no longer delete a session.</li>
+              <li><b><code>/btw</code> no longer reports startup noise as an error:</b> the side question runs pi without extensions (it does not need them), and when no answer comes back the overlay skips <code>Warning:</code> diagnostics on stderr and only shows the line that actually explains the failure.</li>
+              <li><b>Side questions can no longer run tools:</b> the <code>/btw</code> session copy is started with a text-only system prompt, no tools and no context files, so a quick side question can no longer edit files or run commands behind the main task's back.</li>
+              <li><b>The thinking toggle in the <code>/btw</code> overlay is smaller:</b> the expand arrow no longer eats half a line of vertical space.</li>
             </ul>
-            <h3>Other</h3>
-            <ul>
-              <li>The plugin is now licensed under <b>MIT</b>, with third-party notices collected in <code>THIRD_PARTY_NOTICES.md</code>.</li>
-            </ul>
-
         """.trimIndent()
     }
 }

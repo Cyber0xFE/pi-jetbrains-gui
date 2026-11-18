@@ -1,9 +1,41 @@
-# Pi JetBrains GUI
+# Pi Coding Agent GUI
 
-> 🌏 This document is also available in [简体中文 (Chinese)](./README.zh-CN.md).
+[![Marketplace](https://img.shields.io/jetbrains/plugin/v/35678?label=marketplace&style=flat-square&color=fe2857)](https://plugins.jetbrains.com/plugin/35678-pi-coding-agent-gui)
+[![Downloads](https://img.shields.io/jetbrains/plugin/d/35678?style=flat-square)](https://plugins.jetbrains.com/plugin/35678-pi-coding-agent-gui)
+[![GitHub stars](https://img.shields.io/github/stars/Cyber0xFE/pi-jetbrains-gui?style=flat-square)](https://github.com/Cyber0xFE/pi-jetbrains-gui/stargazers)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+[![IDE 2024.2+](https://img.shields.io/badge/IDE-2024.2%2B-000000?style=flat-square&logo=intellijidea&logoColor=white)](https://plugins.jetbrains.com/plugin/35678-pi-coding-agent-gui)
+[![Node.js ≥22.19](https://img.shields.io/badge/node-%E2%89%A522.19.0-339933?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org)
 
-A graphical plugin for using the [pi](https://github.com/badlogic/pi-mono) coding agent inside JetBrains IDEs (IntelliJ IDEA, PyCharm, and other IDEs in the JetBrains family).
-The plugin launches a local `pi --mode rpc` subprocess and renders conversations, tool calls, and diffs in the Pi tool window of your IDE.
+**Your [pi](https://github.com/earendil-works/pi) coding agent, inside JetBrains IDEs — a real chat panel, not another terminal tab.**
+
+This plugin runs your local `pi --mode rpc` and renders conversations, tool calls, diffs and sessions in the **Pi** tool window. It works in IntelliJ IDEA, PyCharm, WebStorm, GoLand, PhpStorm, CLion, Rider and RubyMine **2024.2+**, and keeps sessions in pi's own `~/.pi` format, so models, extensions and history stay exactly where the CLI put them.
+
+> 🌏 This document is also available in [简体中文 (Chinese)](./README.zh-CN.md). · 📦 [Install from JetBrains Marketplace](https://plugins.jetbrains.com/plugin/35678-pi-coding-agent-gui)
+
+![pi running inside the Pi tool window](docs/assets/demo.gif)
+
+## Why this plugin?
+
+Several plugins put pi into a JetBrains IDE. This one is a full conversation surface with the pi TUI's own interaction model:
+
+| | Pi Coding Agent GUI | [Pi GUI](https://plugins.jetbrains.com/plugin/34238) | [Pi Agent Launcher](https://plugins.jetbrains.com/plugin/31737) | [Pi Terminal Bridge](https://plugins.jetbrains.com/plugin/34738) |
+| --- | :---: | :---: | :---: | :---: |
+| In-IDE chat panel (no terminal tab) | ✅ | ✅ | — | — |
+| Parallel task tabs, one pi process each | ✅ | — | — | — |
+| Steering / follow-up queue while pi streams (`Enter` / `Alt+Enter`) | ✅ | — | — | — |
+| `/btw` side questions in a dismissible overlay | ✅ | — | — | — |
+| Session tree with fork from any user message | ✅ | — | — | ✅ |
+| `!` / `!!` shell mode in the composer | ✅ | — | via terminal | via terminal |
+| Search inside the transcript (`Ctrl+F`, regex) | ✅ | — | — | — |
+| Context meter, manual and auto compaction | ✅ | ✅ | — | — |
+| Image paste in the composer | ✅ | ✅ | — | — |
+| Editor selection and console output as context | ✅ | ✅ | ✅ | ✅ |
+| Diff card jumps to the exact editor line | ✅ | ✅ | — | ✅ |
+| Panel actions bound into the IDE keymap | ✅ | — | ✅ | — |
+| UI in Chinese and English, switchable in settings | ✅ | ✅ | — | — |
+
+<sub>`—` = not listed in that plugin's own Marketplace description (checked 2026-11). The chat panel ships in English (default) and Simplified Chinese, switchable in `Settings | Tools | Pi`.</sub>
 
 ## Features
 
@@ -18,12 +50,25 @@ The plugin launches a local `pi --mode rpc` subprocess and renders conversations
 - Switch models and thinking levels from footer popups, and view context usage and token statistics; the model popup supports search and provider grouping, and can add custom models (appended to `~/.pi/agent/models.json` without overwriting existing configuration)
 - Create, switch, rename, delete, and fork sessions, and view branches in the session tree
 - Browse pi commands with `/` and reference project files with `@`
-- Use `/btw <question>` to ask side questions at any time (inspired by Claude Code): the main task is not interrupted, the answer streams in a dismissible overlay, and the Q&A is not written into the main session history; typing `/btw` alone shows the most recent side Q&A
+- Use `/btw <question>` to ask side questions at any time (inspired by Claude Code): the main task is not interrupted, the answer streams in a dismissible overlay, and the Q&A is not written into the main session history; typing `/btw` alone shows the most recent side Q&A. The overlay shows connecting and thinking stages, keeps the reasoning in a collapsed block you can expand, and offers a stop button that keeps the partial answer
 - Run shell commands from the input box like the pi TUI: `! <command>` executes it and keeps the output in the LLM context, `!! <command>` keeps the output out of the context; the command and its output render as a terminal-style card once it finishes, with a cancel button while it runs
 - Manually compact context, configure auto-compaction, and abort automatic retries
 - Support pi extension dialogs, notifications, status text, and status bar widgets
 - Jump files, URLs, terminal output, and diff locations directly into the IDE
 - Paste images into the input box and send them with your message
+- Switch the chat panel between English (default) and Simplified Chinese in settings
+
+## Parallel tasks and queues
+
+Every task tab owns its own `pi` process, so several tasks can run at once and switching tabs never interrupts background work. While pi is streaming you can keep typing: `Enter` queues **steering** (delivered after the current tool call, before the next model call) and `Alt+Enter` queues a **follow-up** (processed after the run ends) — the same semantics as the pi TUI. Queued messages are listed above the composer and can be edited or removed individually.
+
+![Parallel task tabs with the steering queue](docs/assets/steering.gif)
+
+## Side questions with `/btw`
+
+Ask a question mid-task without interrupting it. `/btw <question>` streams its answer into a dismissible overlay and stays out of the session history; typing `/btw` alone shows the most recent side Q&A.
+
+![Ask a side question without interrupting the task](docs/assets/btw.gif)
 
 ## Requirements
 
