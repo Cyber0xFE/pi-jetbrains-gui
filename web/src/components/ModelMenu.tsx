@@ -201,7 +201,7 @@ export function ModelMenu({
               onClick={() => onSelect(row.model)}
             >
               <span className="model-menu-name">{row.label}</span>
-              {row.model.reasoning ? <span className="model-menu-badge">{t("thinking")}</span> : null}
+              {row.model.reasoning ? <span className="model-menu-badge">thinking</span> : null}
               {row.detail ? <span className="model-menu-detail">{row.detail}</span> : null}
               {/* Floating so idle rows do not reserve an empty strip on the right. */}
               <span className="model-menu-actions">
