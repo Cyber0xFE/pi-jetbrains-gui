@@ -211,7 +211,7 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         val ACCENT_COLOR_CHANGED = Topic.create("Pi accent color changed", PiAccentColorListener::class.java)
         val BACKGROUND_IMAGE_CHANGED = Topic.create("Pi background image changed", PiBackgroundImageListener::class.java)
         val LANGUAGE_CHANGED = Topic.create("Pi language changed", PiLanguageListener::class.java)
-        const val DEFAULT_LANGUAGE = "zh"
+        const val DEFAULT_LANGUAGE = "en"
         const val LANGUAGE_ZH = "zh"
         const val LANGUAGE_EN = "en"
         const val SHOW_PI_TOOL_WINDOW_ACTION_ID = "dev.pi.jetbrains.ShowPiToolWindow"
