@@ -1,4 +1,4 @@
-import { useEffect, useRef, type KeyboardEvent } from "react";
+import { useEffect, useRef, type JSX, type KeyboardEvent } from "react";
 import { useI18n } from "../i18n";
 
 interface Props {

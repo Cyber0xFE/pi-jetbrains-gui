@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type JSX } from "react";
 import { useI18n } from "../i18n";
 
 export async function copyText(text: string): Promise<boolean> {

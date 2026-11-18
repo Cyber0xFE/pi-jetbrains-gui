@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ClipboardEvent, KeyboardEvent } from "react";
+import type { ClipboardEvent, JSX, KeyboardEvent } from "react";
 import type { PromptImage, SlashCommand } from "../types";
 import { useI18n } from "../i18n";
 import { ImagePreview } from "./ImagePreview";

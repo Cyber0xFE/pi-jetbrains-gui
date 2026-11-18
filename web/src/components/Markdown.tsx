@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type JSX, type MouseEvent } from "react";
 import MarkdownIt from "markdown-it";
 import cjkFriendly from "markdown-it-cjk-friendly";
 import hljs from "highlight.js/lib/core";

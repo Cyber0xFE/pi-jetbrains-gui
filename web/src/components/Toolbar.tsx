@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 import { useI18n } from "../i18n";
 import type { WireStatus } from "../types";
 

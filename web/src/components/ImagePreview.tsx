@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type JSX } from "react";
 import { post } from "../bridge";
 import { useI18n } from "../i18n";
 import type { PromptImage } from "../types";

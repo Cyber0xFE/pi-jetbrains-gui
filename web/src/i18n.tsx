@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { createContext, useContext, useMemo, type JSX, type ReactNode } from "react";
 
 export type Language = "zh" | "en" | "legacy";
 

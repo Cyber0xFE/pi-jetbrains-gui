@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type JSX } from "react";
 import { formatCost, formatTokens } from "../format";
 import { useI18n } from "../i18n";
 import type { WireStatus } from "../types";

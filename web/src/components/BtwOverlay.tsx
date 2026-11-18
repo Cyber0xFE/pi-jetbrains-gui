@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type JSX } from "react";
 import { Markdown } from "./Markdown";
 import { useI18n } from "../i18n";
 import { AnimatedEllipsis, ThinkingIcon } from "./MessageList";

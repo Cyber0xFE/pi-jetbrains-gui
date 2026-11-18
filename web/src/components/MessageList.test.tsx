@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { MessageList } from "./MessageList";

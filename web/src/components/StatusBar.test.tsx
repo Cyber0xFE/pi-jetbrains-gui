@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WireStatus } from "../types";

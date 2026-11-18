@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type JSX } from "react";
 import type { ToolState, ToolStatus } from "../../state/sessionReducer";
 import { parseDetailsDiff, previewDiff } from "../../tools/diff";
 import {

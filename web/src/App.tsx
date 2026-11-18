@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type JSX } from "react";
 import type { PromptImage } from "./types";
 import { onMessage, post } from "./bridge";
 import { recordPerf } from "./perfLog";

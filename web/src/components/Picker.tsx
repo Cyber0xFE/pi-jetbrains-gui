@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 import { useSmoothWheelScroll } from "../scroll";
 import { useI18n } from "../i18n";
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type JSX } from "react";
 import { useI18n } from "../i18n";
 
 export interface CustomModelDraft {

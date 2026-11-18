@@ -1,4 +1,4 @@
-import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useEffect, useMemo, useRef, useState, type JSX } from "react";
 import { normalizeTaggedBlocks, type Block, type ChatMessage, type ToolState } from "../state/sessionReducer";
 import { Markdown } from "./Markdown";
 import { CopyButton } from "./CopyButton";
