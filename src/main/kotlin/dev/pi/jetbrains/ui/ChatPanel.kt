@@ -694,10 +694,16 @@ class ChatPanel(
      * so messages sent before the first run starts would all be treated as ordinary prompts and
      * merged into a single agent run. The first message starts the run; every later one waits for
      * streaming to begin and then returns to its own queue (steer or follow-up).
+     *
+     * When the agent is still streaming (the queue editor can be opened mid-run), even the first
+     * message must carry its queue behavior: pi rejects a plain prompt with "Agent is already
+     * processing" instead of queueing it.
      */
     private suspend fun sendQueued(entries: List<ClientQueuedMessage>) {
+        fun behaviorOf(entry: ClientQueuedMessage) = if (entry.kind == "steering") "steer" else "followUp"
         val first = entries.first()
-        val firstResponse = request { service.prompt(first.text) }
+        val firstBehavior = behaviorOf(first).takeIf { service.status.value.isStreaming }
+        val firstResponse = request { service.prompt(first.text, streamingBehavior = firstBehavior) }
         if (firstResponse?.success != true) {
             restoreQueued(entries)
             return
@@ -714,8 +720,7 @@ class ChatPanel(
                 return
             }
             val entry = entries[index]
-            val behavior = if (entry.kind == "steering") "steer" else "followUp"
-            request { service.prompt(entry.text, streamingBehavior = behavior) }
+            request { service.prompt(entry.text, streamingBehavior = behaviorOf(entry)) }
             index++
         }
     }
