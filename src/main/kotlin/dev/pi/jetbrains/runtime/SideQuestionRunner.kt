@@ -21,9 +21,9 @@ import kotlinx.serialization.json.jsonPrimitive
  * Runs one `/btw` side question against a throwaway copy of the active session file (mirrors
  * Claude Code's `/btw`).
  *
- * The copy is opened with a text-only system prompt and `--no-tools`: print mode answers once
- * and exits, no tool is exposed or permitted, and every append goes to the copy — so the main
- * session history is never touched. The copy is always deleted afterwards.
+ * The copy is opened with a text-only system prompt, `--no-tools` and `--no-extensions`: print
+ * mode answers once and exits, no tool is exposed or permitted, and every append goes to the copy
+ * — so the main session history is never touched. The copy is always deleted afterwards.
  *
  * Output is the JSON event stream: `message_update` deltas are forwarded to [onDelta] as they
  * arrive so the webview can render the answer live, and the final `message_end` assistant message
@@ -59,7 +59,7 @@ class SideQuestionRunner(
         process?.let { runCatching { it.destroyForcibly() } }
     }
 
-    /** `pi --session <copy> --no-tools --no-context-files --system-prompt <text> [--provider p --model m] --mode json --print <question>` */
+    /** `pi --session <copy> --no-tools --no-extensions --no-context-files --system-prompt <text> [--provider p --model m] --mode json --print <question>` */
     fun buildCommand(sessionCopy: Path, provider: String?, model: String?, question: String): List<String> =
         buildList {
             add(nodeExecutable.toString())
@@ -67,6 +67,7 @@ class SideQuestionRunner(
             add("--session")
             add(sessionCopy.toString())
             add("--no-tools")
+            add("--no-extensions")
             add("--no-context-files")
             add("--system-prompt")
             add(SIDE_QUESTION_SYSTEM_PROMPT)
@@ -188,7 +189,12 @@ class SideQuestionRunner(
 
             val answer = synchronized(accumulated) { accumulated.toString().trim() }
             if (child.exitValue() != 0 || answer.isEmpty()) {
-                val detail = stderr.toString().trim().lineSequence().lastOrNull { it.isNotBlank() }
+                // stderr mixes pi startup diagnostics (package/extension warnings) with the real
+                // failure; only the latter explains why no answer came back.
+                val detail = stderr.lineSequence()
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() && !it.startsWith("Warning:") }
+                    .lastOrNull()
                 return Result(
                     answer = null,
                     error = detail?.takeLast(300) ?: "pi exited with code ${child.exitValue()} and no answer",

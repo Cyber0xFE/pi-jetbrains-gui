@@ -63,7 +63,7 @@ class SideQuestionRunnerTest {
 
         assertEquals(
             listOf(
-                "node", "pi.mjs", "--session", copy.toString(), "--no-tools", "--no-context-files",
+                "node", "pi.mjs", "--session", copy.toString(), "--no-tools", "--no-extensions", "--no-context-files",
                 "--system-prompt",
                 "You are answering a side question in text-only mode. No tools are available or permitted. " +
                     "Answer directly using only the existing conversation context. Never emit tool calls, " +
@@ -200,6 +200,24 @@ class SideQuestionRunnerTest {
         assertNull(result.answer)
         assertNotNull(result.error)
         assertTrue(result.error!!.contains("no answer"), "unexpected error: ${result.error}")
+    }
+
+    @Test
+    fun `ask ignores stderr diagnostics when no answer arrives`() {
+        val cli = script(
+            "warning-only.mjs",
+            """
+            await new Promise((resolve) => { process.stdin.resume(); process.stdin.on("end", resolve); });
+            process.stderr.write('Warning: Extension package "x/package.json": bad peerDependencies\\n');
+            process.stdout.write(JSON.stringify({ type: "agent_settled", aborted: false }) + "\\n");
+            """.trimIndent(),
+        )
+
+        val result = runner(cli).ask(sessionFile(), provider = null, model = null, question = "why?")
+
+        assertNull(result.answer)
+        assertNotNull(result.error)
+        assertFalse(result.error!!.contains("Warning:"), "stderr diagnostic leaked into the error: ${result.error}")
     }
 
     @Test
