@@ -12,8 +12,10 @@ import { StatusBar } from "./components/StatusBar";
 import { Toolbar } from "./components/Toolbar";
 import { setWheelSensitivity } from "./scroll";
 import { ChatStore } from "./store";
+import { I18nProvider, useI18n } from "./i18n";
 import { EMPTY_SEARCH, selectedSearchSeed, type SearchState } from "./search";
 import type { Block } from "./state/sessionReducer";
+import type { ChatState } from "./state/sessionReducer";
 
 type Dialog = "sessions" | null;
 type SessionDialogTab = "sessions" | "tree";
@@ -44,6 +46,15 @@ function repostQueue(entries: QueuedEntry[]): void {
 export function App(): JSX.Element {
   const store = useMemo(() => new ChatStore(), []);
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  return (
+    <I18nProvider language={state.theme?.language}>
+      <AppContent store={store} state={state} />
+    </I18nProvider>
+  );
+}
+
+function AppContent({ store, state }: { store: ChatStore; state: ChatState }): JSX.Element {
+  const { t } = useI18n();
   const [draft, setDraft] = useState("");
   const [focusDraftRequest, setFocusDraftRequest] = useState(0);
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -341,7 +352,7 @@ export function App(): JSX.Element {
         <div className="startbar">
           <span className="startbar-message">{state.status.message}</span>
           <button type="button" className="button" onClick={() => post({ type: "start" })}>
-            Start pi
+            {t("startPi")}
           </button>
         </div>
       )}
@@ -354,11 +365,11 @@ export function App(): JSX.Element {
       {retry && (
         <div className="retrybar">
           <span className="retrybar-message">
-            retrying ({retry.attempt}/{retry.maxAttempts}) in {Math.max(1, Math.round(retry.delayMs / 1000))}s
+            {t("retrying", { attempt: retry.attempt, max: retry.maxAttempts, seconds: Math.max(1, Math.round(retry.delayMs / 1000)) })}
             {retry.errorMessage ? ` — ${retry.errorMessage}` : ""}
           </span>
           <button type="button" className="button button-secondary" onClick={() => post({ type: "abort_retry" })}>
-            Abort retry
+            {t("abortRetry")}
           </button>
         </div>
       )}
@@ -371,7 +382,7 @@ export function App(): JSX.Element {
                 type="button"
                 className="notice-dismiss"
                 onClick={() => store.dispatch({ kind: "dismissNotice", id: notice.id })}
-                aria-label="Dismiss"
+                aria-label={t("dismiss")}
               >
                 ×
               </button>
@@ -388,7 +399,7 @@ export function App(): JSX.Element {
         files={state.files}
         tools={state.tools}
         loadingHistory={state.historyLoading}
-        emptyHint={ready ? "Ask pi about this project…" : state.status.message}
+        emptyHint={ready ? t("askPi") : state.status.message}
         thinkingLabel={state.thinkingLabel}
         connecting={pendingPrompt || (state.sending && !state.busy)}
         scrollToLatestRequest={scrollToLatestRequest}
@@ -401,15 +412,15 @@ export function App(): JSX.Element {
         searchFocusRequest={searchFocusRequest}
       />
       {queueEdit !== null ? (
-        <div className="message-queue message-queue-editing" role="dialog" aria-label="Edit queued messages">
+        <div className="message-queue message-queue-editing" role="dialog" aria-label={t("editQueuedMessages")}>
           {queueEdit.map((entry, index) => {
-            const label = queueKindLabel(entry.kind);
+            const label = entry.kind === "steering" ? t("steering") : t("followUp");
             return (
               <div className="message-queue-editor-row" key={`${entry.kind}:${index}`}>
                 <span className="message-queue-editor-kind">{label}</span>
                 <textarea
                   className="message-queue-editor-input"
-                  aria-label={`Queued ${label} message ${index + 1}`}
+                  aria-label={t("queuedMessage", { label, index: index + 1 })}
                   value={entry.text}
                   rows={2}
                   onChange={(event) => changeQueuedMessage(index, event.target.value)}
@@ -418,8 +429,8 @@ export function App(): JSX.Element {
                   type="button"
                   className="message-queue-remove"
                   onClick={() => removeQueuedMessage(index)}
-                  title="Remove"
-                  aria-label={`Remove queued ${label} message ${index + 1}`}
+                  title={t("remove")}
+                  aria-label={t("removeQueued", { label, index: index + 1 })}
                 >
                   <svg
                     viewBox="0 0 24 24"
@@ -444,30 +455,30 @@ export function App(): JSX.Element {
           })}
           <div className="message-queue-editor-actions">
             <button type="button" className="message-queue-action" onClick={cancelQueueEdit}>
-              Cancel
+              {t("cancel")}
             </button>
             <button
               type="button"
               className="message-queue-action message-queue-action-primary"
               onClick={submitQueueEdit}
             >
-              Send all
+              {t("sendAll")}
             </button>
           </div>
         </div>
       ) : (
         (state.steeringQueue.length > 0 || state.followUpQueue.length > 0) && (
-          <div className="message-queue" role="status" aria-label="Queued messages">
+          <div className="message-queue" role="status" aria-label={t("queuedMessages")}>
             <div className="message-queue-items">
               {state.steeringQueue.map((text, index) => (
                 <div className="message-queue-row" key={`steering:${index}`}>
-                  <span className="message-queue-label">steering</span>
+                  <span className="message-queue-label">{t("steering")}</span>
                   <span className="message-queue-text">{text}</span>
                 </div>
               ))}
               {state.followUpQueue.map((text, index) => (
                 <div className="message-queue-row" key={`follow-up:${index}`}>
-                  <span className="message-queue-label">follow-up</span>
+                  <span className="message-queue-label">{t("followUp")}</span>
                   <span className="message-queue-text">{text}</span>
                 </div>
               ))}
@@ -476,9 +487,9 @@ export function App(): JSX.Element {
               type="button"
               className="message-queue-edit"
               onClick={editQueued}
-              title="Edit queued messages (Alt+Up)"
+              title={t("editQueued")}
             >
-              ✎ Edit
+              ✎ {t("edit")}
             </button>
           </div>
         )

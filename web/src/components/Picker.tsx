@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSmoothWheelScroll } from "../scroll";
+import { useI18n } from "../i18n";
 
 export interface PickerItem {
   key: string;
@@ -48,6 +49,7 @@ const OVERSCAN = 4;
  * The overlay closes on Escape, the backdrop click, or after a selection.
  */
 export function Picker({ title, items, placeholder, emptyText, actions, scrollPosition = "top", onSelect, onClose }: Props): JSX.Element {
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [scrollTop, setScrollTop] = useState(0);
   const [selected, setSelected] = useState(0);
@@ -122,7 +124,7 @@ export function Picker({ title, items, placeholder, emptyText, actions, scrollPo
       <div className="picker" role="dialog" aria-label={title}>
         <header className="picker-head">
           <h2 className="picker-title">{title}</h2>
-          <button type="button" className="picker-close" onClick={onClose} aria-label="Close">
+          <button type="button" className="picker-close" onClick={onClose} aria-label={t("close")}>
             ×
           </button>
         </header>
@@ -130,7 +132,7 @@ export function Picker({ title, items, placeholder, emptyText, actions, scrollPo
           ref={inputRef}
           className="picker-search"
           value={query}
-          placeholder={placeholder ?? "Filter…"}
+          placeholder={placeholder ?? t("filter")}
           spellCheck={false}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => {
@@ -164,7 +166,7 @@ export function Picker({ title, items, placeholder, emptyText, actions, scrollPo
           role="listbox"
           aria-label={title}
         >
-          {filtered.length === 0 && <div className="picker-empty">{emptyText ?? "Nothing to show"}</div>}
+          {filtered.length === 0 && <div className="picker-empty">{emptyText ?? t("nothingToShow")}</div>}
           <div style={{ height: start * ROW_HEIGHT }} />
           {visible.map((item, offset) => {
             const index = start + offset;
@@ -188,7 +190,7 @@ export function Picker({ title, items, placeholder, emptyText, actions, scrollPo
                 {(item.badge || item.default || item.detail) && (
                   <span className="picker-meta">
                     {item.badge && <span className="picker-badge">{item.badge}</span>}
-                    {item.default && <span className="picker-default">default</span>}
+                    {item.default && <span className="picker-default">{t("default")}</span>}
                     {item.detail && <span className="picker-detail">{item.detail}</span>}
                   </span>
                 )}
@@ -197,8 +199,8 @@ export function Picker({ title, items, placeholder, emptyText, actions, scrollPo
                     className="picker-action"
                     role="button"
                     tabIndex={0}
-                    aria-label={item.actionLabel ?? "Set as default"}
-                    title={item.actionLabel ?? "Set as default"}
+                    aria-label={item.actionLabel ?? t("setAsDefault")}
+                    title={item.actionLabel ?? t("setAsDefault")}
                     onClick={(event) => {
                       event.stopPropagation();
                       item.onAction?.();
@@ -219,8 +221,8 @@ export function Picker({ title, items, placeholder, emptyText, actions, scrollPo
                     className="picker-rename"
                     role="button"
                     tabIndex={0}
-                    aria-label="Rename"
-                    title="Rename session"
+                    aria-label={t("rename")}
+                    title={t("renameSession")}
                     onClick={(event) => {
                       event.stopPropagation();
                       item.onRename?.();
@@ -246,8 +248,8 @@ export function Picker({ title, items, placeholder, emptyText, actions, scrollPo
                       className="picker-delete picker-delete-confirm"
                       role="button"
                       tabIndex={0}
-                      aria-label="Confirm delete"
-                      title="Confirm delete"
+                      aria-label={t("confirmDelete")}
+                      title={t("confirmDelete")}
                       onMouseLeave={() => setConfirmDelete(null)}
                       onClick={(event) => {
                         event.stopPropagation();
@@ -267,15 +269,15 @@ export function Picker({ title, items, placeholder, emptyText, actions, scrollPo
                         }
                       }}
                     >
-                      确认删除
+                      {t("confirmDeleteText")}
                     </span>
                   ) : (
                     <span
                       className="picker-delete"
                       role="button"
                       tabIndex={0}
-                      aria-label="Delete session"
-                      title="Delete session"
+                      aria-label={t("deleteSession")}
+                      title={t("deleteSession")}
                       onClick={(event) => {
                         event.stopPropagation();
                         setConfirmDelete(item.key);
@@ -299,7 +301,7 @@ export function Picker({ title, items, placeholder, emptyText, actions, scrollPo
           <div style={{ height: Math.max(0, (filtered.length - end) * ROW_HEIGHT) }} />
         </div>
         <footer className="picker-footer">
-          <span className="picker-count">{filtered.length} item(s)</span>
+          <span className="picker-count">{t("itemCount", { count: filtered.length })}</span>
           {actions}
         </footer>
       </div>

@@ -21,6 +21,7 @@ import dev.pi.jetbrains.PiAccentColorListener
 import dev.pi.jetbrains.PiBackgroundImageListener
 import dev.pi.jetbrains.PiChatFontSizeListener
 import dev.pi.jetbrains.PiWheelSensitivityListener
+import dev.pi.jetbrains.PiLanguageListener
 import dev.pi.jetbrains.PiModelsJson
 import dev.pi.jetbrains.PiSettings
 import dev.pi.jetbrains.editor.EditorNavigator
@@ -169,6 +170,10 @@ class ChatPanel(
         ApplicationManager.getApplication().messageBus.connect(this).subscribe(
             PiSettings.ACCENT_COLOR_CHANGED,
             PiAccentColorListener { bridge?.send(themeMessage()) },
+        )
+        ApplicationManager.getApplication().messageBus.connect(this).subscribe(
+            PiSettings.LANGUAGE_CHANGED,
+            PiLanguageListener { bridge?.send(themeMessage()) },
         )
         ApplicationManager.getApplication().messageBus.connect(this).subscribe(
             PiSettings.BACKGROUND_IMAGE_CHANGED,
@@ -1329,6 +1334,11 @@ class ChatPanel(
                         PiSettings.MIN_BACKGROUND_IMAGE_OPACITY,
                         PiSettings.MAX_BACKGROUND_IMAGE_OPACITY,
                     ) / 100f,
+                language = if (PiSettings.get().getState().language == PiSettings.LANGUAGE_EN) {
+                    PiSettings.LANGUAGE_EN
+                } else {
+                    PiSettings.LANGUAGE_ZH
+                },
             ),
         )
     }

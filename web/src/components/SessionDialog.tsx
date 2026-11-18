@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { formatWhen } from "../format";
+import { useI18n } from "../i18n";
 import type { SessionSummary, TreeEntry } from "../types";
 import { Picker, type PickerItem } from "./Picker";
 
@@ -39,6 +40,7 @@ export function SessionDialog({
   onDelete,
   onFork,
 }: Props): JSX.Element {
+  const { t } = useI18n();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [renameOpen, setRenameOpen] = useState(false);
@@ -56,8 +58,9 @@ export function SessionDialog({
       sessions.map((session) => ({
         key: session.path,
         label: session.name?.trim() || session.firstMessage?.trim() || session.id,
-        detail: `${session.messageCount} messages · ${formatWhen(session.modified)}`,
-        badge: session.current ? "current" : undefined,
+        detail: `${session.messageCount} ${t("messages")} · ${formatWhen(session.modified)}`,
+
+        badge: session.current ? t("current") : undefined,
         active: session.current,
         onRename: () => openRename(session),
         onDelete: () => onDelete(session.path),
@@ -103,10 +106,10 @@ export function SessionDialog({
     const items: PickerItem[] = [];
     for (const entry of tree) {
       if (!isUserRow(entry)) continue;
-      items.push(treeItem(entry, leafId, onFork));
+      items.push(treeItem(entry, leafId, onFork, t));
       if (!expanded.has(entry.id)) continue;
       // Revealed rows sit directly under their fork point, ahead of later branches.
-      for (const hidden of hiddenRows.get(entry.id) ?? []) items.push(treeItem(hidden, leafId, onFork));
+      for (const hidden of hiddenRows.get(entry.id) ?? []) items.push(treeItem(hidden, leafId, onFork, t));
     }
     return items;
   }, [tree, leafId, onFork, expanded]);
@@ -123,16 +126,16 @@ export function SessionDialog({
   return (
     <>
     <Picker
-      title={tab === "sessions" ? "Sessions" : "Session tree"}
+      title={tab === "sessions" ? t("sessions") : t("sessionTree")}
       items={items}
       scrollPosition={tab === "tree" ? "bottom" : "top"}
-      placeholder={tab === "sessions" ? "Filter sessions…" : "Filter entries…"}
+      placeholder={tab === "sessions" ? t("filterSessions") : t("filterEntries")}
       emptyText={
         loading
-          ? "loading sessions…"
+          ? t("loadingSessions")
           : tab === "sessions"
-            ? "No sessions in this project folder yet"
-            : "This session has no entries yet"
+            ? t("noSessions")
+            : t("noEntries")
       }
       actions={
         <>
@@ -140,8 +143,8 @@ export function SessionDialog({
             type="button"
             className={`button button-secondary button-icon ${tab === "sessions" ? "button-tab-active" : ""}`}
             onClick={() => setTab("sessions")}
-            aria-label="Sessions"
-            title="Sessions"
+            aria-label={t("sessions")}
+            title={t("sessions")}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" />
@@ -151,8 +154,8 @@ export function SessionDialog({
             type="button"
             className={`button button-secondary button-icon ${tab === "tree" ? "button-tab-active" : ""}`}
             onClick={() => setTab("tree")}
-            aria-label="Session tree"
-            title="Session tree"
+            aria-label={t("sessionTree")}
+            title={t("sessionTree")}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <path d="M6 3v12" />
@@ -165,8 +168,8 @@ export function SessionDialog({
             type="button"
             className="button button-secondary button-icon"
             onClick={onRefresh}
-            aria-label="Refresh"
-            title="Refresh"
+            aria-label={t("refresh")}
+            title={t("refresh")}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4" />
@@ -176,8 +179,8 @@ export function SessionDialog({
             type="button"
             className="button button-icon"
             onClick={onNewSession}
-            aria-label="New session"
-            title="New session"
+            aria-label={t("newSession")}
+            title={t("newSession")}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <path d="M12 5v14M5 12h14" />
@@ -209,22 +212,22 @@ export function SessionDialog({
         <form
           className="rename-dialog"
           role="dialog"
-          aria-label="Rename session"
+          aria-label={t("renameSession")}
           onSubmit={(event) => {
             event.preventDefault();
             submitRename();
           }}
         >
-          <h2 className="picker-title">Rename session</h2>
+          <h2 className="picker-title">{t("renameSession")}</h2>
           <input
             autoFocus
             className="picker-search rename-input"
             value={renameValue}
             maxLength={120}
-            placeholder="Session title"
+            placeholder={t("sessionTitle")}
             onChange={(event) => setRenameValue(event.target.value)}
           />
-          <div className="rename-hint">A title makes this session easier to find later.</div>
+          <div className="rename-hint">{t("renameHint")}</div>
           <footer className="picker-footer">
             <button
               type="button"
@@ -234,10 +237,10 @@ export function SessionDialog({
                 setRenameTarget(null);
               }}
             >
-              Cancel
+              {t("cancel")}
             </button>
             <button type="submit" className="button" disabled={!renameValue.trim() || !renameTarget}>
-              Save
+              {t("save")}
             </button>
           </footer>
         </form>
@@ -259,15 +262,16 @@ function treeItem(
   entry: TreeEntry,
   leafId: string | null,
   onFork: (entryId: string, images: TreeEntry["images"]) => void,
+  t: ReturnType<typeof useI18n>["t"],
 ): PickerItem {
   return {
     key: entry.id,
     label: entry.label?.trim() || entry.text || `[${entry.type}]`,
-    badge: entry.active ? "active" : undefined,
+    badge: entry.active ? t("active") : undefined,
     active: entry.active || entry.id === leafId,
     disabled: !entry.forkable,
     depth: entry.depth,
     onAction: entry.forkable ? () => onFork(entry.id, entry.images) : undefined,
-    actionLabel: entry.forkable ? "fork from here" : undefined,
+    actionLabel: entry.forkable ? t("forkFromHere") : undefined,
   };
 }

@@ -1,4 +1,5 @@
 import { post } from "../../bridge";
+import { useI18n } from "../../i18n";
 import type { DiffRow } from "../../tools/diff";
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
 
 /** Line-level diff view; clicking a line opens the file at that line (plan M2.3). */
 export function DiffView({ rows, path }: Props): JSX.Element {
+  const { t } = useI18n();
   return (
     <div className="diff">
       {rows.map((row, index) => {
@@ -39,7 +41,7 @@ export function DiffView({ rows, path }: Props): JSX.Element {
             className={`diff-row diff-${row.kind} diff-row-link`}
             role="button"
             tabIndex={0}
-            title={`Open ${targetPath}:${targetLine}`}
+            title={t("open", { path: `${targetPath}:${targetLine}` })}
             onClick={open}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {

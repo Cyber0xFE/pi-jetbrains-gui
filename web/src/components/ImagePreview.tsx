@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { post } from "../bridge";
+import { useI18n } from "../i18n";
 import type { PromptImage } from "../types";
 
 interface Props {
@@ -34,6 +35,7 @@ const CONTEXT_MENU_HEIGHT = 40;
 
 /** Displays an image that can be opened in a focused, dismissible preview with wheel zoom and drag pan. */
 export function ImagePreview({ src, alt, className, triggerClassName }: Props): JSX.Element {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState<Offset>({ x: 0, y: 0 });
@@ -157,7 +159,7 @@ export function ImagePreview({ src, alt, className, triggerClassName }: Props): 
         type="button"
         className={`image-preview-trigger${triggerClassName ? ` ${triggerClassName}` : ""}`}
         onClick={() => setOpen(true)}
-        aria-label={`Preview ${alt.toLowerCase()}`}
+        aria-label={t("openImagePreview", { alt: alt.toLowerCase() })}
       >
         <img className={className} src={src} alt={alt} onContextMenu={handleContextMenu} />
       </button>
@@ -174,7 +176,7 @@ export function ImagePreview({ src, alt, className, triggerClassName }: Props): 
           onContextMenu={(event) => event.preventDefault()}
         >
           <button type="button" role="menuitem" onClick={copyImage}>
-            Copy image
+            {t("copyImage")}
           </button>
         </div>
       )}
@@ -183,15 +185,15 @@ export function ImagePreview({ src, alt, className, triggerClassName }: Props): 
           className="image-preview-backdrop"
           role="dialog"
           aria-modal="true"
-          aria-label="Image preview"
+          aria-label={t("imagePreview")}
           onClick={() => setOpen(false)}
         >
           <button
             type="button"
             className="image-preview-close"
             onClick={() => setOpen(false)}
-            aria-label="Close image preview"
-            title="Close"
+            aria-label={t("closeImagePreview")}
+            title={t("close")}
           >
             ×
           </button>

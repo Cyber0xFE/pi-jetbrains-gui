@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useI18n } from "../i18n";
 
 export interface CustomModelDraft {
   provider: string;
@@ -48,6 +49,7 @@ const DEFAULT_DRAFT: CustomModelDraft = {
  * touching existing configuration.
  */
 export function AddModelDialog({ knownProviders, onSave, onClose }: Props): JSX.Element {
+  const { t } = useI18n();
   const [draft, setDraft] = useState<CustomModelDraft>(DEFAULT_DRAFT);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -101,7 +103,7 @@ export function AddModelDialog({ knownProviders, onSave, onClose }: Props): JSX.
       <form
         className="picker rename-dialog add-model-dialog"
         role="dialog"
-        aria-label="Add model"
+        aria-label={t("addModelDialog")}
         onKeyDown={onKeyDown}
         onSubmit={(event) => {
           event.preventDefault();
@@ -109,14 +111,14 @@ export function AddModelDialog({ knownProviders, onSave, onClose }: Props): JSX.
         }}
       >
         <header className="picker-head">
-          <h2 className="picker-title">Add model</h2>
-          <button type="button" className="picker-close" onClick={onClose} aria-label="Close">
+          <h2 className="picker-title">{t("addModelDialog")}</h2>
+          <button type="button" className="picker-close" onClick={onClose} aria-label={t("close")}>
             ×
           </button>
         </header>
         <div className="add-model-grid">
           <label className="add-model-field">
-            <span>Provider</span>
+            <span>{t("provider")}</span>
             <input
               ref={inputRef}
               value={draft.provider}
@@ -126,7 +128,7 @@ export function AddModelDialog({ knownProviders, onSave, onClose }: Props): JSX.
             />
           </label>
           <label className="add-model-field">
-            <span>API</span>
+            <span>{t("api")}</span>
             <select value={draft.api} onChange={(event) => update("api", event.target.value)}>
               {API_OPTIONS.map((option) => (
                 <option key={option} value={option}>
@@ -136,7 +138,7 @@ export function AddModelDialog({ knownProviders, onSave, onClose }: Props): JSX.
             </select>
           </label>
           <label className="add-model-field add-model-field-wide">
-            <span>Base URL{isNewProvider ? "" : " (existing providers keep theirs)"}</span>
+            <span>{t("baseUrl")}{isNewProvider ? "" : t("existingProvidersKeepTheirs")}</span>
             <input
               value={draft.baseUrl}
               placeholder={isNewProvider ? "https://api.example.com/v1" : "optional"}
@@ -145,7 +147,7 @@ export function AddModelDialog({ knownProviders, onSave, onClose }: Props): JSX.
             />
           </label>
           <label className="add-model-field add-model-field-wide">
-            <span>API key (only set when missing; never overwritten)</span>
+            <span>{t("apiKey")}</span>
             <input
               type="password"
               value={draft.apiKey}
@@ -156,7 +158,7 @@ export function AddModelDialog({ knownProviders, onSave, onClose }: Props): JSX.
             />
           </label>
           <label className="add-model-field">
-            <span>Model ID</span>
+            <span>{t("modelId")}</span>
             <input
               value={draft.modelId}
               placeholder="e.g. my-model-v1"
@@ -165,7 +167,7 @@ export function AddModelDialog({ knownProviders, onSave, onClose }: Props): JSX.
             />
           </label>
           <label className="add-model-field">
-            <span>Display name</span>
+            <span>{t("displayName")}</span>
             <input
               value={draft.name}
               placeholder="optional"
@@ -174,7 +176,7 @@ export function AddModelDialog({ knownProviders, onSave, onClose }: Props): JSX.
             />
           </label>
           <label className="add-model-field">
-            <span>Context window (tokens)</span>
+            <span>{t("contextWindow")}</span>
             <input
               type="number"
               min={0}
@@ -184,7 +186,7 @@ export function AddModelDialog({ knownProviders, onSave, onClose }: Props): JSX.
             />
           </label>
           <label className="add-model-field">
-            <span>Max output tokens</span>
+            <span>{t("maxOutputTokens")}</span>
             <input
               type="number"
               min={0}
@@ -201,18 +203,18 @@ export function AddModelDialog({ knownProviders, onSave, onClose }: Props): JSX.
               checked={draft.reasoning}
               onChange={(event) => update("reasoning", event.target.checked)}
             />
-            <span>thinking (reasoning)</span>
+            <span>{t("reasoning")}</span>
           </label>
           <span className="add-model-check">
-            <span>input:</span>
+            <span>{t("input")}</span>
             <label>
               <input
                 type="checkbox"
-                aria-label="input: text"
+                aria-label={`${t("input")} ${t("text")}`}
                 checked={draft.input.includes("text")}
                 onChange={() => toggleInput("text")}
               />
-              <span>text</span>
+              <span>{t("text")}</span>
             </label>
             <label>
               <input
@@ -226,12 +228,12 @@ export function AddModelDialog({ knownProviders, onSave, onClose }: Props): JSX.
           </span>
         </div>
         <footer className="picker-footer">
-          <span className="picker-count">appended to ~/.pi/agent/models.json; existing config is kept</span>
+          <span className="picker-count">{t("modelConfigKept")}</span>
           <button type="button" className="button button-secondary" onClick={onClose}>
-            Cancel
+            {t("cancel")}
           </button>
           <button type="submit" className="button" disabled={!valid}>
-            Save model
+            {t("saveModel")}
           </button>
         </footer>
       </form>

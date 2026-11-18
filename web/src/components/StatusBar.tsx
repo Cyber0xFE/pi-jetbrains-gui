@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { formatCost, formatTokens } from "../format";
+import { useI18n } from "../i18n";
 import type { WireStatus } from "../types";
 
 interface Props {
@@ -47,6 +48,7 @@ export function StatusBar({
   onSelectThinking,
   onToggleAutoCompaction,
 }: Props): JSX.Element {
+  const { t } = useI18n();
   const autoCompactionTooltipId = useId();
   const [autoCompactionHovered, setAutoCompactionHovered] = useState(false);
   const [autoCompactionFocused, setAutoCompactionFocused] = useState(false);
@@ -90,7 +92,7 @@ export function StatusBar({
   const contextWindow = status.context?.contextWindow ?? status.contextWindow ?? null;
   const percent = status.context?.percent ?? null;
   const autoCompaction = status.autoCompaction !== false;
-  const autoCompactionLabel = autoCompaction ? "自动压缩开启" : "自动压缩关闭";
+  const autoCompactionLabel = autoCompaction ? t("automaticCompactionOn") : t("automaticCompactionOff");
 
   const contextDisplay =
     percent === null
@@ -136,8 +138,8 @@ export function StatusBar({
             className={contextClass}
             title={
               percent === null || contextWindow === null
-                ? "Context usage is not available"
-                : `${formatTokens(usage?.input ?? 0)} input tokens · ${formatTokens(status.context?.tokens ?? 0)} used · ${formatTokens(Math.max(0, contextWindow - (status.context?.tokens ?? 0)))} remaining`
+                ? t("contextUnavailable")
+                : t("contextUsage", { input: formatTokens(usage?.input ?? 0), used: formatTokens(status.context?.tokens ?? 0), remaining: formatTokens(Math.max(0, contextWindow - (status.context?.tokens ?? 0))) })
             }
           >
             {contextDisplay}
@@ -168,10 +170,10 @@ export function StatusBar({
               </span>
             )}
           </span>
-          {status.isCompacting && <span className="status-streaming">compacting…</span>}
+          {status.isCompacting && <span className="status-streaming">{t("compacting")}</span>}
           {streaming && (
             <span className="status-streaming">
-              running
+              {t("running")}
               <span className="status-ellipsis" aria-hidden="true">
                 {[1, 2, 3].map((dot) => (
                   <span key={dot} className={dot <= ellipsisDots ? undefined : "status-ellipsis-off"}>
@@ -196,7 +198,7 @@ export function StatusBar({
                 setOpenPopup("models");
               }}
               disabled={disabled}
-              title={modelCount > 0 ? `${modelCount} available models` : "Open the model picker"}
+              title={modelCount > 0 ? t("availableModels", { count: modelCount }) : t("openModelPicker")}
               aria-haspopup="dialog"
               aria-expanded={openPopup === "models"}
             >
@@ -218,16 +220,16 @@ export function StatusBar({
                   setOpenPopup("thinking");
                 }}
                 disabled={disabled}
-                title="Thinking level"
+                title={t("thinkingLevel")}
                 aria-haspopup="listbox"
                 aria-expanded={openPopup === "thinking"}
               >
                 {thinkingLabel} ▾
               </button>
               {openPopup === "thinking" && (
-                <div className="status-thinking-menu" role="listbox" aria-label="Thinking level">
+                <div className="status-thinking-menu" role="listbox" aria-label={t("thinkingLevel")}>
                   {thinkingLevels.length === 0 ? (
-                    <span className="status-thinking-empty">no thinking levels</span>
+                    <span className="status-thinking-empty">{t("thinkingEmpty")}</span>
                   ) : (
                     thinkingLevels.map((level) => (
                       <button

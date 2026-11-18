@@ -150,6 +150,8 @@ export interface WireTheme {
   fontSize: number;
   /** `data:` URI for the optional chat background image, or null when none is configured. */
   backgroundImage?: string | null;
+  /** UI language selected in the plugin settings. */
+  language?: "zh" | "en";
   /** Background image opacity as a 0..1 fraction. */
   backgroundImageOpacity?: number;
   /** Wheel scroll sensitivity as a fraction of the default speed (1 = default). */

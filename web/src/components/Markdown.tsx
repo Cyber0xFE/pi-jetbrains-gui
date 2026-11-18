@@ -18,6 +18,7 @@ import typescript from "highlight.js/lib/languages/typescript";
 import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import { post } from "../bridge";
+import { useI18n } from "../i18n";
 import { recordPerf } from "../perfLog";
 import { copyText } from "./CopyButton";
 import type { SearchMatch } from "../search";
@@ -267,6 +268,7 @@ export function Markdown({
   userText?: boolean;
   searchHighlight?: SearchHighlighter | null;
 }): JSX.Element {
+  const { t } = useI18n();
   const shown = useThrottled(text, STREAM_THROTTLE_MS, streaming);
   const renderer = useMemo(() => createRenderer(!streaming, fileReferences), [fileReferences, streaming]);
   const html = useMemo(() => {
@@ -276,13 +278,13 @@ export function Markdown({
     // `\` + punctuation (e.g. `Bebop\.pi` renders as `Bebop.pi`), so re-escape those pairs.
     const source = userText ? escapeBackslashEscapes(raw) : raw;
     const env = searchHighlight ? { searchHighlight } : undefined;
-    const rendered = addCodeCopyButtons(renderer.render(source, env));
+    const rendered = addCodeCopyButtons(renderer.render(source, env), t("codeCopy"));
     recordPerf("markdown_render", performance.now() - startedAt, {
       chars: source.length,
       streaming: streaming ? 1 : 0,
     });
     return rendered;
-  }, [renderer, shown, streaming, text, searchHighlight]);
+  }, [renderer, shown, streaming, text, searchHighlight, t]);
 
   const handleClick = (event: MouseEvent<HTMLDivElement>): void => {
     const target = event.target as HTMLElement | null;
@@ -299,12 +301,12 @@ export function Markdown({
       void copyText(code).then((success) => {
         if (!success) return;
         copyButton.innerHTML = codeCopyIcon(true);
-        copyButton.title = "已复制";
-        copyButton.setAttribute("aria-label", "已复制");
+        copyButton.title = t("copied");
+        copyButton.setAttribute("aria-label", t("copied"));
         window.setTimeout(() => {
           copyButton.innerHTML = codeCopyIcon();
-          copyButton.title = "复制代码块";
-          copyButton.setAttribute("aria-label", "复制代码块");
+          copyButton.title = t("codeCopy");
+          copyButton.setAttribute("aria-label", t("codeCopy"));
         }, 1200);
       });
       return;
@@ -452,11 +454,11 @@ function renderSearchHighlighted(content: string, env: unknown): string | null {
   return html;
 }
 
-function addCodeCopyButtons(html: string): string {
+function addCodeCopyButtons(html: string, copyLabel: string): string {
   return html.replace(
     /<pre(\b[^>]*)>([\s\S]*?)<\/pre>/g,
     (_match, attributes: string, body: string) =>
-      `<div class="markdown-card"><button type="button" class="card-copy markdown-card-copy" data-copy-code="true" title="复制代码块" aria-label="复制代码块">${codeCopyIcon()}</button><pre${attributes}>${body}</pre></div>`,
+      `<div class="markdown-card"><button type="button" class="card-copy markdown-card-copy" data-copy-code="true" title="${copyLabel}" aria-label="${copyLabel}">${codeCopyIcon()}</button><pre${attributes}>${body}</pre></div>`,
   );
 }
 

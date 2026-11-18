@@ -1,3 +1,4 @@
+import { useI18n } from "../i18n";
 import type { WireStatus } from "../types";
 
 interface Props {
@@ -18,9 +19,10 @@ export function Toolbar({
   sessionFallback,
   onOpenSessions,
 }: Props): JSX.Element {
+  const { t } = useI18n();
 
-  // Unnamed sessions stay "未命名会话" until the first message replaces the label.
-  const sessionLabel = status.sessionName?.trim() || sessionFallback?.trim() || "未命名会话";
+  // Unnamed sessions stay localized until the first message replaces the label.
+  const sessionLabel = status.sessionName?.trim() || sessionFallback?.trim() || t("unnamedSession");
 
   return (
     <header className="toolbar">
@@ -29,7 +31,7 @@ export function Toolbar({
         className="toolbar-button toolbar-session"
         onClick={onOpenSessions}
         disabled={disabled}
-        title={status.sessionName?.trim() || sessionFallback?.trim() || status.sessionFile || "打开会话选择器"}
+        title={status.sessionName?.trim() || sessionFallback?.trim() || status.sessionFile || t("openSessionPicker")}
       >
         <span className="toolbar-session-mark" aria-hidden="true" />
         <span className="toolbar-session-label">{sessionLabel}</span>

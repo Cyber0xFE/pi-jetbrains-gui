@@ -1,4 +1,5 @@
 import { post } from "../../bridge";
+import { useI18n } from "../../i18n";
 
 interface Props {
   path: string;
@@ -10,9 +11,10 @@ interface Props {
 
 /** Clickable file reference; Kotlin resolves it against the project and opens the editor. */
 export function PathLink({ path, line, endLine, label, className }: Props): JSX.Element {
+  const { t } = useI18n();
   const title = line === undefined
-    ? `Open ${path}`
-    : `Open ${path}:${line}${endLine !== undefined && endLine !== line ? `-${endLine}` : ""}`;
+    ? t("open", { path })
+    : `${t("open", { path })}:${line}${endLine !== undefined && endLine !== line ? `-${endLine}` : ""}`;
   return (
     <button
       type="button"

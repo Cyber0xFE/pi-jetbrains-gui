@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Markdown } from "./Markdown";
+import { useI18n } from "../i18n";
 import { AnimatedEllipsis, ThinkingIcon } from "./MessageList";
 import type { BtwState } from "../state/sessionReducer";
 
@@ -19,6 +20,7 @@ interface Props {
  * the panel away behind a slim tab; Esc expands it again first and closes it on the second press.
  */
 export function BtwOverlay({ btw, collapsed, onCollapse, onExpand, onClose }: Props): JSX.Element {
+  const { t } = useI18n();
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key !== "Escape") return;
@@ -32,22 +34,21 @@ export function BtwOverlay({ btw, collapsed, onCollapse, onExpand, onClose }: Pr
 
   return (
     <>
-      <div className={collapsed ? "btw-overlay btw-overlay-collapsed" : "btw-overlay"} role="dialog" aria-label="Side question" aria-hidden={collapsed}>
+      <div className={collapsed ? "btw-overlay btw-overlay-collapsed" : "btw-overlay"} role="dialog" aria-label={t("sideQuestion")} aria-hidden={collapsed}>
         <div className="btw-overlay-header">
-          <span className="btw-overlay-title">/btw · side question</span>
-          <button type="button" className="btw-overlay-collapse" onClick={onCollapse} aria-label="Collapse side question" title="Collapse">
+          <span className="btw-overlay-title">{t("sideQuestionTitle")}</span>
+          <button type="button" className="btw-overlay-collapse" onClick={onCollapse} aria-label={t("collapseSideQuestion")} title={t("collapseSideQuestion")}>
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" focusable="false">
               <path d="M9 6l6 6-6 6" />
             </svg>
           </button>
-          <button type="button" className="btw-overlay-close" onClick={onClose} aria-label="Dismiss side question">
+          <button type="button" className="btw-overlay-close" onClick={onClose} aria-label={t("dismissSideQuestion")}>
             ×
           </button>
         </div>
         {btw === null ? (
           <div className="btw-overlay-hint">
-            Type <code>/btw your question</code> in the composer to ask without adding anything to the
-            session.
+            {t("sideQuestionHint")}
           </div>
         ) : (
           <>
@@ -56,7 +57,7 @@ export function BtwOverlay({ btw, collapsed, onCollapse, onExpand, onClose }: Pr
               <div className="btw-overlay-pending">
                 <ThinkingIcon spinning={true} />
                 <span className="thinking-label">
-                  正在思考
+                  {t("thinking")}
                   <AnimatedEllipsis className="thinking-ellipsis" />
                 </span>
               </div>
@@ -72,7 +73,7 @@ export function BtwOverlay({ btw, collapsed, onCollapse, onExpand, onClose }: Pr
         )}
       </div>
       {collapsed && (
-        <button type="button" className="btw-tab" onClick={onExpand} aria-label="Expand side question">
+        <button type="button" className="btw-tab" onClick={onExpand} aria-label={t("expandSideQuestion")}>
           {btw?.pending ? "/btw ·…" : "/btw"}
         </button>
       )}

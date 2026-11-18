@@ -1,4 +1,5 @@
 import { useEffect, useRef, type KeyboardEvent } from "react";
+import { useI18n } from "../i18n";
 
 interface Props {
   query: string;
@@ -36,6 +37,7 @@ export function SearchBar({
   onNext,
   onClose,
 }: Props): JSX.Element {
+  const { t } = useI18n();
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -58,13 +60,13 @@ export function SearchBar({
   };
 
   const toggles: Array<{ key: "caseSensitive" | "wholeWord" | "regex"; label: string; title: string }> = [
-    { key: "caseSensitive", label: "Aa", title: "区分大小写" },
-    { key: "wholeWord", label: "ab", title: "全字匹配" },
-    { key: "regex", label: ".*", title: "正则表达式" },
+    { key: "caseSensitive", label: "Aa", title: t("caseSensitive") },
+    { key: "wholeWord", label: "ab", title: t("wholeWord") },
+    { key: "regex", label: ".*", title: t("regex") },
   ];
 
   return (
-    <div className="search-bar" role="search" aria-label="搜索消息内容">
+    <div className="search-bar" role="search" aria-label={t("searchMessage")}>
       <input
         ref={inputRef}
         className="search-input"
@@ -72,8 +74,8 @@ export function SearchBar({
         value={query}
         autoFocus
         spellCheck={false}
-        placeholder="搜索消息…"
-        aria-label="搜索消息"
+        placeholder={t("searchMessages")}
+        aria-label={t("searchMessages")}
         aria-invalid={error !== null}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={handleKeyDown}
@@ -92,15 +94,15 @@ export function SearchBar({
         </button>
       ))}
       <span className={`search-status${error ? " search-status-error" : ""}`} role="status" aria-live="polite">
-        {error ?? (count > 0 ? `${index}/${count}` : "无结果")}
+        {error ?? (count > 0 ? `${index}/${count}` : t("noResults"))}
       </span>
-      <button type="button" className="search-button" aria-label="上一个匹配" title="上一个匹配 (Shift+Enter)" onClick={onPrevious}>
+      <button type="button" className="search-button" aria-label={t("previousMatch")} title={`${t("previousMatch")} (Shift+Enter)`} onClick={onPrevious}>
         <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m4 10 4-4 4 4" /></svg>
       </button>
-      <button type="button" className="search-button" aria-label="下一个匹配" title="下一个匹配 (Enter)" onClick={onNext}>
+      <button type="button" className="search-button" aria-label={t("nextMatch")} title={`${t("nextMatch")} (Enter)`} onClick={onNext}>
         <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
       </button>
-      <button type="button" className="search-button" aria-label="关闭搜索" title="关闭 (Esc)" onClick={onClose}>
+      <button type="button" className="search-button" aria-label={t("closeSearch")} title={`${t("closeSearch")} (Esc)`} onClick={onClose}>
         <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m4 4 8 8m0-8-8 8" /></svg>
       </button>
     </div>

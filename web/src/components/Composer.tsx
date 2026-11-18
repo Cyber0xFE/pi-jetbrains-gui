@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClipboardEvent, KeyboardEvent } from "react";
 import type { PromptImage, SlashCommand } from "../types";
+import { useI18n } from "../i18n";
 import { ImagePreview } from "./ImagePreview";
 
 interface Props {
@@ -58,6 +59,7 @@ export function Composer({
   onAbort,
   onDequeue,
 }: Props): JSX.Element {
+  const { t } = useI18n();
   const [highlight, setHighlight] = useState(0);
   const [dismissed, setDismissed] = useState(false);
   const rows = useRef<Array<HTMLButtonElement | null>>([]);
@@ -87,9 +89,13 @@ export function Composer({
   }, [value]);
 
   const availableCommands = useMemo(() => {
+    const localizedBuiltins = BUILTIN_COMMANDS.map((command) => ({
+      ...command,
+      description: command.name === "compact" ? t("compactDescription") : command.name === "tree" ? t("treeDescription") : t("thinkingDescription"),
+    }));
     const names = new Set(commands.map((command) => command.name.toLowerCase()));
-    return [...BUILTIN_COMMANDS.filter((command) => !names.has(command.name.toLowerCase())), ...commands];
-  }, [commands]);
+    return [...localizedBuiltins.filter((command) => !names.has(command.name.toLowerCase())), ...commands];
+  }, [commands, t]);
 
   const matches = useMemo(() => {
     if (query === null) return [];
@@ -250,22 +256,22 @@ export function Composer({
         <div className="context-attachment" title={pendingContext}>
           <span className="context-attachment-icon">⌁</span>
           <span className="context-attachment-label">{pendingContext}</span>
-          <span className="context-attachment-hint">selected code</span>
-          <button type="button" className="context-attachment-remove" onClick={onClearContext} aria-label="Remove selected code context">
+          <span className="context-attachment-hint">{t("selectedCode")}</span>
+          <button type="button" className="context-attachment-remove" onClick={onClearContext} aria-label={t("removeSelectedCode")}>
             ×
           </button>
         </div>
       )}
       {images.length > 0 && (
-        <div className="composer-images" aria-label="Attached images">
+        <div className="composer-images" aria-label={t("attachedImages")}>
           {images.map((image, index) => (
             <div className="composer-image" key={`${image.mimeType}:${index}`}>
               <ImagePreview
                 src={`data:${image.mimeType};base64,${image.data}`}
-                alt={`Attachment ${index + 1}`}
+                alt={t("attachment", { index: index + 1 })}
                 triggerClassName="composer-image-preview"
               />
-              <button type="button" className="composer-image-remove" onClick={() => onRemoveImage(index)} aria-label="Remove image">
+              <button type="button" className="composer-image-remove" onClick={() => onRemoveImage(index)} aria-label={t("removeImage")}>
                 ×
               </button>
             </div>
@@ -273,7 +279,7 @@ export function Composer({
         </div>
       )}
       {filesOpen && (
-        <div className="slash-menu file-menu" role="listbox" aria-label="Referenced files">
+        <div className="slash-menu file-menu" role="listbox" aria-label={t("referencedFiles")}>
           {fileMatches.map((file, index) => (
             <button
               key={file}
@@ -294,7 +300,7 @@ export function Composer({
         </div>
       )}
       {open && !filesOpen && (
-        <div className="slash-menu" role="listbox" aria-label="Slash commands">
+        <div className="slash-menu" role="listbox" aria-label={t("slashCommands")}>
           {matches.map((command, index) => (
             <button
               key={`${command.source}:${command.name}`}
@@ -317,7 +323,7 @@ export function Composer({
       )}
       <div className={`composer-input-wrap${bashMode ? " composer-bash-mode" : ""}`}>
         <textarea
-          aria-label={bashMode ? "Shell command to run" : "Message to pi"}
+          aria-label={bashMode ? t("shellCommand") : t("messageToPi")}
           aria-multiline="true"
           ref={textarea}
           className={`composer-input${bashMode ? " composer-input-bash" : ""}`}
@@ -327,19 +333,19 @@ export function Composer({
           onKeyDown={handleKeyDown}
           placeholder={
             disabled
-              ? "pi is not running"
+              ? t("piNotRunning")
               : bashMode
-                ? "Run shell command — Enter to execute; ! keeps output in context, !! excludes it"
+                ? t("shellPlaceholder")
                 : steering
-                  ? "pi is streaming — Enter to steer, Alt+Enter to queue a follow-up (/ for commands)"
-                  : "Send a message to pi… (Enter to send, Shift+Enter for a newline, / for commands)"
+                  ? t("streamingPlaceholder")
+                  : t("messagePlaceholder")
           }
           rows={3}
           spellCheck={false}
         />
         {bashMode && <span className="bash-mode-badge" aria-hidden="true">bash</span>}
         {showStop ? (
-          <button type="button" className="composer-send composer-send-stop" onClick={onAbort} title="Stop" aria-label="Stop">
+          <button type="button" className="composer-send composer-send-stop" onClick={onAbort} title={t("stop")} aria-label={t("stop")}>
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
               <rect x="4" y="4" width="16" height="16" rx="2" />
             </svg>
@@ -350,8 +356,8 @@ export function Composer({
             className="composer-send"
             onClick={() => onSend(false)}
             disabled={disabled || !canSend}
-            title={steering ? "Steer" : "Send"}
-            aria-label={steering ? "Steer" : "Send"}
+            title={steering ? t("steer") : t("send")}
+            aria-label={steering ? t("steer") : t("send")}
           >
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
               <path d="M3.4 20.4 22 12 3.4 3.6v6.53L15 12 3.39 13.87z" />

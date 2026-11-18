@@ -9,6 +9,7 @@ import type { SearchHighlighter } from "./Markdown";
 import { recordPerf } from "../perfLog";
 import { useSmoothWheelScroll } from "../scroll";
 import { post } from "../bridge";
+import { useI18n } from "../i18n";
 import {
   compileQuery,
   EMPTY_SEARCH,
@@ -65,6 +66,7 @@ export function MessageList({
   onSearchClose,
   searchFocusRequest = 0,
 }: Props): JSX.Element {
+  const { t } = useI18n();
   recordPerf("message_list_render", 0, { messages: messages.length, tools: Object.keys(tools).length });
   const scroller = useRef<HTMLDivElement>(null);
   const outlineScroller = useRef<HTMLDivElement>(null);
@@ -452,7 +454,7 @@ export function MessageList({
       {userMessages.length > 0 && (
         <aside
           className="message-outline"
-          aria-label="User message navigation"
+          aria-label={t("userMessageNavigation")}
           onMouseLeave={() => {
             setHoverPreview(null);
           }}
@@ -479,7 +481,7 @@ export function MessageList({
               {outlineVirtualized && <div style={{ height: outlineStart * OUTLINE_ITEM_STEP, marginBottom: -12, flex: "0 0 auto" }} />}
               {visibleUserMessages.map(({ message, index }, offset) => {
                 const outlineIndex = outlineStart + offset;
-                const preview = messagePreview(message);
+                const preview = messagePreview(message, t);
                 const isActive = message.id === activeMessageId;
                 return (
                   <button
@@ -487,7 +489,7 @@ export function MessageList({
                     className={`message-outline-item${isActive ? " message-outline-item-active" : ""}`}
                     key={message.id}
                     title={preview}
-                    aria-label={`Jump to user message ${outlineIndex + 1}: ${preview}`}
+                    aria-label={t("jumpToUserMessage", { index: outlineIndex + 1, preview })}
                     aria-current={isActive ? "location" : undefined}
                     onClick={() => jumpToMessage(message.id, index)}
                     onMouseEnter={(event) =>
@@ -536,10 +538,10 @@ export function MessageList({
         onScroll={handleScroll}
         role="log"
         aria-live="polite"
-        aria-label="pi conversation"
+        aria-label={t("conversation")}
       >
         {messages.length === 0 && !connecting && (
-          <div className="empty">{loadingHistory ? "loading transcript" : emptyHint}</div>
+          <div className="empty">{loadingHistory ? t("loadingTranscript") : emptyHint}</div>
         )}
         {hiddenCount > 0 && (
           <button type="button" className="load-earlier" onClick={loadEarlier}>
@@ -564,10 +566,10 @@ export function MessageList({
           />
         ))}
         {connecting && (
-          <div className="connecting-status" role="status" aria-label="正在连接服务">
+          <div className="connecting-status" role="status" aria-label={t("connecting")}>
             <ThinkingIcon spinning />
             <span className="thinking-label">
-              正在连接服务<AnimatedEllipsis className="thinking-ellipsis" />
+              {t("connecting")}<AnimatedEllipsis className="thinking-ellipsis" />
             </span>
           </div>
         )}
@@ -594,8 +596,8 @@ export function MessageList({
           type="button"
           className="latest-button"
           onClick={scrollToLatest}
-          title="Back to latest"
-          aria-label="Back to latest"
+          title={t("backToLatest")}
+          aria-label={t("backToLatest")}
         >
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
             <path d="M12 5v14m-6-6 6 6 6-6" />
@@ -657,6 +659,7 @@ function findSkillInvocation(blocks: Block[]): {
 }
 
 function MessageView({ message, fileReferences, previousAssistantModel, tools, thinkingLabel, searchHighlight, searchActiveMessage }: MessageViewProps): JSX.Element {
+  const { t } = useI18n();
   const showModel = message.role === "assistant" && message.model && message.model !== previousAssistantModel;
   const skillInvocation = message.role === "user" ? findSkillInvocation(message.blocks) : null;
   const contextualText = message.role === "user" && !skillInvocation ? findEditorContext(message.blocks) : null;
@@ -717,15 +720,15 @@ function MessageView({ message, fileReferences, previousAssistantModel, tools, t
             />
           );
         })}
-        {userText && <CopyButton className="message-user-copy" text={userText} title="复制用户消息" iconOnly />}
+        {userText && <CopyButton className="message-user-copy" text={userText} title={t("copyUserMessage")} iconOnly />}
       </div>}
       {message.streaming && message.blocks.length === 0 && <div className="typing">...</div>}
       {message.stopReason === "error" && (
-        <div className="message-error">{message.errorMessage ?? "the request failed"}</div>
+        <div className="message-error">{message.errorMessage ?? t("requestFailed")}</div>
       )}
       {showModel && (
         <footer className="message-footer">
-          <span>{message.model}{message.streaming ? " - streaming" : ""}</span>
+          <span>{message.model}{message.streaming ? ` - ${t("streamingLabel")}` : ""}</span>
         </footer>
       )}
     </article>
@@ -733,6 +736,7 @@ function MessageView({ message, fileReferences, previousAssistantModel, tools, t
 }
 
 function SkillInvocationView({ skill, fileReferences }: { skill: ParsedSkillBlock; fileReferences: readonly string[] }): JSX.Element {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   return (
     <details
@@ -740,7 +744,7 @@ function SkillInvocationView({ skill, fileReferences }: { skill: ParsedSkillBloc
       open={expanded}
     >
       <summary
-        aria-label={`Skill ${skill.name}`}
+        aria-label={`${t("skill")} ${skill.name}`}
         onClick={(event) => {
           // React flushes this state update before the browser's native <details> toggle. Stop
           // that default action so it cannot immediately toggle the controlled state back.
@@ -748,9 +752,9 @@ function SkillInvocationView({ skill, fileReferences }: { skill: ParsedSkillBloc
           setExpanded((current) => !current);
         }}
       >
-        <span className="skill-invocation-label">[skill]</span>
+        <span className="skill-invocation-label">[{t("skill")}]</span>
         <span className="skill-invocation-name">{skill.name}</span>
-        <span className="skill-invocation-hint">({expanded ? "click to collapse" : "click to expand"})</span>
+        <span className="skill-invocation-hint">({expanded ? t("clickToCollapse") : t("clickToExpand")})</span>
       </summary>
       {expanded && (
         <div className="skill-invocation-content">
@@ -807,18 +811,19 @@ function findEditorContext(blocks: Block[]): { block: Extract<Block, { kind: "te
 }
 
 function EditorContextView({ context }: { context: EditorContext }): JSX.Element {
+  const { t } = useI18n();
   const line = context.endLine && context.endLine !== context.startLine
     ? `${context.startLine}-${context.endLine}`
     : String(context.startLine);
   const rangeLabel = context.endLine && context.endLine !== context.startLine
-    ? `lines ${context.startLine}-${context.endLine}`
-    : `line ${context.startLine}`;
+    ? t("lines", { start: context.startLine, end: context.endLine })
+    : t("line", { line: context.startLine });
   return (
     <button
       type="button"
       className="message-editor-context"
-      aria-label={`Open ${context.path} and select ${rangeLabel}`}
-      title={`Open ${context.path}:${line} and select ${rangeLabel}`}
+      aria-label={t("openPathSelect", { path: context.path, range: rangeLabel })}
+      title={t("openPathSelect", { path: `${context.path}:${line}`, range: rangeLabel })}
       onClick={() => post({
         type: "open_path",
         path: context.path,
@@ -830,14 +835,14 @@ function EditorContextView({ context }: { context: EditorContext }): JSX.Element
         <span className="message-editor-context-icon" aria-hidden="true">⌁</span>
         <span className="message-editor-context-path" title={context.path}>{context.path}</span>
         <span className="message-editor-context-line">:{line}</span>
-        {context.buffer && <span className="message-editor-context-buffer">buffer</span>}
+        {context.buffer && <span className="message-editor-context-buffer">{t("buffer")}</span>}
       </div>
       {context.selection && <pre className="message-editor-context-selection">{context.selection}</pre>}
     </button>
   );
 }
 
-function messagePreview(message: ChatMessage): string {
+function messagePreview(message: ChatMessage, t: ReturnType<typeof useI18n>["t"]): string {
   const text = message.blocks
     .filter((block): block is Extract<Block, { kind: "text" }> => block.kind === "text")
     .map((block) => {
@@ -848,7 +853,7 @@ function messagePreview(message: ChatMessage): string {
     .replace(/\s+/g, " ")
     .trim();
   if (text.length > 72) return `${text.slice(0, 72)}...`;
-  return text || "Image or attachment";
+  return text || t("imageOrAttachment");
 }
 
 /**
@@ -974,6 +979,7 @@ interface BlockProps {
 }
 
 function BlockView({ block, fileReferences, tools, streaming, thinkingLabel, durationMs, userText, searchHighlight = null }: BlockProps): JSX.Element | null {
+  const { t } = useI18n();
   switch (block.kind) {
     case "text": {
       if (!/<\/?thinking\b/i.test(block.text)) {
@@ -1006,7 +1012,7 @@ function BlockView({ block, fileReferences, tools, streaming, thinkingLabel, dur
     }
     case "thinking": {
       const thinkingActive = streaming && block.completed !== true;
-      const defaultLabel = block.redacted ? "思考内容已隐藏" : (thinkingActive ? "正在思考" : "已思考");
+      const defaultLabel = block.redacted ? t("thinking") : (thinkingActive ? t("thinking") : t("done"));
       return (
         <details className="thinking">
           <summary>
@@ -1015,7 +1021,7 @@ function BlockView({ block, fileReferences, tools, streaming, thinkingLabel, dur
               {thinkingLabel ?? defaultLabel}
               {thinkingActive && <AnimatedEllipsis className="thinking-ellipsis" />}
               {!thinkingActive && !thinkingLabel && !block.redacted && durationMs !== undefined && (
-                <span className="thinking-duration">（用时 {formatThinkingDuration(durationMs)}）</span>
+                <span className="thinking-duration">{t("thinkingDuration", { seconds: Math.max(0, Math.round(durationMs / 1000)) })}</span>
               )}
             </span>
           </summary>
@@ -1027,12 +1033,12 @@ function BlockView({ block, fileReferences, tools, streaming, thinkingLabel, dur
       return <ToolCard name={block.name} callId={block.callId} tool={tools[block.callId]} tools={tools} />;
     case "image":
       if (!block.data) {
-        return <div className="image-omitted">图片过大，未在会话视图中加载</div>;
+        return <div className="image-omitted">{t("imageTooLarge")}</div>;
       }
       return (
         <ImagePreview
           className={userText ? "message-image-thumbnail" : "image"}
-          alt="Image"
+          alt={t("image")}
           src={`data:${block.mimeType};base64,${block.data}`}
         />
       );
@@ -1070,8 +1076,4 @@ export function ThinkingIcon({ spinning = false }: { spinning?: boolean }): JSX.
       </g>
     </svg>
   );
-}
-
-function formatThinkingDuration(durationMs: number): string {
-  return `${Math.max(0, Math.round(durationMs / 1000))} 秒`;
 }

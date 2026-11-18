@@ -66,6 +66,8 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         var scrollToFirstShortcut: String = DEFAULT_SCROLL_TO_FIRST_SHORTCUT,
         var previousUserMessageShortcut: String = DEFAULT_PREVIOUS_USER_MESSAGE_SHORTCUT,
         var nextUserMessageShortcut: String = DEFAULT_NEXT_USER_MESSAGE_SHORTCUT,
+        /** UI language used by the Pi chat webview: `zh` or `en`. */
+        var language: String = DEFAULT_LANGUAGE,
         /** Preferred model shown as the default in the model picker. */
         var defaultModelProvider: String = "",
         var defaultModelId: String = "",
@@ -104,6 +106,10 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
 
     fun notifyBackgroundImageChanged() {
         ApplicationManager.getApplication().messageBus.syncPublisher(BACKGROUND_IMAGE_CHANGED).backgroundImageChanged()
+    }
+
+    fun notifyLanguageChanged() {
+        ApplicationManager.getApplication().messageBus.syncPublisher(LANGUAGE_CHANGED).languageChanged()
     }
 
     /**
@@ -204,6 +210,10 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
         val CHAT_WHEEL_SENSITIVITY_CHANGED = Topic.create("Pi chat wheel sensitivity changed", PiWheelSensitivityListener::class.java)
         val ACCENT_COLOR_CHANGED = Topic.create("Pi accent color changed", PiAccentColorListener::class.java)
         val BACKGROUND_IMAGE_CHANGED = Topic.create("Pi background image changed", PiBackgroundImageListener::class.java)
+        val LANGUAGE_CHANGED = Topic.create("Pi language changed", PiLanguageListener::class.java)
+        const val DEFAULT_LANGUAGE = "zh"
+        const val LANGUAGE_ZH = "zh"
+        const val LANGUAGE_EN = "en"
         const val SHOW_PI_TOOL_WINDOW_ACTION_ID = "dev.pi.jetbrains.ShowPiToolWindow"
         const val NEW_PI_TAB_ACTION_ID = "dev.pi.jetbrains.NewPiTab"
         const val CLOSE_PI_TAB_ACTION_ID = "dev.pi.jetbrains.ClosePiTab"
@@ -249,6 +259,10 @@ class PiSettings : PersistentStateComponent<PiSettings.State> {
 }
 
 private fun String.toKeyStroke(): javax.swing.KeyStroke? = takeIf { it.isNotBlank() }?.let(javax.swing.KeyStroke::getKeyStroke)
+
+fun interface PiLanguageListener {
+    fun languageChanged()
+}
 
 fun interface PiChatFontSizeListener {
     fun chatFontSizeChanged()

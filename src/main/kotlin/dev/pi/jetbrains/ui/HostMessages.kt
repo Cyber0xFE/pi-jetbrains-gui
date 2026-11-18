@@ -113,6 +113,8 @@ data class HostTheme(
     val backgroundImageOpacity: Float = 0f,
     /** Wheel scroll sensitivity as a fraction of the default speed (1 = default). */
     val wheelSensitivity: Float = 1f,
+    /** UI language used by the webview (`zh` or `en`). */
+    val language: String = "en",
 )
 
 @Serializable

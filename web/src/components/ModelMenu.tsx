@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatTokens } from "../format";
+import { useI18n } from "../i18n";
 import { useSmoothWheelScroll } from "../scroll";
 import type { ModelInfo } from "../types";
 
@@ -55,6 +56,7 @@ export function ModelMenu({
   onSetDefault,
   onAddModel,
 }: Props): JSX.Element {
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [scrollTop, setScrollTop] = useState(0);
   const [selected, setSelected] = useState(0);
@@ -86,7 +88,7 @@ export function ModelMenu({
           detail: (() => {
             const name = model.name?.trim();
             const showId = Boolean(name) && name !== model.id;
-            return [showId ? model.id : null, model.contextWindow ? `${formatTokens(model.contextWindow)} ctx` : null]
+            return [showId ? model.id : null, model.contextWindow ? `${formatTokens(model.contextWindow)} ${t("context")}` : null]
               .filter(Boolean)
               .join(" · ") || null;
           })(),
@@ -141,12 +143,12 @@ export function ModelMenu({
   };
 
   return (
-    <div className="model-menu" role="dialog" aria-label="Models">
+    <div className="model-menu" role="dialog" aria-label={t("models")}>
       <input
         ref={inputRef}
         className="model-menu-search"
         value={query}
-        placeholder="Search models…"
+        placeholder={t("searchModels")}
         spellCheck={false}
         onChange={(event) => setQuery(event.target.value)}
         onKeyDown={(event) => {
@@ -169,10 +171,10 @@ export function ModelMenu({
         style={{ height: listHeight }}
         onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
         role="listbox"
-        aria-label="Models"
+        aria-label={t("models")}
       >
         {rows.length === 0 && (
-          <div className="model-menu-empty">{ready ? "loading models…" : "pi is not running"}</div>
+          <div className="model-menu-empty">{ready ? t("loadingModels") : t("piNotRunning")}</div>
         )}
         <div style={{ height: start * ROW_HEIGHT }} />
         {visible.map((row, offset) => {
@@ -199,19 +201,19 @@ export function ModelMenu({
               onClick={() => onSelect(row.model)}
             >
               <span className="model-menu-name">{row.label}</span>
-              {row.model.reasoning ? <span className="model-menu-badge">thinking</span> : null}
+              {row.model.reasoning ? <span className="model-menu-badge">{t("thinking")}</span> : null}
               {row.detail ? <span className="model-menu-detail">{row.detail}</span> : null}
               {/* Floating so idle rows do not reserve an empty strip on the right. */}
               <span className="model-menu-actions">
                 {row.isDefault ? (
-                  <span className="model-menu-default">default</span>
+                  <span className="model-menu-default">{t("default")}</span>
                 ) : (
                   <span
                     className="model-menu-default-action"
                     role="button"
                     tabIndex={0}
-                    aria-label="Set as default"
-                    title="Set as default"
+                    aria-label={t("setAsDefault")}
+                    title={t("setAsDefault")}
                     onClick={(event) => {
                       event.stopPropagation();
                       onSetDefault(row.model);
@@ -223,7 +225,7 @@ export function ModelMenu({
                       onSetDefault(row.model);
                     }}
                   >
-                    Set as default
+                    {t("setAsDefault")}
                   </span>
                 )}
                 {row.active && (
@@ -242,9 +244,9 @@ export function ModelMenu({
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M12 5v14M5 12h14" />
           </svg>
-          Add model
+          {t("addModel")}
         </button>
-        <span className="model-menu-count">{models.length} model(s)</span>
+        <span className="model-menu-count">{t("modelCount", { count: models.length })}</span>
       </footer>
     </div>
   );

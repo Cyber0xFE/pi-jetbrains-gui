@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useI18n } from "../i18n";
 
 export async function copyText(text: string): Promise<boolean> {
   try {
@@ -27,7 +28,9 @@ interface Props {
   iconOnly?: boolean;
 }
 
-export function CopyButton({ text, className = "", title = "Copy card", iconOnly = false }: Props): JSX.Element {
+export function CopyButton({ text, className = "", title, iconOnly = false }: Props): JSX.Element {
+  const { t } = useI18n();
+  const resolvedTitle = title ?? t("copy");
   const [copied, setCopied] = useState(false);
 
   const copy = async (): Promise<void> => {
@@ -39,7 +42,7 @@ export function CopyButton({ text, className = "", title = "Copy card", iconOnly
 
   return (
     <button type="button" className={`card-copy ${className}`.trim()} onClick={copy}
-      title={copied ? "已复制" : title} aria-label={iconOnly ? (copied ? "已复制" : title) : undefined}>
+      title={copied ? t("copied") : resolvedTitle} aria-label={iconOnly ? (copied ? t("copied") : resolvedTitle) : undefined}>
       {iconOnly ? (
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.7"
           strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

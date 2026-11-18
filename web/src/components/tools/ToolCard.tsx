@@ -13,6 +13,7 @@ import {
 import { DiffView } from "./DiffView";
 import { PathLink } from "./PathLink";
 import { post } from "../../bridge";
+import { useI18n } from "../../i18n";
 
 const MAX_NESTING = 4;
 
@@ -29,24 +30,25 @@ interface Props {
  * `ctx.executeTool()` are rendered as nested cards under their parent (plan M2.6).
  */
 export function ToolCard({ callId, name, tool, tools, depth = 0 }: Props): JSX.Element {
+  const { t } = useI18n();
   const state: ToolState = tool ?? { callId, name, status: "running" };
   const children = useMemo(
     () => Object.values(tools).filter((candidate) => candidate.parentCallId === callId),
     [tools, callId],
   );
-  const view = renderTool(state);
+  const view = renderTool(state, t);
 
   return (
     <section className={`tool-card tool-card-${state.status}`} data-call-id={callId} data-tool={state.name}>
       <header className="tool-head">
         <span className="tool-name">{state.name}</span>
         <span className="tool-title">{view.title}</span>
-        <StatusBadge status={state.status} durationMs={state.durationMs} />
+        <StatusBadge status={state.status} durationMs={state.durationMs} t={t} />
       </header>
       {view.body}
       {children.length > 0 && depth < MAX_NESTING && (
         <div className="tool-children">
-          <div className="tool-children-label">{children.length} nested call(s)</div>
+          <div className="tool-children-label">{t("nestedCalls", { count: children.length })}</div>
           {children.map((child) => (
             <ToolCard
               key={child.callId}
@@ -68,25 +70,27 @@ interface ToolView {
   body: JSX.Element | null;
 }
 
-function renderTool(tool: ToolState): ToolView {
+type Translate = ReturnType<typeof useI18n>["t"];
+
+function renderTool(tool: ToolState, t: Translate): ToolView {
   switch (tool.name) {
     case "read":
-      return readView(tool);
+      return readView(tool, t);
     case "edit":
-      return editView(tool);
+      return editView(tool, t);
     case "write":
-      return writeView(tool);
+      return writeView(tool, t);
     case "bash":
     case "powershell":
-      return bashView(tool);
+      return bashView(tool, t);
     case "grep":
-      return grepView(tool);
+      return grepView(tool, t);
     case "find":
-      return findView(tool);
+      return findView(tool, t);
     case "ls":
-      return lsView(tool);
+      return lsView(tool, t);
     default:
-      return genericView(tool);
+      return genericView(tool, t);
   }
 }
 
@@ -94,7 +98,7 @@ function renderTool(tool: ToolState): ToolView {
 // read
 // ---------------------------------------------------------------------------------------------
 
-function readView(tool: ToolState): ToolView {
+function readView(tool: ToolState, t: Translate): ToolView {
   const path = stringField(tool.args, "path");
   const offset = numberField(tool.args, "offset");
   const limit = numberField(tool.args, "limit");
@@ -117,7 +121,7 @@ function readView(tool: ToolState): ToolView {
     ),
     body: tool.output ? (
       <details className="tool-section" open={tool.isError || tool.output.split("\n").length <= 3}>
-        <summary>{tool.isError ? "error" : `content · ${tool.output.split("\n").length} lines`}</summary>
+        <summary>{tool.isError ? t("error") : t("contentLines", { count: tool.output.split("\n").length })}</summary>
         <pre className={`tool-output${tool.isError ? " tool-output-error" : ""}`}>{truncateToolText(tool.output)}</pre>
       </details>
     ) : null,
@@ -146,7 +150,7 @@ function editsOf(args: unknown): EditPair[] {
   return pairs;
 }
 
-function editView(tool: ToolState): ToolView {
+function editView(tool: ToolState, t: Translate): ToolView {
   const path = stringField(tool.args, "path");
   const edits = editsOf(tool.args);
   const details = tool.details;
@@ -163,7 +167,7 @@ function editView(tool: ToolState): ToolView {
     <>
       {edits.map((edit, index) => (
         <div key={index} className="diff-group">
-          {edits.length > 1 && <div className="diff-caption">edit {index + 1}</div>}
+          {edits.length > 1 && <div className="diff-caption">{t("editCount", { count: index + 1 })}</div>}
           <DiffView
             rows={previewDiff(
               edit.oldText.slice(0, MAX_DIFF_INPUT_CHARS),
@@ -172,7 +176,7 @@ function editView(tool: ToolState): ToolView {
           />
         </div>
       ))}
-      <div className="tool-note">preview from args; pi applies edits fuzzily (BOM/whitespace tolerant)</div>
+      <div className="tool-note">{t("preview")} from args; pi applies edits fuzzily (BOM/whitespace tolerant)</div>
     </>
   ) : null;
 
@@ -180,7 +184,7 @@ function editView(tool: ToolState): ToolView {
     title: (
       <>
         {path !== undefined && <PathLink path={path} />}
-        <span className="chip">{edits.length > 0 ? `${edits.length} edit(s)` : "diff"}</span>
+        <span className="chip">{edits.length > 0 ? t("editCount", { count: edits.length }) : t("diff")}</span>
         {isPreview && !tool.isError && <span className="chip chip-muted">preview</span>}
       </>
     ),
@@ -192,7 +196,7 @@ function editView(tool: ToolState): ToolView {
 // write
 // ---------------------------------------------------------------------------------------------
 
-function writeView(tool: ToolState): ToolView {
+function writeView(tool: ToolState, t: Translate): ToolView {
   const path = stringField(tool.args, "path");
   const content = stringField(tool.args, "content");
   const lines = content === undefined ? 0 : content.split("\n").length;
@@ -208,7 +212,7 @@ function writeView(tool: ToolState): ToolView {
       tool.output ? <pre className="tool-output tool-output-error">{truncateToolText(tool.output)}</pre> : null
     ) : content !== undefined ? (
       <details className="tool-section">
-        <summary>written content</summary>
+        <summary>{t("writtenContent")}</summary>
         <pre className="tool-output">{truncateToolText(content)}</pre>
       </details>
     ) : null,
@@ -219,7 +223,7 @@ function writeView(tool: ToolState): ToolView {
 // bash
 // ---------------------------------------------------------------------------------------------
 
-function bashView(tool: ToolState): ToolView {
+function bashView(tool: ToolState, t: Translate): ToolView {
   const command = stringField(tool.args, "command");
   const timeout = numberField(tool.args, "timeout");
   const excludeFromContext = asObject(tool.args)?.excludeFromContext === true;
@@ -236,11 +240,11 @@ function bashView(tool: ToolState): ToolView {
   return {
     title: (
       <>
-        {timeout !== undefined && <span className="chip">{timeout}s timeout</span>}
-        {excludeFromContext && <span className="chip chip-muted">not in context</span>}
-        {cancelled && <span className="chip">cancelled</span>}
-        {failed && <span className="chip">exit {exitCode}</span>}
-        {!hasOutput && tool.status === "running" && <span className="tool-note">waiting for output…</span>}
+        {timeout !== undefined && <span className="chip">{t("timeout", { seconds: timeout })}</span>}
+        {excludeFromContext && <span className="chip chip-muted">{t("notInContext")}</span>}
+        {cancelled && <span className="chip">{t("cancelled")}</span>}
+        {failed && <span className="chip">{t("exit", { code: exitCode ?? 0 })}</span>}
+        {!hasOutput && tool.status === "running" && <span className="tool-note">{t("waitingForOutput")}</span>}
       </>
     ),
     body: (
@@ -248,7 +252,7 @@ function bashView(tool: ToolState): ToolView {
         {command !== undefined && <pre className="tool-command">$ {command}</pre>}
         {hasOutput && (
           <details className="tool-section" open={outputOpen}>
-            <summary>output · {outputLines} lines</summary>
+            <summary>{t("outputLines", { count: outputLines })}</summary>
             <pre className={`tool-output tool-terminal${failed && !tool.isError ? " tool-output-error" : ""}`}>{truncateToolText(tool.output ?? "")}</pre>
           </details>
         )}
@@ -286,7 +290,7 @@ interface GrepHit {
 const GREP_LINE = /^(.*?):(\d+):\s?(.*)$/;
 const MAX_VISIBLE_HITS = 1000;
 
-function grepView(tool: ToolState): ToolView {
+function grepView(tool: ToolState, t: Translate): ToolView {
   const pattern = stringField(tool.args, "pattern");
   const searchPath = stringField(tool.args, "path");
   const glob = stringField(tool.args, "glob");
@@ -296,9 +300,9 @@ function grepView(tool: ToolState): ToolView {
     title: (
       <>
         {pattern !== undefined && <code className="chip chip-code">{pattern}</code>}
-        {searchPath !== undefined && <PathLink path={searchPath} label={searchPath === "." ? "cwd" : searchPath} />}
+        {searchPath !== undefined && <PathLink path={searchPath} label={searchPath === "." ? t("cwd") : searchPath} />}
         {glob !== undefined && <span className="chip chip-muted">{glob}</span>}
-        {hits.length > 0 && <span className="chip">{hits.length} hit(s)</span>}
+        {hits.length > 0 && <span className="chip">{t("hitCount", { count: hits.length })}</span>}
       </>
     ),
     body:
@@ -307,7 +311,7 @@ function grepView(tool: ToolState): ToolView {
       ) : hits.length > 0 ? (
         hits.length > 3 ? (
           <details className="tool-section">
-            <summary>{hits.length} hit(s)</summary>
+            <summary>{t("hitCount", { count: hits.length })}</summary>
             <div className="hits">
               {hits.map((hit, index) => (
                 <div key={index} className="hit">
@@ -348,7 +352,7 @@ function parseGrepHits(output: string | undefined): GrepHit[] {
   return hits;
 }
 
-function findView(tool: ToolState): ToolView {
+function findView(tool: ToolState, t: Translate): ToolView {
   const pattern = stringField(tool.args, "pattern");
   const searchPath = stringField(tool.args, "path");
   const files = tool.output
@@ -359,8 +363,8 @@ function findView(tool: ToolState): ToolView {
     title: (
       <>
         {pattern !== undefined && <code className="chip chip-code">{pattern}</code>}
-        {searchPath !== undefined && <PathLink path={searchPath} label={searchPath === "." ? "cwd" : searchPath} />}
-        <span className="chip">{files.length} file(s)</span>
+        {searchPath !== undefined && <PathLink path={searchPath} label={searchPath === "." ? t("cwd") : searchPath} />}
+        <span className="chip">{t("fileCount", { count: files.length })}</span>
       </>
     ),
     body:
@@ -376,14 +380,14 @@ function findView(tool: ToolState): ToolView {
   };
 }
 
-function lsView(tool: ToolState): ToolView {
+function lsView(tool: ToolState, t: Translate): ToolView {
   const path = stringField(tool.args, "path");
   const lines = tool.output?.split("\n").length ?? 0;
   return {
-    title: <PathLink path={path ?? "."} label={path ?? "cwd"} />,
+    title: <PathLink path={path ?? "."} label={path ?? t("cwd")} />,
     body: tool.output ? (
       <details className="tool-section" open={tool.isError || lines <= 3}>
-        <summary>{tool.isError ? "error" : `content · ${lines} lines`}</summary>
+        <summary>{tool.isError ? t("error") : t("contentLines", { count: lines })}</summary>
         <pre className={`tool-output${tool.isError ? " tool-output-error" : ""}`}>{truncateToolText(tool.output)}</pre>
       </details>
     ) : null,
@@ -394,20 +398,20 @@ function lsView(tool: ToolState): ToolView {
 // unknown tools
 // ---------------------------------------------------------------------------------------------
 
-function genericView(tool: ToolState): ToolView {
+function genericView(tool: ToolState, t: Translate): ToolView {
   return {
-    title: tool.args !== undefined ? <span className="chip chip-muted">args</span> : null,
+    title: tool.args !== undefined ? <span className="chip chip-muted">{t("arguments")}</span> : null,
     body: (
       <>
         {tool.args !== undefined && (
           <details className="tool-section">
-            <summary>arguments</summary>
+            <summary>{t("arguments")}</summary>
             <pre className="tool-output">{truncateToolText(formatJson(tool.args))}</pre>
           </details>
         )}
         {tool.output !== undefined && (
           <details className="tool-section" open={tool.isError || tool.output.split("\n").length <= 3}>
-            <summary>{tool.isError ? "error" : `result · ${tool.output.split("\n").length} lines`}</summary>
+            <summary>{tool.isError ? t("error") : t("resultLines", { count: tool.output.split("\n").length })}</summary>
             <pre className="tool-output">{truncateToolText(tool.output)}</pre>
           </details>
         )}
@@ -422,8 +426,8 @@ function genericView(tool: ToolState): ToolView {
   };
 }
 
-function StatusBadge({ status, durationMs }: { status: ToolStatus; durationMs?: number }): JSX.Element {
-  const label = status === "running" ? "running" : status === "error" ? "failed" : "done";
+function StatusBadge({ status, durationMs, t }: { status: ToolStatus; durationMs?: number; t: Translate }): JSX.Element {
+  const label = status === "running" ? t("running") : status === "error" ? t("failed") : t("done");
   return (
     <span className="tool-status">
       {label}

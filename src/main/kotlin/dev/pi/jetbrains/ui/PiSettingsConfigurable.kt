@@ -22,6 +22,7 @@ import java.awt.event.KeyEvent
 import javax.swing.Box
 import javax.swing.JButton
 import javax.swing.JCheckBox
+import javax.swing.JComboBox
 import javax.swing.JComponent
 import javax.swing.JLabel
 import javax.swing.JPanel
@@ -90,6 +91,10 @@ class PiSettingsConfigurable : Configurable {
                 event.component.accessibleContext?.accessibleName = "Pi 主题色"
             }
         })
+    }
+    private val language = JComboBox(arrayOf("中文", "English")).apply {
+        toolTipText = "选择 Pi 聊天界面的语言"
+        accessibleContext.accessibleName = "Pi 界面语言"
     }
     private val panelShortcut = JTextField()
     private var panelShortcutValue = ""
@@ -192,6 +197,7 @@ class PiSettingsConfigurable : Configurable {
         )
 
         addSection("界面与行为")
+        addField("界面语言：", language, "切换 Pi 聊天界面的中文或英文；应用后已打开的聊天标签会立即更新。")
         fun configureShortcut(field: JTextField, accessibleName: String, onStroke: (KeyStroke) -> Unit) {
             field.isEditable = false
             field.columns = 22
@@ -412,6 +418,7 @@ class PiSettingsConfigurable : Configurable {
         return nodePath.text != state.nodePath ||
             networkProxyEnabled.isSelected != state.networkProxyEnabled ||
             networkProxy.text.trim() != state.networkProxy ||
+            languageCode() != state.language ||
             logDirectory.text != state.logDirectory ||
             chatFontSizeValue() != state.chatFontSize ||
             chatWheelSensitivityValue() != state.chatWheelSensitivity ||
@@ -441,9 +448,11 @@ class PiSettingsConfigurable : Configurable {
         val proxyEnabled = networkProxyEnabled.isSelected
         val proxy = networkProxy.text.trim()
         val proxyChanged = proxyEnabled != state.networkProxyEnabled || proxy != state.networkProxy
+        val languageChanged = languageCode() != state.language
         state.networkProxyEnabled = proxyEnabled
         state.networkProxy = proxy
         state.nodePath = nodePath.text.trim()
+        state.language = languageCode()
         state.logDirectory = logDirectory.text.trim()
         state.chatFontSize = chatFontSizeValue()
         state.chatWheelSensitivity = chatWheelSensitivityValue()
@@ -462,6 +471,7 @@ class PiSettingsConfigurable : Configurable {
         state.nextUserMessageShortcut = nextUserMessageShortcutValue
         settings.applyShortcuts()
         if (proxyChanged) settings.notifyNetworkProxyChanged()
+        if (languageChanged) settings.notifyLanguageChanged()
         if (fontSizeChanged) settings.notifyChatFontSizeChanged()
         if (wheelSensitivityChanged) settings.notifyChatWheelSensitivityChanged()
         if (accentColorChanged) settings.notifyAccentColorChanged()
@@ -474,6 +484,7 @@ class PiSettingsConfigurable : Configurable {
         networkProxyEnabled.isSelected = state.networkProxyEnabled
         networkProxy.text = state.networkProxy
         networkProxy.isEnabled = state.networkProxyEnabled
+        language.selectedIndex = if (state.language == PiSettings.LANGUAGE_EN) 1 else 0
         logDirectory.text = state.logDirectory
         chatFontSize.value = state.chatFontSize.coerceIn(PiSettings.MIN_CHAT_FONT_SIZE, PiSettings.MAX_CHAT_FONT_SIZE)
         chatWheelSensitivity.value = state.chatWheelSensitivity.coerceIn(
@@ -532,6 +543,8 @@ class PiSettingsConfigurable : Configurable {
             .withDescription("选择一张 PNG、JPG、GIF、WebP 或 BMP 图片")
         FileChooser.chooseFile(descriptor, null, null)?.path?.let { backgroundImage.text = it }
     }
+
+    private fun languageCode(): String = if (language.selectedIndex == 1) PiSettings.LANGUAGE_EN else PiSettings.LANGUAGE_ZH
 
     private fun backgroundImageOpacityValue(): Int = (backgroundImageOpacity.value as? Number)?.toInt()
         ?.coerceIn(PiSettings.MIN_BACKGROUND_IMAGE_OPACITY, PiSettings.MAX_BACKGROUND_IMAGE_OPACITY)
