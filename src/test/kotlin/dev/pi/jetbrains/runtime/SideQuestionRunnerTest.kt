@@ -58,7 +58,14 @@ class SideQuestionRunnerTest {
         val command = runner.buildCommand(copy, provider = "p", model = "m", question = "why?")
 
         assertEquals(
-            listOf("node", "pi.mjs", "--session", copy.toString(), "--no-tools", "--provider", "p", "--model", "m", "--mode", "json", "--print", "why?"),
+            listOf(
+                "node", "pi.mjs", "--session", copy.toString(), "--no-tools", "--no-context-files",
+                "--system-prompt",
+                "You are answering a side question in text-only mode. No tools are available or permitted. " +
+                    "Answer directly using only the existing conversation context. Never emit tool calls, " +
+                    "function calls, XML tool syntax, or DSML tool markup.",
+                "--provider", "p", "--model", "m", "--mode", "json", "--print", "why?",
+            ),
             command,
         )
     }

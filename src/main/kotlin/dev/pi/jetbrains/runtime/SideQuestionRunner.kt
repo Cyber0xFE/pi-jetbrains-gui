@@ -19,9 +19,9 @@ import kotlinx.serialization.json.jsonPrimitive
  * Runs one `/btw` side question against a throwaway copy of the active session file (mirrors
  * Claude Code's `/btw`).
  *
- * The copy is opened with `pi --session <copy> --no-tools --mode json --print <question>`: print
- * mode answers once and exits, `--no-tools` keeps the answer tool-free, and every append goes to
- * the copy — so the main session history is never touched. The copy is always deleted afterwards.
+ * The copy is opened with a text-only system prompt and `--no-tools`: print mode answers once
+ * and exits, no tool is exposed or permitted, and every append goes to the copy — so the main
+ * session history is never touched. The copy is always deleted afterwards.
  *
  * Output is the JSON event stream: `message_update` deltas are forwarded to [onDelta] as they
  * arrive so the webview can render the answer live, and the final `message_end` assistant message
@@ -41,7 +41,7 @@ class SideQuestionRunner(
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    /** `pi --session <copy> --no-tools [--provider p --model m] --mode json --print <question>` */
+    /** `pi --session <copy> --no-tools --no-context-files --system-prompt <text> [--provider p --model m] --mode json --print <question>` */
     fun buildCommand(sessionCopy: Path, provider: String?, model: String?, question: String): List<String> =
         buildList {
             add(nodeExecutable.toString())
@@ -49,6 +49,9 @@ class SideQuestionRunner(
             add("--session")
             add(sessionCopy.toString())
             add("--no-tools")
+            add("--no-context-files")
+            add("--system-prompt")
+            add(SIDE_QUESTION_SYSTEM_PROMPT)
             if (!provider.isNullOrBlank() && !model.isNullOrBlank()) {
                 add("--provider")
                 add(provider)
@@ -195,6 +198,12 @@ class SideQuestionRunner(
     }
 
     companion object {
+        /** The side question must not inherit agent instructions that encourage tool use. */
+        private const val SIDE_QUESTION_SYSTEM_PROMPT =
+            "You are answering a side question in text-only mode. No tools are available or permitted. " +
+                "Answer directly using only the existing conversation context. Never emit tool calls, " +
+                "function calls, XML tool syntax, or DSML tool markup."
+
         /** Side questions can involve reasoning models over a large transcript. */
         val DEFAULT_TIMEOUT: Duration = Duration.ofSeconds(180)
     }
