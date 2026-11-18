@@ -691,6 +691,19 @@ describe("App", () => {
     deliver({ type: "dequeue", steering: ["again"], followUp: [] });
     expect(await screen.findByRole("dialog", { name: "Edit queued messages" })).toBeDefined();
 
+    // The action hints are CSS popovers on hover/focus: JCEF drops native `title` tooltips.
+    const cancelButton = screen.getByRole("button", { name: "Cancel" });
+    fireEvent.mouseEnter(cancelButton);
+    expect(screen.getByRole("tooltip").textContent).toBe("Cancel editing");
+    expect(cancelButton.getAttribute("aria-describedby")).not.toBeNull();
+    fireEvent.mouseLeave(cancelButton);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    const sendAllButton = screen.getByRole("button", { name: "Send all" });
+    fireEvent.mouseEnter(sendAllButton);
+    expect(screen.getByRole("tooltip").textContent).toBe("Send all");
+    fireEvent.mouseLeave(sendAllButton);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+
     // Cancel restores the untouched queue through the same host-side path.
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() =>

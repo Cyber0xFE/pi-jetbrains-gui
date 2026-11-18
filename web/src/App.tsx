@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type JSX } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type JSX } from "react";
 import type { PromptImage } from "./types";
 import { onMessage, post } from "./bridge";
 import { recordPerf } from "./perfLog";
@@ -69,6 +69,9 @@ function AppContent({ store, state }: { store: ChatStore; state: ChatState }): J
   const [queueEdit, setQueueEdit] = useState<QueuedEntry[] | null>(null);
   /** Snapshot taken when editing started, so Cancel can restore the queues untouched. */
   const queueEditOrigin = useRef<QueuedEntry[]>([]);
+  /** Which queue-editor action button is hovered or focused; JCEF drops native `title` tooltips. */
+  const [queueActionHint, setQueueActionHint] = useState<"cancel" | "sendAll" | null>(null);
+  const queueActionHintId = useId();
   const pendingPromptStartedAt = useRef<number | null>(null);
   const pendingPromptTimer = useRef<number | null>(null);
 
@@ -467,38 +470,64 @@ function AppContent({ store, state }: { store: ChatStore; state: ChatState }): J
             );
           })}
           <div className="message-queue-editor-actions">
-            <button
-              type="button"
-              className="message-queue-icon"
-              onClick={cancelQueueEdit}
-              title={t("cancel")}
-              aria-label={t("cancel")}
+            <span
+              className="message-queue-icon-wrap"
+              onMouseEnter={() => setQueueActionHint("cancel")}
+              onMouseLeave={() => setQueueActionHint((current) => (current === "cancel" ? null : current))}
+              onFocus={() => setQueueActionHint("cancel")}
+              onBlur={() => setQueueActionHint((current) => (current === "cancel" ? null : current))}
             >
-              <svg
-                viewBox="0 0 24 24"
-                width="15"
-                height="15"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                aria-hidden="true"
-                focusable="false"
+              <button
+                type="button"
+                className="message-queue-icon"
+                onClick={cancelQueueEdit}
+                aria-label={t("cancel")}
+                aria-describedby={queueActionHint === "cancel" ? `${queueActionHintId}-cancel` : undefined}
               >
-                <path d="M6 6l12 12M18 6L6 18" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              className="message-queue-icon message-queue-icon-primary"
-              onClick={submitQueueEdit}
-              title={t("sendAll")}
-              aria-label={t("sendAll")}
+                <svg
+                  viewBox="0 0 24 24"
+                  width="15"
+                  height="15"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  aria-hidden="true"
+                  focusable="false"
+                >
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+              {queueActionHint === "cancel" && (
+                <span id={`${queueActionHintId}-cancel`} role="tooltip" className="message-queue-tooltip">
+                  {t("cancelEdit")}
+                </span>
+              )}
+            </span>
+            <span
+              className="message-queue-icon-wrap"
+              onMouseEnter={() => setQueueActionHint("sendAll")}
+              onMouseLeave={() => setQueueActionHint((current) => (current === "sendAll" ? null : current))}
+              onFocus={() => setQueueActionHint("sendAll")}
+              onBlur={() => setQueueActionHint((current) => (current === "sendAll" ? null : current))}
             >
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true" focusable="false">
-                <path d="M3.4 20.4 22 12 3.4 3.6v6.53L15 12 3.39 13.87z" />
-              </svg>
-            </button>
+              <button
+                type="button"
+                className="message-queue-icon message-queue-icon-primary"
+                onClick={submitQueueEdit}
+                aria-label={t("sendAll")}
+                aria-describedby={queueActionHint === "sendAll" ? `${queueActionHintId}-send-all` : undefined}
+              >
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true" focusable="false">
+                  <path d="M3.4 20.4 22 12 3.4 3.6v6.53L15 12 3.39 13.87z" />
+                </svg>
+              </button>
+              {queueActionHint === "sendAll" && (
+                <span id={`${queueActionHintId}-send-all`} role="tooltip" className="message-queue-tooltip">
+                  {t("sendAll")}
+                </span>
+              )}
+            </span>
           </div>
         </div>
       ) : (

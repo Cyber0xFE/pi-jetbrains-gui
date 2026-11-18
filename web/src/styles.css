@@ -2622,10 +2622,32 @@ mark.search-hit {
   padding: 2px 32px 0 0;
 }
 
+.message-queue-icon-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+/* JCEF does not surface native `title` tooltips, so the action hints are rendered CSS popovers. */
+.message-queue-tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  z-index: 10;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--fg);
+  box-shadow: var(--shadow-sm);
+  font-size: calc(var(--fs) - 2px);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .message-queue-icon {
   flex: 0 0 auto;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
