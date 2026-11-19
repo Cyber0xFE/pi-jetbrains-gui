@@ -103,18 +103,16 @@ intellijPlatform {
 
         // 写法与结构见 docs/marketing/marketplace-listing.md 第 5 节。
         changeNotes = """
-            <h2>What's New in 0.6.0</h2>
+            <h2>What's New in 0.6.1</h2>
             <h3>Features</h3>
             <ul>
-              <li><b>The chat panel now speaks English and Simplified Chinese:</b> a new interface-language option in the plugin settings localizes the whole panel - session list, model picker, search bar, tool cards, dialogs, empty and error states, composer hints and keyboard hints - and already open tabs switch as soon as you apply the setting. English is the new default, so existing setups come up in English after the update and switch back with this one setting. The settings page itself is localized too, and model-list <b>thinking</b> badges stay in English because that is how pi names them.</li>
-              <li><b><code>/btw</code> side questions can be stopped and now show their reasoning:</b> a stop button in the overlay header aborts the side question and keeps the partial answer instead of reporting it as an error. The overlay walks through <b>connecting</b> → <b>thinking</b> → <b>streaming</b> instead of a blank wait, streams the model's reasoning into a collapsible thinking block (collapsed by default and labelled "done" once finished), and keeps its header and buttons fixed while long answers scroll in the body.</li>
-              <li><b>Prompt history recall with <code>↑</code> / <code>↓</code> in the composer:</b> press <code>↑</code> to walk back through the user messages of the current session and <code>↓</code> to come forward again; the draft you had before browsing is restored when you leave history. Editing, sending, or switching sessions exits history browsing, and the <code>/</code> and <code>@</code> menu arrow-key navigation is untouched.</li>
+              <li><b>The queue editor's actions are now icon buttons:</b> a paper-plane button (same icon as the composer's send) posts all queued messages, and an × button cancels the edit and restores the queues untouched; both keep tooltips and accessible names.</li>
             </ul>
             <h3>Fixes</h3>
             <ul>
-              <li><b><code>/btw</code> no longer reports startup noise as an error:</b> the side question runs pi without extensions (it does not need them), and when no answer comes back the overlay skips <code>Warning:</code> diagnostics on stderr and only shows the line that actually explains the failure.</li>
-              <li><b>Side questions can no longer run tools:</b> the <code>/btw</code> session copy is started with a text-only system prompt, no tools and no context files, so a quick side question can no longer edit files or run commands behind the main task's back.</li>
-              <li><b>The thinking toggle in the <code>/btw</code> overlay is smaller:</b> the expand arrow no longer eats half a line of vertical space.</li>
+              <li><b>"Send all" no longer fails while pi is streaming:</b> when the queue editor is opened mid-run, even the first queued message is sent with its queue behavior (steer/follow-up) instead of a plain prompt, so pi no longer rejects it with "Agent is already processing" and the edit is not lost.</li>
+              <li><b>Queue editor icon buttons show a custom tooltip:</b> JCEF does not render native <code>title</code> hints, so the buttons now show a bubble on hover/focus (with <code>aria-describedby</code> for screen readers).</li>
+              <li><b>Bare URLs stop at full-width punctuation:</b> a link in a message is truncated as soon as it hits a full-width Chinese comma, period or similar mark, so trailing Chinese text is no longer swallowed into the URL.</li>
             </ul>
         """.trimIndent()
     }
