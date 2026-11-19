@@ -93,6 +93,15 @@ interface InlineTokenLike {
 const CJK_TRAILING_PUNCTUATION = /[\u00b7\u2010-\u201f\u2026\u3001-\u303f\ufe10-\ufe19\ufe30-\ufe4f\uff01-\uff0f\uff1a-\uff20\uff3b-\uff40\uff5b-\uff65]/;
 
 /**
+ * CJK and full-width punctuation that cannot appear unencoded in a real URL. linkify-it matches
+ * straight through it, so `https://pi.dev/docs（Latest，非 draft / 非 prerelease）` used to swallow
+ * `（Latest，非` into the link and percent-encode it into the href. Unlike
+ * [CJK_TRAILING_PUNCTUATION] this set stops the URL where the punctuation starts instead of
+ * trimming the tail; it leaves out `·` (U+00B7) and U+2010-201F, which do occur inside URLs.
+ */
+const CJK_URL_BOUNDARY = /[\u2026\u3001-\u303f\ufe10-\ufe19\ufe30-\ufe4f\uff01-\uff0f\uff1a-\uff20\uff3b-\uff40\uff5b-\uff65]/;
+
+/**
  * `markdown-it` 14 runs its inline `linkify` rule before `emphasis` so bare URLs beat emphasis
  * markers. linkify-it does not stop at CJK text, so a URL followed directly by Chinese swallows
  * both the closing marker and the following sentence: `**打开：http://…/5**（店铺` rendered as a
@@ -127,6 +136,10 @@ const linkifyKeepingEmphasisMarkers = (state: InlineStateLike, silent: boolean):
   // the link target.
   const markerIndex = url.indexOf("*");
   let end = markerIndex > 0 ? markerIndex : url.length;
+  // CJK punctuation inside the match is a sentence boundary, not part of the URL: linkify-it
+  // would otherwise keep `（Latest，非` and encode it into the link target.
+  const boundary = url.slice(0, end).search(CJK_URL_BOUNDARY);
+  if (boundary >= 0) end = boundary;
   while (end > 0 && CJK_TRAILING_PUNCTUATION.test(url[end - 1] ?? "")) end -= 1;
   if (end !== url.length) url = url.slice(0, end);
   if (url.length <= protoLength) return false;

@@ -124,6 +124,26 @@ describe("Markdown", () => {
     expect(container.textContent).toContain("login）。");
   });
 
+  it("stops a bare URL where full-width punctuation starts, not only at its tail", () => {
+    // linkify-it matched through `（Latest，非` and encoded it into the href, so the tail-only
+    // trim could not help: the URL ended with `非`, which is not punctuation.
+    const source =
+      "地址：https://github.com/Cyber0xFE/pi-jetbrains-gui/releases/tag/v0.6.0（Latest，非 draft / 非 prerelease）";
+    const { container } = render(<Markdown text={source} streaming={false} />);
+    const anchor = container.querySelector("a");
+    expect(anchor?.textContent).toBe("https://github.com/Cyber0xFE/pi-jetbrains-gui/releases/tag/v0.6.0");
+    expect(anchor?.getAttribute("href")).toBe("https://github.com/Cyber0xFE/pi-jetbrains-gui/releases/tag/v0.6.0");
+    expect(container.textContent).toContain("v0.6.0（Latest，非 draft / 非 prerelease）");
+  });
+
+  it("stops a bare URL at a full-width comma inside the sentence", () => {
+    const { container } = render(<Markdown text={"见 https://pi.dev/docs，那里有更多示例"} streaming={false} />);
+    const anchor = container.querySelector("a");
+    expect(anchor?.textContent).toBe("https://pi.dev/docs");
+    expect(anchor?.getAttribute("href")).toBe("https://pi.dev/docs");
+    expect(container.textContent).toContain("https://pi.dev/docs，那里有更多示例");
+  });
+
   it("keeps intraword underscores literal while rendering CJK-adjacent emphasis", () => {
     const { container } = render(<Markdown text={"foo_bar_baz 与 **中文**一起"} streaming={false} />);
     expect(container.querySelector("strong")?.textContent).toBe("中文");
