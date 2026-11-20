@@ -442,23 +442,6 @@ body::before {
   padding-right: 112px;
 }
 
-/* Custom models reserve room for the edit/delete chips (shown on hover). */
-.model-menu-row-custom .model-menu-detail {
-  padding-right: 62px;
-}
-
-.model-menu-row-custom.model-menu-row-active .model-menu-detail {
-  padding-right: 90px;
-}
-
-.model-menu-row-custom.model-menu-row-default .model-menu-detail {
-  padding-right: 140px;
-}
-
-.model-menu-row-custom.model-menu-row-default.model-menu-row-active .model-menu-detail {
-  padding-right: 168px;
-}
-
 .model-menu-default {
   flex: 0 0 auto;
   padding: 1px 7px;
