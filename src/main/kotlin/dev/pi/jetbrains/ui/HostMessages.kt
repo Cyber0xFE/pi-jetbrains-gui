@@ -234,14 +234,25 @@ data class HostModel(
     val provider: String? = null,
     val reasoning: Boolean? = null,
     val contextWindow: Long? = null,
+    val maxTokens: Long? = null,
+    val api: String? = null,
+    val baseUrl: String? = null,
+    val input: List<String>? = null,
+    /** True when the model was added via the dialog (~/.pi/agent/models.json `providers`). */
+    val custom: Boolean = false,
 ) {
     companion object {
-        fun from(model: RpcModelInfo): HostModel = HostModel(
+        fun from(model: RpcModelInfo, custom: Boolean): HostModel = HostModel(
             id = model.id,
             name = model.name,
             provider = model.provider,
             reasoning = model.reasoning,
             contextWindow = model.contextWindow,
+            maxTokens = model.maxTokens,
+            api = model.api,
+            baseUrl = model.baseUrl,
+            input = model.input,
+            custom = custom,
         )
     }
 }
@@ -463,11 +474,17 @@ object HostMessages {
         currentModel: String?,
         defaultProvider: String? = null,
         defaultModel: String? = null,
+        customKeys: Set<Pair<String, String>> = emptySet(),
     ): JsonElement =
         PiJson.encodeToJsonElement(
             HostModelsMessage.serializer(),
             HostModelsMessage(
-                models = models.map { HostModel.from(it) },
+                models = models.map {
+                    HostModel.from(
+                        it,
+                        custom = it.provider != null && customKeys.contains(it.provider to it.id),
+                    )
+                },
                 currentProvider = currentProvider,
                 currentModel = currentModel,
                 defaultProvider = defaultProvider,

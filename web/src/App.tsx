@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type JSX } from "react";
 import type { PromptImage } from "./types";
+import type { ModelInfo } from "./types";
 import { onMessage, post } from "./bridge";
 import { recordPerf } from "./perfLog";
 import { Composer } from "./components/Composer";
 import { MessageList } from "./components/MessageList";
 import { ModelMenu } from "./components/ModelMenu";
-import { AddModelDialog } from "./components/AddModelDialog";
+import { AddModelDialog, type CustomModelDraft } from "./components/AddModelDialog";
 import { BtwOverlay } from "./components/BtwOverlay";
 import { SessionDialog } from "./components/SessionDialog";
 import { StatusBar } from "./components/StatusBar";
@@ -38,6 +39,22 @@ function repostQueue(entries: QueuedEntry[]): void {
   post({ type: "send_queued", queued });
 }
 
+/** Seed the model dialog with an existing custom model's known fields for editing. */
+function modelToDraft(model: ModelInfo): CustomModelDraft {
+  return {
+    provider: model.provider ?? "",
+    api: model.api ?? "",
+    baseUrl: model.baseUrl ?? "",
+    apiKey: "",
+    modelId: model.id,
+    name: model.name ?? "",
+    contextWindow: model.contextWindow ?? 0,
+    maxTokens: model.maxTokens ?? 0,
+    reasoning: Boolean(model.reasoning),
+    input: model.input && model.input.length > 0 ? model.input : ["text"],
+  };
+}
+
 export function App(): JSX.Element {
   const store = useMemo(() => new ChatStore(), []);
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
@@ -54,6 +71,8 @@ function AppContent({ store, state }: { store: ChatStore; state: ChatState }): J
   const [focusDraftRequest, setFocusDraftRequest] = useState(0);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [addModelOpen, setAddModelOpen] = useState(false);
+  /** Custom model being edited in the model dialog, or null when adding a new one. */
+  const [editingModel, setEditingModel] = useState<ModelInfo | null>(null);
   const [sessionDialogTab, setSessionDialogTab] = useState<SessionDialogTab>("sessions");
   const [images, setImages] = useState<PromptImage[]>([]);
   const [pendingPrompt, setPendingPrompt] = useState(false);
@@ -605,7 +624,21 @@ function AppContent({ store, state }: { store: ChatStore; state: ChatState }): J
             onSetDefault={(model) => post({ type: "set_default_model", provider: model.provider ?? "", modelId: model.id })}
             onAddModel={() => {
               close();
+              setEditingModel(null);
               setAddModelOpen(true);
+            }}
+            onEditModel={(model) => {
+              close();
+              setEditingModel(model);
+              setAddModelOpen(true);
+            }}
+            onDeleteModel={(model) => {
+              close();
+              post({
+                type: "delete_custom_model",
+                provider: model.provider ?? "",
+                modelId: model.id,
+              });
             }}
           />
         )}
@@ -667,11 +700,16 @@ function AppContent({ store, state }: { store: ChatStore; state: ChatState }): J
           knownProviders={
             Array.from(new Set(state.models.map((model) => model.provider).filter((p): p is string => Boolean(p))))
           }
-          onClose={() => setAddModelOpen(false)}
+          initial={editingModel ? modelToDraft(editingModel) : null}
+          onClose={() => {
+            setAddModelOpen(false);
+            setEditingModel(null);
+          }}
           onSave={(draft) => {
             setAddModelOpen(false);
+            setEditingModel(null);
             post({
-              type: "save_custom_model",
+              type: editingModel ? "update_custom_model" : "save_custom_model",
               provider: draft.provider,
               api: draft.api,
               baseUrl: draft.baseUrl,

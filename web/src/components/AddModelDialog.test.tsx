@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AddModelDialog, type CustomModelDraft } from "./AddModelDialog";
 
@@ -68,6 +68,83 @@ describe("AddModelDialog", () => {
       reasoning: true,
       input: ["image"],
     });
+  });
+
+  it("accepts k-unit input for token counts", () => {
+    const onSave = vi.fn();
+    render(<AddModelDialog knownProviders={[]} onSave={onSave} onClose={() => {}} />);
+
+    fill({ provider: "p", modelId: "m", baseUrl: "https://api.example.com/v1", contextWindow: 524288, maxTokens: 128000 });
+    fireEvent.change(screen.getByLabelText(/Context window/), { target: { value: "128k" } });
+    fireEvent.change(screen.getByLabelText(/Max output tokens/), { target: { value: "1.5K" } });
+    fireEvent.click(screen.getByText("Save model"));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ contextWindow: 128000, maxTokens: 1500 }),
+    );
+  });
+
+  it("edits an existing custom model with locked identity and prefilled fields", () => {
+    const onSave = vi.fn();
+    render(
+      <AddModelDialog
+        knownProviders={["agent-plan"]}
+        initial={{
+          provider: "agent-plan",
+          api: "openai-completions",
+          baseUrl: "https://api.example.com/v1",
+          apiKey: "",
+          modelId: "glm-6",
+          name: "GLM 6",
+          contextWindow: 524288,
+          maxTokens: 128000,
+          reasoning: true,
+          input: ["text", "image"],
+        }}
+        onSave={onSave}
+        onClose={() => {}}
+      />,
+    );
+
+    const providerInput = screen.getByLabelText(/Provider/) as HTMLInputElement;
+    const modelIdInput = screen.getByLabelText(/Model ID/) as HTMLInputElement;
+    expect(providerInput.disabled).toBe(true);
+    expect(modelIdInput.disabled).toBe(true);
+    expect((screen.getByLabelText(/Display name/) as HTMLInputElement).value).toBe("GLM 6");
+    expect((screen.getByLabelText(/Context window/) as HTMLInputElement).value).toBe("524288");
+
+    fireEvent.change(screen.getByLabelText(/Display name/), { target: { value: "GLM 6 Pro" } });
+    fireEvent.click(screen.getByText("Save model"));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: "agent-plan",
+        modelId: "glm-6",
+        name: "GLM 6 Pro",
+        contextWindow: 524288,
+        maxTokens: 128000,
+        reasoning: true,
+        input: ["text", "image"],
+      }),
+    );
+  });
+
+  it("lists existing providers in a dropdown and still accepts a new one", () => {
+    render(<AddModelDialog knownProviders={["agent-plan", "openai"]} onSave={() => {}} onClose={() => {}} />);
+
+    const providerInput = screen.getByLabelText(/Provider/) as HTMLInputElement;
+    fireEvent.focus(providerInput);
+    const listbox = screen.getByRole("listbox");
+    const options = within(listbox).getAllByRole("option");
+    expect(options.map((option) => option.textContent)).toEqual(["agent-plan", "openai"]);
+
+    fireEvent.click(options[1]!);
+    expect(providerInput.value).toBe("openai");
+
+    // Typing filters the list; a brand-new provider can still be entered directly.
+    fireEvent.change(providerInput, { target: { value: "my-new-provider" } });
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(providerInput.value).toBe("my-new-provider");
   });
 
   it("closes on Escape without saving", () => {

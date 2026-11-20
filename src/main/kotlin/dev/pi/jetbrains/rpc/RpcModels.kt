@@ -71,8 +71,11 @@ data class RpcModelInfo(
     val name: String? = null,
     val provider: String? = null,
     val api: String? = null,
+    val baseUrl: String? = null,
     val reasoning: Boolean? = null,
     val contextWindow: Long? = null,
+    val maxTokens: Long? = null,
+    val input: List<String>? = null,
 )
 
 /** Subset of `RpcSessionState`; unknown fields are ignored. */

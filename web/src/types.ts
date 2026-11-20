@@ -215,6 +215,12 @@ export interface ModelInfo {
   provider?: string | null;
   reasoning?: boolean | null;
   contextWindow?: number | null;
+  maxTokens?: number | null;
+  api?: string | null;
+  baseUrl?: string | null;
+  input?: string[] | null;
+  /** True when the model was added via the dialog (~/.pi/agent/models.json). */
+  custom?: boolean | null;
 }
 
 /** Slash command from `get_commands` (plan M3.8). */
@@ -311,6 +317,20 @@ export type Outbound =
       reasoning: boolean;
       input: string[];
     }
+  | {
+      type: "update_custom_model";
+      provider: string;
+      api: string;
+      baseUrl: string;
+      apiKey?: string;
+      modelId: string;
+      name?: string;
+      contextWindow?: number;
+      maxTokens?: number;
+      reasoning: boolean;
+      input: string[];
+    }
+  | { type: "delete_custom_model"; provider: string; modelId: string }
   | { type: "get_thinking_levels" }
   | { type: "set_thinking_level"; level: string }
   // M3: compaction / retry / slash commands

@@ -442,6 +442,23 @@ body::before {
   padding-right: 112px;
 }
 
+/* Custom models reserve room for the edit/delete chips (shown on hover). */
+.model-menu-row-custom .model-menu-detail {
+  padding-right: 62px;
+}
+
+.model-menu-row-custom.model-menu-row-active .model-menu-detail {
+  padding-right: 90px;
+}
+
+.model-menu-row-custom.model-menu-row-default .model-menu-detail {
+  padding-right: 140px;
+}
+
+.model-menu-row-custom.model-menu-row-default.model-menu-row-active .model-menu-detail {
+  padding-right: 168px;
+}
+
 .model-menu-default {
   flex: 0 0 auto;
   padding: 1px 7px;
@@ -494,6 +511,74 @@ body::before {
   stroke-linecap: round;
   stroke-linejoin: round;
   fill: none;
+}
+
+.model-menu-edit,
+.model-menu-delete {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: var(--bg-raised);
+  color: var(--fg-dim);
+  cursor: pointer;
+  visibility: hidden;
+}
+
+.model-menu-edit svg,
+.model-menu-delete svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.model-menu-row:hover .model-menu-edit,
+.model-menu-row-selected .model-menu-edit,
+.model-menu-edit:hover,
+.model-menu-edit:focus-visible,
+.model-menu-row:hover .model-menu-delete,
+.model-menu-row-selected .model-menu-delete,
+.model-menu-delete:hover,
+.model-menu-delete:focus-visible {
+  visibility: visible;
+}
+
+.model-menu-edit:hover,
+.model-menu-edit:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  outline: none;
+}
+
+.model-menu-delete:hover,
+.model-menu-delete:focus-visible {
+  border-color: var(--error);
+  background: var(--error-bg);
+  color: var(--error);
+  outline: none;
+}
+
+/* In-place confirmation: the delete icon is replaced by a label at the same spot. */
+.model-menu-delete-confirm {
+  width: auto;
+  min-width: 22px;
+  padding: 0 8px;
+  border-color: var(--error);
+  background: var(--error-bg);
+  color: var(--error);
+  font-size: 0.78em;
+  line-height: 1.7;
+  white-space: nowrap;
+  visibility: visible;
 }
 
 .model-menu-empty {
@@ -3149,6 +3234,52 @@ mark.search-hit {
 .add-model-field select:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+.add-model-field input:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Provider field combobox: JCEF has no datalist popup, so the dropdown is rendered inline. */
+.provider-combobox {
+  position: relative;
+}
+
+.provider-combobox-list {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 210;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-raised);
+  box-shadow: 0 8px 24px rgba(20, 30, 45, 0.25);
+}
+
+.provider-combobox-option {
+  display: block;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.92em;
+  text-align: left;
+  cursor: pointer;
+}
+
+.provider-combobox-option:hover,
+.provider-combobox-option:focus-visible {
+  background: var(--accent-soft);
+  color: var(--accent);
+  outline: none;
 }
 
 .add-model-checks {

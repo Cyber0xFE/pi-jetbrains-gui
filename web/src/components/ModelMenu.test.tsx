@@ -12,6 +12,7 @@ const MODELS: ModelInfo[] = [
   { id: "mimo-v2.6-flash", name: "mimo-v2.6-flash", provider: "mimo" },
   { id: "mimo-v2.6-pro", name: "mimo-v2.6-pro", provider: "mimo" },
   { id: "deepseek-v4.1-flash", provider: "ark" },
+  { id: "glm-6", name: "GLM 6", provider: "agent-plan", custom: true, contextWindow: 524_288 },
 ];
 
 function menu(overrides: Partial<Parameters<typeof ModelMenu>[0]> = {}): JSX.Element {
@@ -26,6 +27,8 @@ function menu(overrides: Partial<Parameters<typeof ModelMenu>[0]> = {}): JSX.Ele
       onSelect={() => undefined}
       onSetDefault={() => undefined}
       onAddModel={() => undefined}
+      onEditModel={() => undefined}
+      onDeleteModel={() => undefined}
       {...overrides}
     />
   );
@@ -38,7 +41,8 @@ describe("ModelMenu", () => {
     expect(screen.getByText("deepseek")).toBeDefined();
     expect(screen.getByText("mimo")).toBeDefined();
     expect(screen.getByText("ark")).toBeDefined();
-    expect(container.querySelectorAll(".model-menu-group")).toHaveLength(3);
+    expect(screen.getByText("agent-plan")).toBeDefined();
+    expect(container.querySelectorAll(".model-menu-group")).toHaveLength(4);
 
     const activeRow = screen.getByRole("option", { name: /mimo-v2.6-flash/ });
     expect(activeRow.getAttribute("aria-selected")).toBe("true");
@@ -88,6 +92,24 @@ describe("ModelMenu", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Add model/ }));
     expect(onAddModel).toHaveBeenCalledTimes(1);
+  });
+
+  it("edits and deletes a custom model", () => {
+    const onEditModel = vi.fn();
+    const onDeleteModel = vi.fn();
+    render(menu({ onEditModel, onDeleteModel }));
+
+    const customRow = screen.getByRole("option", { name: /GLM 6/ });
+    fireEvent.click(within(customRow).getByRole("button", { name: "Edit model" }));
+    expect(onEditModel).toHaveBeenCalledTimes(1);
+    expect(onEditModel.mock.calls[0]?.[0]).toMatchObject({ id: "glm-6", provider: "agent-plan" });
+
+    // First click arms the in-place confirmation, the second one deletes.
+    fireEvent.click(within(customRow).getByRole("button", { name: "Delete model" }));
+    expect(onDeleteModel).not.toHaveBeenCalled();
+    fireEvent.click(within(customRow).getByRole("button", { name: "Confirm delete" }));
+    expect(onDeleteModel).toHaveBeenCalledTimes(1);
+    expect(onDeleteModel.mock.calls[0]?.[0]).toMatchObject({ id: "glm-6" });
   });
 
   it("shows the loading and stopped empty states", () => {

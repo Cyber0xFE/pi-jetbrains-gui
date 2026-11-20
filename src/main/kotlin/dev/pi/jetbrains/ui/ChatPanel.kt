@@ -538,6 +538,73 @@ class ChatPanel(
                     }
                 }
             }
+            "update_custom_model" -> {
+                val provider = message.provider?.trim().orEmpty()
+                val modelId = message.modelId?.trim().orEmpty()
+                if (provider.isEmpty() || modelId.isEmpty()) return
+                scope.launch {
+                    val error = PiModelsJson.updateModel(
+                        provider = provider,
+                        api = message.api.orEmpty(),
+                        baseUrl = message.baseUrl.orEmpty(),
+                        apiKey = message.apiKey.orEmpty(),
+                        modelId = modelId,
+                        name = message.name.orEmpty(),
+                        contextWindow = message.contextWindow ?: 0,
+                        maxTokens = message.maxTokens ?: 0,
+                        reasoning = message.reasoning ?: false,
+                        input = message.input,
+                    )
+                    if (error != null) {
+                        bridge?.send(HostMessages.notice(error))
+                    } else {
+                        bridge?.send(
+                            HostMessages.notice(
+                                "updated $provider/$modelId in ~/.pi/agent/models.json",
+                                level = "info",
+                            ),
+                        )
+                        if (service.status.value.isStreaming) {
+                            bridge?.send(
+                                HostMessages.notice(
+                                    "pi is streaming; the change loads after the next restart",
+                                    level = "info",
+                                ),
+                            )
+                        } else {
+                            service.restartToApplyModelConfig()
+                        }
+                    }
+                }
+            }
+            "delete_custom_model" -> {
+                val provider = message.provider?.trim().orEmpty()
+                val modelId = message.modelId?.trim().orEmpty()
+                if (provider.isEmpty() || modelId.isEmpty()) return
+                scope.launch {
+                    val error = PiModelsJson.removeModel(provider = provider, modelId = modelId)
+                    if (error != null) {
+                        bridge?.send(HostMessages.notice(error))
+                    } else {
+                        bridge?.send(
+                            HostMessages.notice(
+                                "removed $provider/$modelId from ~/.pi/agent/models.json",
+                                level = "info",
+                            ),
+                        )
+                        if (service.status.value.isStreaming) {
+                            bridge?.send(
+                                HostMessages.notice(
+                                    "pi is streaming; the change loads after the next restart",
+                                    level = "info",
+                                ),
+                            )
+                        } else {
+                            service.restartToApplyModelConfig()
+                        }
+                    }
+                }
+            }
             "get_thinking_levels" -> scope.launch { sendThinkingLevels() }
             "set_thinking_level" -> {
                 val level = message.level ?: return
@@ -881,7 +948,14 @@ class ChatPanel(
         val defaultProvider = settings.defaultModelProvider.trim().takeIf { it.isNotEmpty() } ?: currentProvider
         val defaultModel = settings.defaultModelId.trim().takeIf { it.isNotEmpty() } ?: currentModel
         activeBridge.send(
-            HostMessages.models(models, currentProvider, currentModel, defaultProvider, defaultModel),
+            HostMessages.models(
+                models,
+                currentProvider,
+                currentModel,
+                defaultProvider,
+                defaultModel,
+                customKeys = PiModelsJson.customModelKeys(),
+            ),
         )
     }
 

@@ -15,6 +15,9 @@ interface Props {
   onSelect: (model: ModelInfo) => void;
   onSetDefault: (model: ModelInfo) => void;
   onAddModel: () => void;
+  /** Custom models (defined in ~/.pi/agent/models.json) can be edited in the same dialog. */
+  onEditModel: (model: ModelInfo) => void;
+  onDeleteModel: (model: ModelInfo) => void;
 }
 
 interface GroupRow {
@@ -32,6 +35,7 @@ interface ModelRow {
   detail: string | null;
   active: boolean;
   isDefault: boolean;
+  custom: boolean;
 }
 
 type Row = GroupRow | ModelRow;
@@ -55,11 +59,14 @@ export function ModelMenu({
   onSelect,
   onSetDefault,
   onAddModel,
+  onEditModel,
+  onDeleteModel,
 }: Props): JSX.Element {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [scrollTop, setScrollTop] = useState(0);
   const [selected, setSelected] = useState(0);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -94,6 +101,7 @@ export function ModelMenu({
           })(),
           active: model.provider === activeProvider && model.id === activeModel,
           isDefault: model.provider === defaultProvider && model.id === defaultModel,
+          custom: Boolean(model.custom),
         });
       }
     }
@@ -195,7 +203,7 @@ export function ModelMenu({
               type="button"
               role="option"
               aria-selected={row.active}
-              className={`model-menu-row ${index === selected ? "model-menu-row-selected" : ""} ${row.active ? "model-menu-row-active" : ""} ${row.isDefault ? "model-menu-row-default" : ""}`}
+              className={`model-menu-row ${index === selected ? "model-menu-row-selected" : ""} ${row.active ? "model-menu-row-active" : ""} ${row.isDefault ? "model-menu-row-default" : ""} ${row.custom ? "model-menu-row-custom" : ""}`}
               style={{ height: ROW_HEIGHT }}
               onMouseEnter={() => setSelected(index)}
               onClick={() => onSelect(row.model)}
@@ -228,6 +236,82 @@ export function ModelMenu({
                     {t("setAsDefault")}
                   </span>
                 )}
+                {row.custom && (
+                  <span
+                    className="model-menu-edit"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={t("editModel")}
+                    title={t("editModel")}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onEditModel(row.model);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.stopPropagation();
+                      event.preventDefault();
+                      onEditModel(row.model);
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="m4 16.5-.7 3.2 3.2-.7L18.7 6.8a2.2 2.2 0 0 0-3.1-3.1L3.4 15.9M14.4 5.6l4 4" />
+                    </svg>
+                  </span>
+                )}
+                {row.custom &&
+                  (confirmDelete === row.key ? (
+                    <span
+                      className="model-menu-delete model-menu-delete-confirm"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={t("confirmDelete")}
+                      title={t("confirmDelete")}
+                      onMouseLeave={() => setConfirmDelete(null)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setConfirmDelete(null);
+                        onDeleteModel(row.model);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Escape") {
+                          event.stopPropagation();
+                          event.preventDefault();
+                          setConfirmDelete(null);
+                        } else if (event.key === "Enter" || event.key === " ") {
+                          event.stopPropagation();
+                          event.preventDefault();
+                          setConfirmDelete(null);
+                          onDeleteModel(row.model);
+                        }
+                      }}
+                    >
+                      {t("confirmDeleteText")}
+                    </span>
+                  ) : (
+                    <span
+                      className="model-menu-delete"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={t("deleteModel")}
+                      title={t("deleteModel")}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setConfirmDelete(row.key);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.stopPropagation();
+                          event.preventDefault();
+                          setConfirmDelete(row.key);
+                        }
+                      }}
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M4 7h16M9 7V4h6v3m-9 0 1 13h8l1-13M10 11v5m4-5v5" />
+                      </svg>
+                    </span>
+                  ))}
                 {row.active && (
                   <svg className="model-menu-check" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                     <path d="m5 13 5 5L20 7" />

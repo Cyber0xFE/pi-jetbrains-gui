@@ -203,6 +203,152 @@ class PiModelsJsonTest {
     }
 
     @Test
+    fun `updates an existing model and provider-level blanks keep their values`() {
+        Files.createDirectories(modelsPath().parent)
+        Files.writeString(
+            modelsPath(),
+            """
+            {
+              "providers": {
+                "agent-plan": {
+                  "api": "openai-completions",
+                  "apiKey": "existing-key",
+                  "baseUrl": "https://example.invalid/v1",
+                  "models": [{"id": "glm-5.3", "reasoning": true}, {"id": "glm-6", "name": "GLM 6", "contextWindow": 1000}]
+                }
+              }
+            }
+            """.trimIndent(),
+        )
+
+        val error = PiModelsJson.updateModel(
+            provider = "agent-plan",
+            api = "anthropic-messages",
+            baseUrl = "",
+            apiKey = "",
+            modelId = "glm-6",
+            name = "GLM 6 Pro",
+            contextWindow = 524288,
+            maxTokens = 128000,
+            reasoning = true,
+            input = listOf("text", "image"),
+            homeDir = tempDir,
+        )
+
+        assertNull(error)
+        val provider = PiModelsJson.read(modelsPath())["providers"]?.jsonObject?.get("agent-plan")?.jsonObject
+        // api overwritten, blank baseUrl/apiKey left untouched.
+        assertEquals("anthropic-messages", provider?.get("api")?.jsonPrimitive?.content)
+        assertEquals("existing-key", provider?.get("apiKey")?.jsonPrimitive?.content)
+        assertEquals("https://example.invalid/v1", provider?.get("baseUrl")?.jsonPrimitive?.content)
+        val models = provider?.get("models") as? JsonArray
+        assertEquals(2, models?.size)
+        val updated = models?.get(1)?.jsonObject
+        assertEquals("glm-6", updated?.get("id")?.jsonPrimitive?.content)
+        assertEquals("GLM 6 Pro", updated?.get("name")?.jsonPrimitive?.content)
+        assertEquals(524288L, updated?.get("contextWindow")?.jsonPrimitive?.longOrNull)
+        assertEquals(128000L, updated?.get("maxTokens")?.jsonPrimitive?.longOrNull)
+        assertEquals(listOf("text", "image"), (updated?.get("input") as? JsonArray)?.map { it.jsonPrimitive.content })
+    }
+
+    @Test
+    fun `clears optional fields when editing them back to empty`() {
+        Files.createDirectories(modelsPath().parent)
+        Files.writeString(
+            modelsPath(),
+            """{"providers": {"p": {"models": [{"id": "m", "name": "Old", "contextWindow": 999, "maxTokens": 99}]}}}""",
+        )
+
+        assertNull(
+            PiModelsJson.updateModel(
+                provider = "p",
+                api = "",
+                baseUrl = "",
+                apiKey = "",
+                modelId = "m",
+                name = "",
+                contextWindow = 0,
+                maxTokens = 0,
+                reasoning = false,
+                input = emptyList(),
+                homeDir = tempDir,
+            ),
+        )
+
+        val model = PiModelsJson.read(modelsPath())["providers"]?.jsonObject?.get("p")?.jsonObject?.get("models") as? JsonArray
+        val entry = model?.first()?.jsonObject
+        assertEquals("m", entry?.get("id")?.jsonPrimitive?.content)
+        assertNull(entry?.get("name"))
+        assertNull(entry?.get("contextWindow"))
+        assertNull(entry?.get("maxTokens"))
+    }
+
+    @Test
+    fun `rejects updates of models that do not exist`() {
+        Files.createDirectories(modelsPath().parent)
+        Files.writeString(modelsPath(), """{"providers": {"p": {"models": [{"id": "m"}]}}}""")
+
+        val error = PiModelsJson.updateModel(
+            provider = "p",
+            api = "",
+            baseUrl = "",
+            apiKey = "",
+            modelId = "missing",
+            name = "",
+            contextWindow = 0,
+            maxTokens = 0,
+            reasoning = false,
+            input = emptyList(),
+            homeDir = tempDir,
+        )
+
+        assertNotNull(error)
+    }
+
+    @Test
+    fun `removes a model and drops a provider left without models`() {
+        Files.createDirectories(modelsPath().parent)
+        Files.writeString(
+            modelsPath(),
+            """{"providers": {"a": {"models": [{"id": "m1"}]}, "b": {"models": [{"id": "m1"}, {"id": "m2"}]}}}""",
+        )
+
+        assertNull(PiModelsJson.removeModel(provider = "a", modelId = "m1", homeDir = tempDir))
+        val afterFirst = PiModelsJson.read(modelsPath())["providers"]?.jsonObject
+        assertEquals(setOf("b"), afterFirst?.keys)
+
+        assertNull(PiModelsJson.removeModel(provider = "b", modelId = "m1", homeDir = tempDir))
+        val afterSecond = PiModelsJson.read(modelsPath())["providers"]?.jsonObject?.get("b")?.jsonObject
+        assertEquals(1, (afterSecond?.get("models") as? JsonArray)?.size)
+        assertEquals("m2", (afterSecond?.get("models") as? JsonArray)?.first()?.jsonObject?.get("id")?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun `removing a missing model reports an error`() {
+        Files.createDirectories(modelsPath().parent)
+        Files.writeString(modelsPath(), """{"providers": {"p": {"models": [{"id": "m"}]}}}""")
+
+        val error = PiModelsJson.removeModel(provider = "p", modelId = "nope", homeDir = tempDir)
+        assertNotNull(error)
+    }
+
+    @Test
+    fun `lists custom model keys from models json`() {
+        assertEquals(emptySet<Pair<String, String>>(), PiModelsJson.customModelKeys(homeDir = tempDir))
+
+        Files.createDirectories(modelsPath().parent)
+        Files.writeString(
+            modelsPath(),
+            """{"providers": {"a": {"models": [{"id": "m1"}, {"id": "m2"}]}, "b": {"modelOverrides": {"m": {}}}}}""",
+        )
+
+        assertEquals(
+            setOf("a" to "m1", "a" to "m2"),
+            PiModelsJson.customModelKeys(homeDir = tempDir),
+        )
+    }
+
+    @Test
     fun `preserves unknown root and provider fields`() {
         Files.createDirectories(modelsPath().parent)
         Files.writeString(

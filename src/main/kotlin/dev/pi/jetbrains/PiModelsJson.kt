@@ -99,6 +99,132 @@ object PiModelsJson {
         }.getOrElse { throwable -> "failed to update models.json: ${throwable.message}" }
     }
 
+    /**
+     * Updates an existing custom model in place. The model row keeps its [modelId]; the provider's
+     * `api`/`baseUrl`/`apiKey` are only overwritten when the caller supplied a non-blank value
+     * (apiKey is never read back, so blank means "keep the stored secret"). Returns null on
+     * success or a user-facing error message.
+     */
+    fun updateModel(
+        provider: String,
+        api: String,
+        baseUrl: String,
+        apiKey: String,
+        modelId: String,
+        name: String,
+        contextWindow: Long,
+        maxTokens: Long,
+        reasoning: Boolean,
+        input: List<String>,
+        homeDir: Path = Paths.get(System.getProperty("user.home") ?: "."),
+    ): String? {
+        val trimmedProvider = provider.trim()
+        val trimmedModelId = modelId.trim()
+        if (trimmedProvider.isEmpty() || trimmedModelId.isEmpty()) return "provider and model id are required"
+        val path = homeDir.resolve(".pi").resolve("agent").resolve("models.json")
+        return runCatching {
+            val root = readRoot(path)
+            val providers = (root["providers"] as? JsonObject)
+                ?: error("models.json has no `providers` object")
+            val existing = providers[trimmedProvider] as? JsonObject
+                ?: return "model `$trimmedModelId` not found under provider `$trimmedProvider`"
+            val models = existing["models"] as? JsonArray
+                ?: error("provider `$trimmedProvider` models must be an array")
+            val index = models.indexOfFirst {
+                (it as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull == trimmedModelId
+            }
+            if (index < 0) return "model `$trimmedModelId` not found under provider `$trimmedProvider`"
+            val updatedModels = JsonArray(models.toMutableList().apply {
+                set(
+                    index,
+                    buildModelObject(
+                        id = trimmedModelId,
+                        name = name.trim(),
+                        reasoning = reasoning,
+                        contextWindow = contextWindow,
+                        maxTokens = maxTokens,
+                        input = input.filter { it == "text" || it == "image" }.distinct(),
+                    ),
+                )
+            })
+            val additions = buildMap {
+                if (api.isNotBlank()) put("api", JsonPrimitive(api.trim()))
+                if (baseUrl.isNotBlank()) put("baseUrl", JsonPrimitive(baseUrl.trim()))
+                if (apiKey.isNotBlank()) put("apiKey", JsonPrimitive(apiKey.trim()))
+            }
+            val updatedProvider = JsonObject(existing.toMutableMap().apply {
+                putAll(additions)
+                put("models", updatedModels)
+            })
+            val updatedProviders = JsonObject(providers.toMutableMap().apply { put(trimmedProvider, updatedProvider) })
+            writeAtomically(path, JsonObject(root.toMutableMap().apply { put("providers", updatedProviders) }))
+            null
+        }.getOrElse { throwable -> "failed to update models.json: ${throwable.message}" }
+    }
+
+    /**
+     * Removes [modelId] from its provider. When the last model of a provider is deleted the whole
+     * provider entry is dropped, matching the expectation that a provider created by the dialog
+     * disappears once its only model is gone. Returns null on success or a user-facing error.
+     */
+    fun removeModel(
+        provider: String,
+        modelId: String,
+        homeDir: Path = Paths.get(System.getProperty("user.home") ?: "."),
+    ): String? {
+        val trimmedProvider = provider.trim()
+        val trimmedModelId = modelId.trim()
+        if (trimmedProvider.isEmpty() || trimmedModelId.isEmpty()) return "provider and model id are required"
+        val path = homeDir.resolve(".pi").resolve("agent").resolve("models.json")
+        return runCatching {
+            val root = readRoot(path)
+            val providers = (root["providers"] as? JsonObject)
+                ?: error("models.json has no `providers` object")
+            val existing = providers[trimmedProvider] as? JsonObject
+                ?: return "model `$trimmedModelId` not found under provider `$trimmedProvider`"
+            val models = existing["models"] as? JsonArray
+                ?: error("provider `$trimmedProvider` models must be an array")
+            val updatedModels = JsonArray(
+                models.filterNot {
+                    (it as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull == trimmedModelId
+                },
+            )
+            if (updatedModels.size == models.size) {
+                return "model `$trimmedModelId` not found under provider `$trimmedProvider`"
+            }
+            val updatedProviders = if (updatedModels.isEmpty()) {
+                JsonObject(providers.toMutableMap().apply { remove(trimmedProvider) })
+            } else {
+                JsonObject(
+                    providers.toMutableMap().apply {
+                        put(trimmedProvider, JsonObject(existing.toMutableMap().apply { put("models", updatedModels) }))
+                    },
+                )
+            }
+            writeAtomically(path, JsonObject(root.toMutableMap().apply { put("providers", updatedProviders) }))
+            null
+        }.getOrElse { throwable -> "failed to update models.json: ${throwable.message}" }
+    }
+
+    /**
+     * Keys (provider, modelId) of every custom model defined under `models.json` `providers`;
+     * used to mark picker rows that were added through the plugin's model dialog.
+     */
+    fun customModelKeys(homeDir: Path = Paths.get(System.getProperty("user.home") ?: ".")): Set<Pair<String, String>> {
+        val path = homeDir.resolve(".pi").resolve("agent").resolve("models.json")
+        if (!Files.isRegularFile(path)) return emptySet()
+        val providers = (readRoot(path)["providers"] as? JsonObject) ?: return emptySet()
+        return buildSet {
+            for ((provider, providerElement) in providers) {
+                val models = (providerElement as? JsonObject)?.get("models") as? JsonArray ?: continue
+                for (modelElement in models) {
+                    val id = (modelElement as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull ?: continue
+                    add(provider to id)
+                }
+            }
+        }
+    }
+
     private fun readRoot(path: Path): JsonObject {
         if (!Files.isRegularFile(path)) return JsonObject(emptyMap())
         val content = Files.readString(path, StandardCharsets.UTF_8).removePrefix("\uFEFF")

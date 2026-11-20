@@ -1,6 +1,16 @@
 import { useEffect, useRef, useState, type JSX } from "react";
 import { useI18n } from "../i18n";
 
+/** Parse a token count that may use a "k" suffix (e.g. "4k", "1.5K") into an absolute count. */
+function parseTokenCount(raw: string): number {
+  const text = raw.trim();
+  if (text === "") return 0;
+  const kMatch = /^(\d+(?:\.\d+)?)\s*[kK]$/.exec(text);
+  if (kMatch) return Math.round(parseFloat(kMatch[1]!) * 1000);
+  const count = Number(text);
+  return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+}
+
 export interface CustomModelDraft {
   provider: string;
   api: string;
@@ -17,6 +27,8 @@ export interface CustomModelDraft {
 interface Props {
   /** Providers already present in the model list; used to hint whether the provider is new. */
   knownProviders: string[];
+  /** When set, the dialog edits that existing custom model instead of adding a new one. */
+  initial?: CustomModelDraft | null;
   onSave: (draft: CustomModelDraft) => void;
   onClose: () => void;
 }
@@ -48,14 +60,37 @@ const DEFAULT_DRAFT: CustomModelDraft = {
  * `save_custom_model`; the host appends the entry to ~/.pi/agent/models.json without
  * touching existing configuration.
  */
-export function AddModelDialog({ knownProviders, onSave, onClose }: Props): JSX.Element {
+export function AddModelDialog({ knownProviders, initial = null, onSave, onClose }: Props): JSX.Element {
   const { t } = useI18n();
-  const [draft, setDraft] = useState<CustomModelDraft>(DEFAULT_DRAFT);
+  const editing = initial !== null;
+  const [draft, setDraft] = useState<CustomModelDraft>(initial ?? DEFAULT_DRAFT);
+  const [contextWindowText, setContextWindowText] = useState(
+    initial && initial.contextWindow > 0 ? String(initial.contextWindow) : "",
+  );
+  const [maxTokensText, setMaxTokensText] = useState(
+    initial && initial.maxTokens > 0 ? String(initial.maxTokens) : "",
+  );
+  const [providerOpen, setProviderOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const providerWrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  // Close the provider dropdown when clicking outside of it (JCEF has no native datalist popup).
+  useEffect(() => {
+    if (!providerOpen) return;
+    const onPointerDown = (event: MouseEvent | TouchEvent): void => {
+      if (!providerWrapRef.current?.contains(event.target as Node)) setProviderOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+    };
+  }, [providerOpen]);
 
   const provider = draft.provider.trim();
   const modelId = draft.modelId.trim();
@@ -68,6 +103,10 @@ export function AddModelDialog({ knownProviders, onSave, onClose }: Props): JSX.
 
   const update = <K extends keyof CustomModelDraft>(key: K, value: CustomModelDraft[K]): void =>
     setDraft((current) => ({ ...current, [key]: value }));
+
+  const providerOptions = knownProviders.filter((provider) =>
+    provider.toLowerCase().includes(draft.provider.trim().toLowerCase()),
+  );
 
   const toggleInput = (modality: string): void =>
     setDraft((current) => ({
@@ -86,8 +125,8 @@ export function AddModelDialog({ knownProviders, onSave, onClose }: Props): JSX.
       baseUrl: draft.baseUrl.trim(),
       apiKey: draft.apiKey.trim(),
       name: draft.name.trim(),
-      contextWindow: Number(draft.contextWindow) || 0,
-      maxTokens: Number(draft.maxTokens) || 0,
+      contextWindow: parseTokenCount(contextWindowText),
+      maxTokens: parseTokenCount(maxTokensText),
     });
   };
 
@@ -111,7 +150,7 @@ export function AddModelDialog({ knownProviders, onSave, onClose }: Props): JSX.
         }}
       >
         <header className="picker-head">
-          <h2 className="picker-title">{t("addModelDialog")}</h2>
+          <h2 className="picker-title">{editing ? t("editModelDialog") : t("addModelDialog")}</h2>
           <button type="button" className="picker-close" onClick={onClose} aria-label={t("close")}>
             ×
           </button>
@@ -119,13 +158,44 @@ export function AddModelDialog({ knownProviders, onSave, onClose }: Props): JSX.
         <div className="add-model-grid">
           <label className="add-model-field">
             <span>{t("provider")}</span>
-            <input
-              ref={inputRef}
-              value={draft.provider}
-              placeholder="e.g. my-provider"
-              spellCheck={false}
-              onChange={(event) => update("provider", event.target.value)}
-            />
+            <div className="provider-combobox" ref={providerWrapRef}>
+              <input
+                ref={inputRef}
+                value={draft.provider}
+                placeholder={editing ? undefined : t("providerPlaceholder")}
+                spellCheck={false}
+                disabled={editing}
+                onChange={(event) => {
+                  update("provider", event.target.value);
+                  setProviderOpen(true);
+                }}
+                onFocus={() => setProviderOpen(true)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape" && providerOpen && providerOptions.length > 0) {
+                    event.stopPropagation();
+                    setProviderOpen(false);
+                  }
+                }}
+              />
+              {providerOpen && !editing && providerOptions.length > 0 && (
+                <div className="provider-combobox-list" role="listbox">
+                  {providerOptions.map((provider) => (
+                    <button
+                      type="button"
+                      key={provider}
+                      role="option"
+                      className="provider-combobox-option"
+                      onClick={() => {
+                        update("provider", provider);
+                        setProviderOpen(false);
+                      }}
+                    >
+                      {provider}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </label>
           <label className="add-model-field">
             <span>{t("api")}</span>
@@ -151,7 +221,7 @@ export function AddModelDialog({ knownProviders, onSave, onClose }: Props): JSX.
             <input
               type="password"
               value={draft.apiKey}
-              placeholder="optional"
+              placeholder={editing ? t("keepExistingKey") : "optional"}
               spellCheck={false}
               autoComplete="off"
               onChange={(event) => update("apiKey", event.target.value)}
@@ -163,6 +233,7 @@ export function AddModelDialog({ knownProviders, onSave, onClose }: Props): JSX.
               value={draft.modelId}
               placeholder="e.g. my-model-v1"
               spellCheck={false}
+              disabled={editing}
               onChange={(event) => update("modelId", event.target.value)}
             />
           </label>
@@ -178,21 +249,23 @@ export function AddModelDialog({ knownProviders, onSave, onClose }: Props): JSX.
           <label className="add-model-field">
             <span>{t("contextWindow")}</span>
             <input
-              type="number"
-              min={0}
-              value={draft.contextWindow || ""}
-              placeholder="optional"
-              onChange={(event) => update("contextWindow", Number(event.target.value) || 0)}
+              type="text"
+              inputMode="numeric"
+              value={contextWindowText}
+              placeholder="optional, e.g. 128k"
+              spellCheck={false}
+              onChange={(event) => setContextWindowText(event.target.value)}
             />
           </label>
           <label className="add-model-field">
             <span>{t("maxOutputTokens")}</span>
             <input
-              type="number"
-              min={0}
-              value={draft.maxTokens || ""}
-              placeholder="optional"
-              onChange={(event) => update("maxTokens", Number(event.target.value) || 0)}
+              type="text"
+              inputMode="numeric"
+              value={maxTokensText}
+              placeholder="optional, e.g. 8k"
+              spellCheck={false}
+              onChange={(event) => setMaxTokensText(event.target.value)}
             />
           </label>
         </div>
@@ -228,7 +301,7 @@ export function AddModelDialog({ knownProviders, onSave, onClose }: Props): JSX.
           </span>
         </div>
         <footer className="picker-footer">
-          <span className="picker-count">{t("modelConfigKept")}</span>
+          <span className="picker-count">{editing ? t("modelConfigUpdated") : t("modelConfigKept")}</span>
           <button type="button" className="button button-secondary" onClick={onClose}>
             {t("cancel")}
           </button>
