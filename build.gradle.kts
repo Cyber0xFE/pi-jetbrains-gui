@@ -103,16 +103,18 @@ intellijPlatform {
 
         // 写法与结构见 docs/marketing/marketplace-listing.md 第 5 节。
         changeNotes = """
-            <h2>What's New in 0.6.1</h2>
+            <h2>What's New in 0.7.0</h2>
             <h3>Features</h3>
             <ul>
-              <li><b>The queue editor's actions are now icon buttons:</b> a paper-plane button (same icon as the composer's send) posts all queued messages, and an × button cancels the edit and restores the queues untouched; both keep tooltips and accessible names.</li>
+              <li><b>Custom models can now be edited and deleted:</b> hovering a model you added to <code>~/.pi/agent/models.json</code> reveals a pencil and a bin in the model popup. The pencil reopens the model form with every known field filled in (provider and model ID stay locked), and saving rewrites that entry in place: other provider fields are left as they are and the stored API key is only replaced when you type a new one. The bin turns into a red <b>confirm delete</b> in the same spot and needs a second click; afterwards pi restarts so the change takes effect (or, while pi is streaming, you are told it loads after the next restart). No more hand-editing JSON.</li>
+              <li><b>Token fields accept <code>k</code> shortcuts:</b> context window and max output tokens take <code>128k</code>, <code>8k</code> or <code>1.5K</code> as well as plain numbers, so you no longer have to count zeros.</li>
+              <li><b>The provider field is a combobox:</b> it lists the providers already in your model list, filtered as you type, and still accepts a new provider name.</li>
             </ul>
             <h3>Fixes</h3>
             <ul>
-              <li><b>"Send all" no longer fails while pi is streaming:</b> when the queue editor is opened mid-run, even the first queued message is sent with its queue behavior (steer/follow-up) instead of a plain prompt, so pi no longer rejects it with "Agent is already processing" and the edit is not lost.</li>
-              <li><b>Queue editor icon buttons show a custom tooltip:</b> JCEF does not render native <code>title</code> hints, so the buttons now show a bubble on hover/focus (with <code>aria-describedby</code> for screen readers).</li>
-              <li><b>Bare URLs stop at full-width punctuation:</b> a link in a message is truncated as soon as it hits a full-width Chinese comma, period or similar mark, so trailing Chinese text is no longer swallowed into the URL.</li>
+              <li><b>The edit and delete icons no longer reserve space:</b> they stay hidden until you hover, select or keyboard-focus the row, so model names and provider details keep their full width instead of trailing off in empty space.</li>
+              <li><b>Settings can be opened again:</b> the Pi settings page now declares an id and a display name, so opening <b>Settings</b> no longer fails while loading the configurable.</li>
+              <li><b>Chinese wording follows pi:</b> context window and max output tokens now read <b>词元</b> instead of <b>令牌</b>, and the diff badge stays <code>diff</code>.</li>
             </ul>
         """.trimIndent()
     }
